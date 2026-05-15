@@ -124,9 +124,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.08 — Complete Activity + Overdue Follow-Up Dashboard";
+const APP_VERSION = "Rev 1.09 — Search + Filter Companies";
 const REVISION_NOTE =
-  "Activities can now be marked complete, and the dashboard shows open, due-today, and overdue follow-ups.";
+  "Companies can now be searched and filtered by tier, status, and product path.";
 
 const REQUIRED_FIELDS = ["Company Name"];
 
@@ -459,6 +459,10 @@ function isOverdue(activity: ActivityRecord) {
   return activity.due_date < today;
 }
 
+function normalizeForSearch(value: unknown) {
+  return String(value ?? "").toLowerCase().trim();
+}
+
 export default function Home() {
   const [activeTab, setActiveTab] = useState<TabKey>("dashboard");
   const [csvData, setCsvData] = useState<ParsedCsv | null>(null);
@@ -470,6 +474,10 @@ export default function Home() {
   const [isLoadingCompanyDetail, setIsLoadingCompanyDetail] = useState(false);
   const [isSavingActivity, setIsSavingActivity] = useState(false);
   const [isCompletingActivity, setIsCompletingActivity] = useState("");
+  const [companySearchTerm, setCompanySearchTerm] = useState("");
+  const [companyTierFilter, setCompanyTierFilter] = useState("All");
+  const [companyStatusFilter, setCompanyStatusFilter] = useState("All");
+  const [companyProductPathFilter, setCompanyProductPathFilter] = useState("All");
   const [selectedCompanyDetail, setSelectedCompanyDetail] = useState<CompanyDetail | null>(null);
   const [activityForm, setActivityForm] = useState<ActivityForm>({
     activityType: "note",
@@ -524,6 +532,79 @@ export default function Home() {
     const prospect = getLatestProspect(company);
     return prospect?.priority_tier === "A+" || prospect?.priority_tier === "A";
   }).length;
+
+  const companyTierOptions = useMemo(() => {
+    const tiers = crmSummary.companies
+      .map((company) => getLatestProspect(company)?.priority_tier)
+      .filter((tier): tier is string => Boolean(tier));
+
+    return ["All", ...Array.from(new Set(tiers)).sort()];
+  }, [crmSummary.companies]);
+
+  const companyStatusOptions = useMemo(() => {
+    const statuses = crmSummary.companies
+      .map((company) => company.status || "new")
+      .filter(Boolean);
+
+    return ["All", ...Array.from(new Set(statuses)).sort()];
+  }, [crmSummary.companies]);
+
+  const companyProductPathOptions = useMemo(() => {
+    const paths = crmSummary.companies
+      .map((company) => getLatestProspect(company)?.likely_product_path)
+      .filter((path): path is string => Boolean(path));
+
+    return ["All", ...Array.from(new Set(paths)).sort()];
+  }, [crmSummary.companies]);
+
+  const filteredCompanies = useMemo(() => {
+    const search = normalizeForSearch(companySearchTerm);
+
+    return crmSummary.companies.filter((company) => {
+      const prospect = getLatestProspect(company);
+
+      const searchableText = [
+        company.company_name,
+        company.domain,
+        company.website,
+        company.industry,
+        company.city,
+        company.state,
+        company.status,
+        prospect?.priority_tier,
+        prospect?.fit_rating,
+        prospect?.confidence,
+        prospect?.likely_product_path,
+        prospect?.next_best_action,
+      ]
+        .map(normalizeForSearch)
+        .join(" ");
+
+      const matchesSearch = !search || searchableText.includes(search);
+      const matchesTier =
+        companyTierFilter === "All" || prospect?.priority_tier === companyTierFilter;
+      const matchesStatus =
+        companyStatusFilter === "All" || (company.status || "new") === companyStatusFilter;
+      const matchesProductPath =
+        companyProductPathFilter === "All" ||
+        prospect?.likely_product_path === companyProductPathFilter;
+
+      return matchesSearch && matchesTier && matchesStatus && matchesProductPath;
+    });
+  }, [
+    crmSummary.companies,
+    companySearchTerm,
+    companyTierFilter,
+    companyStatusFilter,
+    companyProductPathFilter,
+  ]);
+
+  function clearCompanyFilters() {
+    setCompanySearchTerm("");
+    setCompanyTierFilter("All");
+    setCompanyStatusFilter("All");
+    setCompanyProductPathFilter("All");
+  }
 
   async function loadCrmSummary() {
     setIsLoadingSummary(true);
@@ -841,7 +922,7 @@ export default function Home() {
               <MetricCard
                 label="Companies in CRM"
                 value={crmSummary.companies.length.toString()}
-                note="Loaded from Supabase"
+                note={`${filteredCompanies.length} shown after filters`}
               />
               <MetricCard
                 label="Open follow-ups"
@@ -861,31 +942,31 @@ export default function Home() {
             </div>
 
             <div className="rounded-2xl bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-bold">Rev 1.08 Objective</h2>
+              <h2 className="text-xl font-bold">Rev 1.09 Objective</h2>
               <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-600">
-                This revision makes follow-up management actionable. Activities can be
-                completed, and the dashboard now shows overdue, due-today, and open
-                follow-up work so sales users can see what needs attention.
+                This revision adds search and filtering to the company list so sales users can
+                quickly focus by company name, industry, location, score tier, status, and likely
+                product path.
               </p>
 
               <div className="mt-6 grid gap-4 md:grid-cols-3">
                 <InfoPanel
                   title="What works now"
                   items={[
-                    "Mark activity complete",
-                    "Open follow-up dashboard",
-                    "Due-today dashboard",
-                    "Overdue follow-up dashboard",
-                    "Company detail completion button",
+                    "Company text search",
+                    "Priority tier filter",
+                    "Status filter",
+                    "Product path filter",
+                    "Clear filters button",
                   ]}
                 />
                 <InfoPanel
                   title="What comes next"
                   items={[
-                    "Search and filters",
                     "Print-ready prospecting package",
                     "Graymills knowledge base tables",
                     "OpenAI prospect analysis later",
+                    "Bulk edit/archive controls later",
                   ]}
                 />
                 <InfoPanel
@@ -936,7 +1017,20 @@ export default function Home() {
 
         {activeTab === "companies" && (
           <CompaniesSection
-            companies={crmSummary.companies}
+            companies={filteredCompanies}
+            totalCompanyCount={crmSummary.companies.length}
+            companySearchTerm={companySearchTerm}
+            setCompanySearchTerm={setCompanySearchTerm}
+            companyTierFilter={companyTierFilter}
+            setCompanyTierFilter={setCompanyTierFilter}
+            companyTierOptions={companyTierOptions}
+            companyStatusFilter={companyStatusFilter}
+            setCompanyStatusFilter={setCompanyStatusFilter}
+            companyStatusOptions={companyStatusOptions}
+            companyProductPathFilter={companyProductPathFilter}
+            setCompanyProductPathFilter={setCompanyProductPathFilter}
+            companyProductPathOptions={companyProductPathOptions}
+            clearCompanyFilters={clearCompanyFilters}
             onOpenCompany={loadCompanyDetail}
             isLoadingCompanyDetail={isLoadingCompanyDetail}
           />
@@ -1378,23 +1472,127 @@ function RecentImports({ imports }: { imports: ImportSummary[] }) {
 
 function CompaniesSection({
   companies,
+  totalCompanyCount,
+  companySearchTerm,
+  setCompanySearchTerm,
+  companyTierFilter,
+  setCompanyTierFilter,
+  companyTierOptions,
+  companyStatusFilter,
+  setCompanyStatusFilter,
+  companyStatusOptions,
+  companyProductPathFilter,
+  setCompanyProductPathFilter,
+  companyProductPathOptions,
+  clearCompanyFilters,
   onOpenCompany,
   isLoadingCompanyDetail,
 }: {
   companies: CompanySummary[];
+  totalCompanyCount: number;
+  companySearchTerm: string;
+  setCompanySearchTerm: (value: string) => void;
+  companyTierFilter: string;
+  setCompanyTierFilter: (value: string) => void;
+  companyTierOptions: string[];
+  companyStatusFilter: string;
+  setCompanyStatusFilter: (value: string) => void;
+  companyStatusOptions: string[];
+  companyProductPathFilter: string;
+  setCompanyProductPathFilter: (value: string) => void;
+  companyProductPathOptions: string[];
+  clearCompanyFilters: () => void;
   onOpenCompany: (companyId: string) => void;
   isLoadingCompanyDetail: boolean;
 }) {
   return (
     <section className="rounded-2xl bg-white p-6 shadow-sm">
-      <h2 className="text-xl font-bold">Companies</h2>
-      <p className="mt-2 text-sm text-slate-600">
-        Company records created from ZoomInfo imports. Click a company name to open the detail view.
-      </p>
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+          <h2 className="text-xl font-bold">Companies</h2>
+          <p className="mt-2 text-sm text-slate-600">
+            Company records created from ZoomInfo imports. Click a company name to open the detail view.
+          </p>
+        </div>
+
+        <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-700">
+          Showing <span className="font-bold">{companies.length}</span> of{" "}
+          <span className="font-bold">{totalCompanyCount}</span>
+        </div>
+      </div>
+
+      <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <div className="grid gap-4 lg:grid-cols-4">
+          <div className="lg:col-span-2">
+            <label className="text-sm font-semibold text-slate-700">Search Companies</label>
+            <input
+              type="text"
+              value={companySearchTerm}
+              onChange={(event) => setCompanySearchTerm(event.target.value)}
+              placeholder="Search name, industry, city, state, website, product path..."
+              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-semibold text-slate-700">Priority Tier</label>
+            <select
+              value={companyTierFilter}
+              onChange={(event) => setCompanyTierFilter(event.target.value)}
+              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            >
+              {companyTierOptions.map((option) => (
+                <option key={`tier-${option}`} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-sm font-semibold text-slate-700">Status</label>
+            <select
+              value={companyStatusFilter}
+              onChange={(event) => setCompanyStatusFilter(event.target.value)}
+              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            >
+              {companyStatusOptions.map((option) => (
+                <option key={`status-${option}`} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="lg:col-span-3">
+            <label className="text-sm font-semibold text-slate-700">Product Path</label>
+            <select
+              value={companyProductPathFilter}
+              onChange={(event) => setCompanyProductPathFilter(event.target.value)}
+              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            >
+              {companyProductPathOptions.map((option) => (
+                <option key={`path-${option}`} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-end">
+            <button
+              onClick={clearCompanyFilters}
+              className="w-full rounded-xl bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-100"
+            >
+              Clear Filters
+            </button>
+          </div>
+        </div>
+      </div>
 
       {companies.length === 0 ? (
         <p className="mt-6 rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-600">
-          No companies imported yet.
+          No companies match the current search or filters.
         </p>
       ) : (
         <div className="mt-4 overflow-x-auto">
