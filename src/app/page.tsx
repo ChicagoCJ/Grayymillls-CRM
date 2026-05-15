@@ -2,7 +2,7 @@
 
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
 
-type TabKey = "dashboard" | "companies" | "contacts" | "import";
+type TabKey = "dashboard" | "companies" | "contacts" | "import" | "companyDetail";
 
 type ParsedCsv = {
   fileName: string;
@@ -87,9 +87,17 @@ type CrmSummary = {
   imports: ImportSummary[];
 };
 
-const APP_VERSION = "Rev 1.04 — Manual Column Mapping + Import Review";
+type CompanyDetail = {
+  company: Record<string, string | number | null>;
+  contacts: Record<string, string | boolean | null>[];
+  prospects: Record<string, string | number | null>[];
+  primaryProspect: Record<string, string | number | null> | null;
+  intelligence: Record<string, unknown> | null;
+};
+
+const APP_VERSION = "Rev 1.05 — Company Detail Page + Prospect Intelligence View";
 const REVISION_NOTE =
-  "Manual mapping added before import; required-field validation and import review added.";
+  "Company rows now open a detail view with contacts, prospect score, Graymills fit intelligence, and copyable sales block.";
 
 const REQUIRED_FIELDS = ["Company Name"];
 
@@ -382,6 +390,17 @@ function isMapped(value: string | undefined) {
   return Boolean(value && value !== "Not detected" && value !== "__skip__");
 }
 
+function displayValue(value: unknown) {
+  if (value === null || value === undefined || value === "") return "Not provided";
+  if (typeof value === "string" || typeof value === "number") return String(value);
+  return JSON.stringify(value);
+}
+
+function parseJsonArray(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value;
+  return [];
+}
+
 export default function Home() {
   const [activeTab, setActiveTab] = useState<TabKey>("dashboard");
   const [csvData, setCsvData] = useState<ParsedCsv | null>(null);
@@ -390,6 +409,8 @@ export default function Home() {
   const [importMessage, setImportMessage] = useState("");
   const [isImporting, setIsImporting] = useState(false);
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
+  const [isLoadingCompanyDetail, setIsLoadingCompanyDetail] = useState(false);
+  const [selectedCompanyDetail, setSelectedCompanyDetail] = useState<CompanyDetail | null>(null);
   const [crmSummary, setCrmSummary] = useState<CrmSummary>({
     companies: [],
     contacts: [],
@@ -417,14 +438,6 @@ export default function Home() {
 
     return mapping;
   }, [manualMapping, suggestedMappingObject]);
-
-  const highConfidenceMappings = mappingSuggestions.filter(
-    (mapping) => mapping.confidence === "High"
-  ).length;
-
-  const missingMappings = CRM_FIELDS.filter(
-    (field) => !isMapped(activeMapping[field.field])
-  ).length;
 
   const requiredMissingFields = REQUIRED_FIELDS.filter(
     (field) => !isMapped(activeMapping[field])
@@ -457,6 +470,27 @@ export default function Home() {
       setErrorMessage(error instanceof Error ? error.message : "Could not load CRM summary.");
     } finally {
       setIsLoadingSummary(false);
+    }
+  }
+
+  async function loadCompanyDetail(companyId: string) {
+    setIsLoadingCompanyDetail(true);
+    setErrorMessage("");
+
+    try {
+      const response = await fetch(`/api/company-detail?id=${companyId}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Could not load company detail.");
+      }
+
+      setSelectedCompanyDetail(data);
+      setActiveTab("companyDetail");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Could not load company detail.");
+    } finally {
+      setIsLoadingCompanyDetail(false);
     }
   }
 
@@ -669,31 +703,32 @@ export default function Home() {
             </div>
 
             <div className="rounded-2xl bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-bold">Rev 1.04 Objective</h2>
+              <h2 className="text-xl font-bold">Rev 1.05 Objective</h2>
               <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-600">
-                This revision adds manual column mapping and an import readiness review before
-                records are saved to Supabase. The goal is cleaner ZoomInfo imports and fewer
-                bad CRM records.
+                This revision adds company drill-down. Sales users can open a company
+                record and see the attached contacts, scored prospect hypothesis, Graymills
+                fit intelligence, discovery questions, first call opener, email draft, and
+                copyable sales block.
               </p>
 
               <div className="mt-6 grid gap-4 md:grid-cols-3">
                 <InfoPanel
                   title="What works now"
                   items={[
-                    "CSV upload and preview",
-                    "Manual mapping dropdowns",
-                    "Required-field validation",
-                    "Import readiness review",
-                    "Import to Supabase",
+                    "Company row click-through",
+                    "Company overview",
+                    "Attached contacts",
+                    "Prospect intelligence view",
+                    "Copyable sales block",
                   ]}
                 />
                 <InfoPanel
                   title="What comes next"
                   items={[
-                    "Company detail pages",
-                    "Prospecting package view",
-                    "Editable sales notes and follow-ups",
-                    "Copyable sales block on company record",
+                    "Editable activity notes",
+                    "Follow-up tasks",
+                    "Prospect package print view",
+                    "Search and filtering",
                   ]}
                 />
                 <InfoPanel
@@ -712,9 +747,22 @@ export default function Home() {
           </section>
         )}
 
-        {activeTab === "companies" && <CompaniesSection companies={crmSummary.companies} />}
+        {activeTab === "companies" && (
+          <CompaniesSection
+            companies={crmSummary.companies}
+            onOpenCompany={loadCompanyDetail}
+            isLoadingCompanyDetail={isLoadingCompanyDetail}
+          />
+        )}
 
         {activeTab === "contacts" && <ContactsSection contacts={crmSummary.contacts} />}
+
+        {activeTab === "companyDetail" && (
+          <CompanyDetailSection
+            detail={selectedCompanyDetail}
+            onBack={() => setActiveTab("companies")}
+          />
+        )}
 
         {activeTab === "import" && (
           <section className="grid gap-6">
@@ -1048,12 +1096,20 @@ function RecentImports({ imports }: { imports: ImportSummary[] }) {
   );
 }
 
-function CompaniesSection({ companies }: { companies: CompanySummary[] }) {
+function CompaniesSection({
+  companies,
+  onOpenCompany,
+  isLoadingCompanyDetail,
+}: {
+  companies: CompanySummary[];
+  onOpenCompany: (companyId: string) => void;
+  isLoadingCompanyDetail: boolean;
+}) {
   return (
     <section className="rounded-2xl bg-white p-6 shadow-sm">
       <h2 className="text-xl font-bold">Companies</h2>
       <p className="mt-2 text-sm text-slate-600">
-        Company records created from ZoomInfo imports. Rev 1.05 should add click-through detail pages.
+        Company records created from ZoomInfo imports. Click a company name to open the detail view.
       </p>
 
       {companies.length === 0 ? (
@@ -1082,7 +1138,13 @@ function CompaniesSection({ companies }: { companies: CompanySummary[] }) {
                 return (
                   <tr key={company.id} className="border-b border-slate-100 align-top">
                     <td className="py-3 pr-4">
-                      <p className="font-semibold">{company.company_name}</p>
+                      <button
+                        onClick={() => onOpenCompany(company.id)}
+                        disabled={isLoadingCompanyDetail}
+                        className="text-left font-semibold text-blue-700 hover:text-blue-900 hover:underline disabled:cursor-wait disabled:text-slate-400"
+                      >
+                        {company.company_name}
+                      </button>
                       <p className="text-xs text-slate-500">
                         {company.domain || company.website || "No website"}
                       </p>
@@ -1172,5 +1234,280 @@ function ContactsSection({ contacts }: { contacts: ContactSummary[] }) {
         </div>
       )}
     </section>
+  );
+}
+
+function CompanyDetailSection({
+  detail,
+  onBack,
+}: {
+  detail: CompanyDetail | null;
+  onBack: () => void;
+}) {
+  if (!detail) {
+    return (
+      <section className="rounded-2xl bg-white p-6 shadow-sm">
+        <button
+          onClick={onBack}
+          className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+        >
+          Back to Companies
+        </button>
+        <p className="mt-4 text-sm text-slate-600">No company detail loaded.</p>
+      </section>
+    );
+  }
+
+  const company = detail.company;
+  const primaryProspect = detail.primaryProspect;
+  const intelligence = detail.intelligence;
+
+  const discoveryQuestions = parseJsonArray(intelligence?.discovery_questions);
+  const recommendedProductPaths = parseJsonArray(intelligence?.recommended_product_paths);
+  const likelyObjections = parseJsonArray(intelligence?.likely_objections);
+
+  return (
+    <section className="grid gap-6">
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
+        <button
+          onClick={onBack}
+          className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+        >
+          Back to Companies
+        </button>
+
+        <div className="mt-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
+              Company Detail
+            </p>
+            <h2 className="mt-2 text-3xl font-bold">{displayValue(company.company_name)}</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+              {displayValue(company.industry)}
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <SmallScoreCard
+              label="Priority"
+              value={
+                primaryProspect
+                  ? `${displayValue(primaryProspect.priority_score)} / 100`
+                  : "Not scored"
+              }
+            />
+            <SmallScoreCard
+              label="Tier"
+              value={primaryProspect ? displayValue(primaryProspect.priority_tier) : "—"}
+            />
+            <SmallScoreCard
+              label="Fit"
+              value={primaryProspect ? displayValue(primaryProspect.fit_rating) : "—"}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <DetailCard title="Company Snapshot">
+          <DetailRow label="Website" value={company.website} />
+          <DetailRow label="Domain" value={company.domain} />
+          <DetailRow label="Employees" value={company.employee_count} />
+          <DetailRow label="Phone" value={company.company_phone} />
+          <DetailRow
+            label="Location"
+            value={[company.city, company.state, company.country].filter(Boolean).join(", ")}
+          />
+          <DetailRow label="Status" value={company.status} />
+        </DetailCard>
+
+        <DetailCard title="Prospect Summary">
+          <DetailRow label="Product Line" value={primaryProspect?.product_line} />
+          <DetailRow label="Product Path" value={primaryProspect?.likely_product_path} />
+          <DetailRow label="Use Case" value={primaryProspect?.primary_use_case} />
+          <DetailRow label="Likely Soils" value={primaryProspect?.likely_soils} />
+          <DetailRow label="Confidence" value={primaryProspect?.confidence} />
+        </DetailCard>
+
+        <DetailCard title="Next Best Action">
+          <p className="text-sm leading-6 text-slate-700">
+            {displayValue(primaryProspect?.next_best_action)}
+          </p>
+        </DetailCard>
+      </div>
+
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
+        <h3 className="text-xl font-bold">Contacts</h3>
+
+        {detail.contacts.length === 0 ? (
+          <p className="mt-3 text-sm text-slate-600">No contacts attached.</p>
+        ) : (
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            {detail.contacts.map((contact) => (
+              <div key={String(contact.id)} className="rounded-xl border border-slate-200 p-4">
+                <p className="font-semibold">{displayValue(contact.full_name)}</p>
+                <p className="mt-1 text-sm text-slate-600">{displayValue(contact.title)}</p>
+                <div className="mt-3 grid gap-1 text-sm text-slate-700">
+                  <p>Email: {displayValue(contact.email)}</p>
+                  <p>Direct: {displayValue(contact.direct_phone)}</p>
+                  <p>Mobile: {displayValue(contact.mobile_phone)}</p>
+                  <p>Function: {displayValue(contact.function_area || contact.department)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <DetailCard title="What They Do">
+          <p className="text-sm leading-6 text-slate-700">
+            {displayValue(intelligence?.what_they_do)}
+          </p>
+        </DetailCard>
+
+        <DetailCard title="Likely Graymills Relevance">
+          <p className="text-sm leading-6 text-slate-700">
+            {displayValue(intelligence?.likely_relevance)}
+          </p>
+        </DetailCard>
+
+        <DetailCard title="Likely Parts / Components Cleaned">
+          <p className="text-sm leading-6 text-slate-700">
+            {displayValue(intelligence?.likely_parts_cleaned)}
+          </p>
+        </DetailCard>
+
+        <DetailCard title="Likely Soils / Contaminants">
+          <p className="text-sm leading-6 text-slate-700">
+            {displayValue(intelligence?.likely_soils_contaminants)}
+          </p>
+        </DetailCard>
+
+        <DetailCard title="Likely Cleaning Pain Points">
+          <p className="text-sm leading-6 text-slate-700">
+            {displayValue(intelligence?.likely_pain_points)}
+          </p>
+        </DetailCard>
+
+        <DetailCard title="Suggested Sales Angle">
+          <p className="text-sm leading-6 text-slate-700">
+            {displayValue(intelligence?.suggested_sales_angle)}
+          </p>
+        </DetailCard>
+
+        <DetailCard title="Buyer Persona">
+          <p className="text-sm leading-6 text-slate-700">
+            {displayValue(intelligence?.buyer_persona)}
+          </p>
+        </DetailCard>
+
+        <DetailCard title="Reason to Believe">
+          <p className="text-sm leading-6 text-slate-700">
+            {displayValue(intelligence?.reason_to_believe)}
+          </p>
+        </DetailCard>
+      </div>
+
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
+        <h3 className="text-xl font-bold">Discovery Questions</h3>
+        {discoveryQuestions.length === 0 ? (
+          <p className="mt-3 text-sm text-slate-600">No discovery questions generated.</p>
+        ) : (
+          <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm leading-6 text-slate-700">
+            {discoveryQuestions.map((question, index) => (
+              <li key={`${String(question)}-${index}`}>{displayValue(question)}</li>
+            ))}
+          </ol>
+        )}
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <DetailCard title="First Call Opener">
+          <p className="text-sm leading-6 text-slate-700">
+            {displayValue(intelligence?.first_call_opener)}
+          </p>
+        </DetailCard>
+
+        <DetailCard title="Email Draft">
+          <p className="text-sm font-semibold text-slate-800">
+            Subject: {displayValue(intelligence?.email_subject)}
+          </p>
+          <p className="mt-3 text-sm leading-6 text-slate-700">
+            {displayValue(intelligence?.email_message)}
+          </p>
+        </DetailCard>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <JsonListCard title="Recommended Product Paths" items={recommendedProductPaths} />
+        <JsonListCard title="Likely Objections and Responses" items={likelyObjections} />
+      </div>
+
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
+        <h3 className="text-xl font-bold">Copyable Sales Block</h3>
+        <p className="mt-2 text-sm text-slate-600">
+          Copy this into CRM notes, call prep, or sales handoff.
+        </p>
+        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-800">
+          {displayValue(intelligence?.copyable_sales_block)}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SmallScoreCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">{label}</p>
+      <p className="mt-1 text-lg font-bold text-blue-950">{value}</p>
+    </div>
+  );
+}
+
+function DetailCard({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl bg-white p-6 shadow-sm">
+      <h3 className="text-lg font-bold">{title}</h3>
+      <div className="mt-4">{children}</div>
+    </div>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: unknown }) {
+  return (
+    <div className="border-b border-slate-100 py-2 text-sm last:border-b-0">
+      <p className="font-semibold text-slate-700">{label}</p>
+      <p className="mt-1 text-slate-600">{displayValue(value)}</p>
+    </div>
+  );
+}
+
+function JsonListCard({ title, items }: { title: string; items: unknown[] }) {
+  return (
+    <div className="rounded-2xl bg-white p-6 shadow-sm">
+      <h3 className="text-lg font-bold">{title}</h3>
+      {items.length === 0 ? (
+        <p className="mt-3 text-sm text-slate-600">No items generated.</p>
+      ) : (
+        <div className="mt-4 grid gap-3">
+          {items.map((item, index) => (
+            <pre
+              key={index}
+              className="whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs leading-5 text-slate-700"
+            >
+              {typeof item === "string" ? item : JSON.stringify(item, null, 2)}
+            </pre>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
