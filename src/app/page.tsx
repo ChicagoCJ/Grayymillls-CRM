@@ -87,121 +87,151 @@ type CrmSummary = {
   imports: ImportSummary[];
 };
 
-const APP_VERSION = "Rev 1.03 — Supabase Connection + Import Save";
+const APP_VERSION = "Rev 1.04 — Manual Column Mapping + Import Review";
 const REVISION_NOTE =
-  "UI cleanup: detected headers hidden, import controls moved left, future bulk prospect controls noted.";
+  "Manual mapping added before import; required-field validation and import review added.";
+
+const REQUIRED_FIELDS = ["Company Name"];
 
 const CRM_FIELDS = [
   {
     field: "Company Name",
+    required: true,
     aliases: ["company name", "company", "account name", "account"],
   },
   {
     field: "Website",
+    required: false,
     aliases: ["website", "web site", "company website", "url", "domain"],
   },
   {
     field: "Industry",
+    required: false,
     aliases: ["industry", "industries", "primary industry"],
   },
   {
     field: "NAICS",
+    required: false,
     aliases: ["naics", "naics code", "primary naics"],
   },
   {
     field: "SIC",
+    required: false,
     aliases: ["sic", "sic code", "primary sic"],
   },
   {
     field: "Employee Count",
+    required: false,
     aliases: ["employees", "employee count", "company employees", "number of employees"],
   },
   {
     field: "Revenue",
+    required: false,
     aliases: ["revenue", "annual revenue", "company revenue"],
   },
   {
     field: "Company Phone",
+    required: false,
     aliases: ["company phone", "main phone", "phone", "hq phone"],
   },
   {
     field: "Company Fax",
+    required: false,
     aliases: ["fax", "company fax"],
   },
   {
     field: "Company Address",
+    required: false,
     aliases: ["company address", "street address", "address", "hq address"],
   },
   {
     field: "Company City",
+    required: false,
     aliases: ["company city", "city", "hq city"],
   },
   {
     field: "Company State",
+    required: false,
     aliases: ["company state", "state", "hq state"],
   },
   {
     field: "Company Postal Code",
+    required: false,
     aliases: ["postal code", "zip", "zip code", "company zip"],
   },
   {
     field: "Company Country",
+    required: false,
     aliases: ["country", "company country", "hq country"],
   },
   {
     field: "First Name",
+    required: false,
     aliases: ["first name", "contact first name", "person first name"],
   },
   {
     field: "Last Name",
+    required: false,
     aliases: ["last name", "contact last name", "person last name"],
   },
   {
     field: "Full Name",
+    required: false,
     aliases: ["full name", "contact name", "person name", "name"],
   },
   {
     field: "Job Title",
+    required: false,
     aliases: ["title", "job title", "contact title", "person title"],
   },
   {
     field: "Management Level",
+    required: false,
     aliases: ["management level", "seniority", "level"],
   },
   {
     field: "Department",
+    required: false,
     aliases: ["department", "contact department"],
   },
   {
     field: "Function",
+    required: false,
     aliases: ["function", "job function", "contact function"],
   },
   {
     field: "Email",
+    required: false,
     aliases: ["email", "email address", "business email", "contact email"],
   },
   {
     field: "Direct Phone",
+    required: false,
     aliases: ["direct phone", "direct dial", "contact phone"],
   },
   {
     field: "Mobile Phone",
+    required: false,
     aliases: ["mobile", "mobile phone", "cell", "cell phone"],
   },
   {
     field: "Person City",
+    required: false,
     aliases: ["person city", "contact city"],
   },
   {
     field: "Person State",
+    required: false,
     aliases: ["person state", "contact state"],
   },
   {
     field: "Person Country",
+    required: false,
     aliases: ["person country", "contact country"],
   },
   {
     field: "LinkedIn URL",
+    required: false,
     aliases: ["linkedin", "linkedin url", "person linkedin url", "contact linkedin"],
   },
 ];
@@ -348,9 +378,14 @@ function buildMappingObject(mappingSuggestions: MappingSuggestion[]) {
   }, {});
 }
 
+function isMapped(value: string | undefined) {
+  return Boolean(value && value !== "Not detected" && value !== "__skip__");
+}
+
 export default function Home() {
   const [activeTab, setActiveTab] = useState<TabKey>("dashboard");
   const [csvData, setCsvData] = useState<ParsedCsv | null>(null);
+  const [manualMapping, setManualMapping] = useState<Record<string, string>>({});
   const [errorMessage, setErrorMessage] = useState("");
   const [importMessage, setImportMessage] = useState("");
   const [isImporting, setIsImporting] = useState(false);
@@ -366,17 +401,40 @@ export default function Home() {
     return suggestMappings(csvData.headers);
   }, [csvData]);
 
-  const mappingObject = useMemo(() => {
+  const suggestedMappingObject = useMemo(() => {
     return buildMappingObject(mappingSuggestions);
   }, [mappingSuggestions]);
+
+  const activeMapping = useMemo(() => {
+    const mapping: Record<string, string> = {};
+
+    CRM_FIELDS.forEach((field) => {
+      mapping[field.field] =
+        manualMapping[field.field] ??
+        suggestedMappingObject[field.field] ??
+        "Not detected";
+    });
+
+    return mapping;
+  }, [manualMapping, suggestedMappingObject]);
 
   const highConfidenceMappings = mappingSuggestions.filter(
     (mapping) => mapping.confidence === "High"
   ).length;
 
-  const missingMappings = mappingSuggestions.filter(
-    (mapping) => mapping.confidence === "Not found"
+  const missingMappings = CRM_FIELDS.filter(
+    (field) => !isMapped(activeMapping[field.field])
   ).length;
+
+  const requiredMissingFields = REQUIRED_FIELDS.filter(
+    (field) => !isMapped(activeMapping[field])
+  );
+
+  const mappedOptionalFields = CRM_FIELDS.filter(
+    (field) => !field.required && isMapped(activeMapping[field.field])
+  ).length;
+
+  const isReadyToImport = Boolean(csvData) && requiredMissingFields.length === 0;
 
   const aTierCompanies = crmSummary.companies.filter((company) => {
     const prospect = getLatestProspect(company);
@@ -405,6 +463,16 @@ export default function Home() {
   useEffect(() => {
     loadCrmSummary();
   }, []);
+
+  useEffect(() => {
+    if (!csvData) {
+      setManualMapping({});
+      return;
+    }
+
+    const initialMapping = buildMappingObject(suggestMappings(csvData.headers));
+    setManualMapping(initialMapping);
+  }, [csvData]);
 
   async function handleCsvUpload(event: ChangeEvent<HTMLInputElement>) {
     setErrorMessage("");
@@ -443,6 +511,18 @@ export default function Home() {
     }
   }
 
+  function updateManualMapping(crmField: string, selectedColumn: string) {
+    setManualMapping((current) => ({
+      ...current,
+      [crmField]: selectedColumn,
+    }));
+  }
+
+  function resetMappingToSuggestions() {
+    if (!csvData) return;
+    setManualMapping(buildMappingObject(suggestMappings(csvData.headers)));
+  }
+
   async function handleImportToCrm() {
     if (!csvData) return;
 
@@ -450,13 +530,12 @@ export default function Home() {
     setErrorMessage("");
     setImportMessage("");
 
-    if (
-      !mappingObject["Company Name"] ||
-      mappingObject["Company Name"] === "Not detected"
-    ) {
+    if (requiredMissingFields.length > 0) {
       setIsImporting(false);
       setErrorMessage(
-        "Company Name was not detected. Rev 1.04 will add manual mapping, but for now the CSV needs a recognizable company name column."
+        `Required mapping missing: ${requiredMissingFields.join(
+          ", "
+        )}. Please map required fields before importing.`
       );
       return;
     }
@@ -471,7 +550,7 @@ export default function Home() {
           fileName: csvData.fileName,
           headers: csvData.headers,
           rows: csvData.rows,
-          mapping: mappingObject,
+          mapping: activeMapping,
         }),
       });
 
@@ -590,31 +669,31 @@ export default function Home() {
             </div>
 
             <div className="rounded-2xl bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-bold">Rev 1.03 Objective</h2>
+              <h2 className="text-xl font-bold">Rev 1.04 Objective</h2>
               <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-600">
-                This revision connects the app to Supabase through server-side API routes.
-                ZoomInfo CSV data can now be saved as companies, contacts, prospects, raw
-                import rows, and initial Graymills prospect intelligence.
+                This revision adds manual column mapping and an import readiness review before
+                records are saved to Supabase. The goal is cleaner ZoomInfo imports and fewer
+                bad CRM records.
               </p>
 
               <div className="mt-6 grid gap-4 md:grid-cols-3">
                 <InfoPanel
                   title="What works now"
                   items={[
-                    "CSV file upload",
-                    "Header detection without showing wide header tags",
-                    "Suggested field mapping",
+                    "CSV upload and preview",
+                    "Manual mapping dropdowns",
+                    "Required-field validation",
+                    "Import readiness review",
                     "Import to Supabase",
-                    "Companies and contacts loaded from CRM",
                   ]}
                 />
                 <InfoPanel
                   title="What comes next"
                   items={[
-                    "Manual mapping controls",
                     "Company detail pages",
                     "Prospecting package view",
                     "Editable sales notes and follow-ups",
+                    "Copyable sales block on company record",
                   ]}
                 />
                 <InfoPanel
@@ -633,13 +712,9 @@ export default function Home() {
           </section>
         )}
 
-        {activeTab === "companies" && (
-          <CompaniesSection companies={crmSummary.companies} />
-        )}
+        {activeTab === "companies" && <CompaniesSection companies={crmSummary.companies} />}
 
-        {activeTab === "contacts" && (
-          <ContactsSection contacts={crmSummary.contacts} />
-        )}
+        {activeTab === "contacts" && <ContactsSection contacts={crmSummary.contacts} />}
 
         {activeTab === "import" && (
           <section className="grid gap-6">
@@ -648,8 +723,8 @@ export default function Home() {
                 <div>
                   <h2 className="text-xl font-bold">Import ZoomInfo CSV</h2>
                   <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                    Upload a ZoomInfo CSV, preview the records, review suggested mapping, and
-                    save the data into the Graymills CRM.
+                    Upload a ZoomInfo CSV, review and adjust field mapping, then save the
+                    data into the Graymills CRM.
                   </p>
                 </div>
 
@@ -665,8 +740,16 @@ export default function Home() {
                   </label>
 
                   <button
+                    onClick={resetMappingToSuggestions}
+                    disabled={!csvData}
+                    className="inline-flex items-center justify-center rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                  >
+                    Reset Mapping
+                  </button>
+
+                  <button
                     onClick={handleImportToCrm}
-                    disabled={!csvData || isImporting}
+                    disabled={!csvData || isImporting || !isReadyToImport}
                     className="inline-flex items-center justify-center rounded-xl bg-green-700 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-green-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                   >
                     {isImporting ? "Importing..." : "Import to CRM"}
@@ -699,51 +782,121 @@ export default function Home() {
                     note="Data rows excluding header"
                   />
                   <MetricCard
-                    label="Columns"
-                    value={csvData.headers.length.toString()}
-                    note="Detected CSV headers"
+                    label="Mapped optional fields"
+                    value={mappedOptionalFields.toString()}
+                    note="Optional CRM fields currently mapped"
                   />
                   <MetricCard
-                    label="Mapping status"
-                    value={`${highConfidenceMappings} high`}
-                    note={`${missingMappings} missing`}
+                    label="Import readiness"
+                    value={isReadyToImport ? "Ready" : "Blocked"}
+                    note={
+                      isReadyToImport
+                        ? "Required fields are mapped"
+                        : `${requiredMissingFields.length} required field missing`
+                    }
                   />
                 </div>
 
                 <div className="rounded-2xl bg-white p-6 shadow-sm">
-                  <h3 className="text-lg font-bold">Suggested CRM Field Mapping</h3>
+                  <h3 className="text-lg font-bold">Import Review</h3>
+                  <div className="mt-4 grid gap-4 md:grid-cols-3">
+                    <ReviewCard
+                      label="Required Mapping"
+                      value={isReadyToImport ? "Pass" : "Needs attention"}
+                      status={isReadyToImport ? "good" : "bad"}
+                      note={
+                        isReadyToImport
+                          ? "Company Name is mapped."
+                          : `Missing: ${requiredMissingFields.join(", ")}`
+                      }
+                    />
+                    <ReviewCard
+                      label="Records to Import"
+                      value={csvData.rawRowCount.toString()}
+                      status="neutral"
+                      note="Each row will create or reuse a company and contact."
+                    />
+                    <ReviewCard
+                      label="Mapping Method"
+                      value="Manual Review"
+                      status="neutral"
+                      note="Dropdown selections below will be used for import."
+                    />
+                  </div>
+
+                  {!isReadyToImport && (
+                    <div className="mt-4 rounded-xl border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-900">
+                      Company Name is required because it anchors the company, contact,
+                      prospect, and prospect intelligence records. Map it before importing.
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-2xl bg-white p-6 shadow-sm">
+                  <h3 className="text-lg font-bold">Manual CRM Field Mapping</h3>
                   <p className="mt-2 text-sm text-slate-600">
-                    Rev 1.03 uses these detected mappings to save records. Rev 1.04 should add
-                    manual dropdown controls so you can correct mappings before import.
+                    Review each CRM field and choose the correct ZoomInfo CSV column. Use
+                    “Skip / Not mapped” for optional fields you do not want to import.
                   </p>
 
-                  <div className="mt-4 max-w-3xl overflow-x-auto">
+                  <div className="mt-4 max-w-4xl overflow-x-auto">
                     <table className="w-full table-fixed border-collapse text-left text-sm">
                       <thead>
                         <tr className="border-b border-slate-200">
-                          <th className="w-[34%] py-3 pr-3 font-semibold">CRM Field</th>
-                          <th className="w-[46%] py-3 pr-3 font-semibold">Suggested CSV Column</th>
-                          <th className="w-[20%] py-3 pr-3 font-semibold">Confidence</th>
+                          <th className="w-[30%] py-3 pr-3 font-semibold">CRM Field</th>
+                          <th className="w-[44%] py-3 pr-3 font-semibold">CSV Column to Use</th>
+                          <th className="w-[14%] py-3 pr-3 font-semibold">Required</th>
+                          <th className="w-[12%] py-3 pr-3 font-semibold">Auto</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {mappingSuggestions.map((mapping) => (
-                          <tr key={mapping.crmField} className="border-b border-slate-100">
-                            <td className="py-3 pr-3 font-medium">{mapping.crmField}</td>
-                            <td className="py-3 pr-3 text-slate-700">
-                              {mapping.suggestedColumn}
-                            </td>
-                            <td className="py-3 pr-3">
-                              <span
-                                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getConfidenceClass(
-                                  mapping.confidence
-                                )}`}
-                              >
-                                {mapping.confidence}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
+                        {CRM_FIELDS.map((field) => {
+                          const suggestion = mappingSuggestions.find(
+                            (mapping) => mapping.crmField === field.field
+                          );
+
+                          return (
+                            <tr key={field.field} className="border-b border-slate-100 align-middle">
+                              <td className="py-3 pr-3 font-medium">{field.field}</td>
+                              <td className="py-3 pr-3">
+                                <select
+                                  value={activeMapping[field.field] ?? "Not detected"}
+                                  onChange={(event) =>
+                                    updateManualMapping(field.field, event.target.value)
+                                  }
+                                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                                >
+                                  <option value="Not detected">Skip / Not mapped</option>
+                                  {csvData.headers.map((header) => (
+                                    <option key={`${field.field}-${header}`} value={header}>
+                                      {header}
+                                    </option>
+                                  ))}
+                                </select>
+                              </td>
+                              <td className="py-3 pr-3">
+                                <span
+                                  className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                    field.required
+                                      ? "bg-red-100 text-red-800"
+                                      : "bg-slate-100 text-slate-600"
+                                  }`}
+                                >
+                                  {field.required ? "Required" : "Optional"}
+                                </span>
+                              </td>
+                              <td className="py-3 pr-3">
+                                <span
+                                  className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getConfidenceClass(
+                                    suggestion?.confidence ?? "Not found"
+                                  )}`}
+                                >
+                                  {suggestion?.confidence ?? "Not found"}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -811,6 +964,33 @@ function MetricCard({
   );
 }
 
+function ReviewCard({
+  label,
+  value,
+  note,
+  status,
+}: {
+  label: string;
+  value: string;
+  note: string;
+  status: "good" | "bad" | "neutral";
+}) {
+  const statusClass =
+    status === "good"
+      ? "border-green-200 bg-green-50 text-green-900"
+      : status === "bad"
+        ? "border-red-200 bg-red-50 text-red-900"
+        : "border-slate-200 bg-slate-50 text-slate-900";
+
+  return (
+    <div className={`rounded-xl border p-4 ${statusClass}`}>
+      <p className="text-sm font-medium opacity-80">{label}</p>
+      <p className="mt-2 text-xl font-bold">{value}</p>
+      <p className="mt-2 text-xs opacity-80">{note}</p>
+    </div>
+  );
+}
+
 function InfoPanel({ title, items }: { title: string; items: string[] }) {
   return (
     <div className="rounded-xl border border-slate-200 p-4">
@@ -873,7 +1053,7 @@ function CompaniesSection({ companies }: { companies: CompanySummary[] }) {
     <section className="rounded-2xl bg-white p-6 shadow-sm">
       <h2 className="text-xl font-bold">Companies</h2>
       <p className="mt-2 text-sm text-slate-600">
-        Company records created from ZoomInfo imports. Rev 1.04 should add click-through detail pages.
+        Company records created from ZoomInfo imports. Rev 1.05 should add click-through detail pages.
       </p>
 
       {companies.length === 0 ? (
