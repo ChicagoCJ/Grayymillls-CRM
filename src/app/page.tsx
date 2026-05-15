@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, ReactNode, useEffect, useMemo, useState } from "react";
 
 type TabKey = "dashboard" | "companies" | "contacts" | "import" | "companyDetail";
 
@@ -81,6 +81,19 @@ type ImportSummary = {
   created_at: string;
 };
 
+type ActivityRecord = {
+  id: string;
+  company_id: string;
+  contact_id: string | null;
+  prospect_id: string | null;
+  activity_type: string;
+  subject: string | null;
+  notes: string | null;
+  due_date: string | null;
+  completed_at: string | null;
+  created_at: string;
+};
+
 type CrmSummary = {
   companies: CompanySummary[];
   contacts: ContactSummary[];
@@ -93,11 +106,19 @@ type CompanyDetail = {
   prospects: Record<string, string | number | null>[];
   primaryProspect: Record<string, string | number | null> | null;
   intelligence: Record<string, unknown> | null;
+  activities: ActivityRecord[];
 };
 
-const APP_VERSION = "Rev 1.05 — Company Detail Page + Prospect Intelligence View";
+type ActivityForm = {
+  activityType: "note" | "call" | "email" | "meeting" | "task" | "quote_followup";
+  subject: string;
+  notes: string;
+  dueDate: string;
+};
+
+const APP_VERSION = "Rev 1.07 — Format Product Paths + Objections";
 const REVISION_NOTE =
-  "Company rows now open a detail view with contacts, prospect score, Graymills fit intelligence, and copyable sales block.";
+  "Product paths and objections now display as clean sales cards instead of raw JSON.";
 
 const REQUIRED_FIELDS = ["Company Name"];
 
@@ -367,7 +388,8 @@ function getConfidenceClass(confidence: MappingSuggestion["confidence"]) {
   return "bg-gray-100 text-gray-600";
 }
 
-function formatDate(value: string) {
+function formatDate(value: string | null) {
+  if (!value) return "No date";
   return new Date(value).toLocaleDateString();
 }
 
@@ -401,6 +423,30 @@ function parseJsonArray(value: unknown): unknown[] {
   return [];
 }
 
+function getActivityLabel(type: string) {
+  const labels: Record<string, string> = {
+    note: "Note",
+    call: "Call",
+    email: "Email",
+    meeting: "Meeting",
+    task: "Task",
+    quote_followup: "Quote Follow-Up",
+    import_note: "Import Note",
+  };
+
+  return labels[type] || type;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function formatTitleFromKey(key: string) {
+  return key
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 export default function Home() {
   const [activeTab, setActiveTab] = useState<TabKey>("dashboard");
   const [csvData, setCsvData] = useState<ParsedCsv | null>(null);
@@ -410,7 +456,14 @@ export default function Home() {
   const [isImporting, setIsImporting] = useState(false);
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
   const [isLoadingCompanyDetail, setIsLoadingCompanyDetail] = useState(false);
+  const [isSavingActivity, setIsSavingActivity] = useState(false);
   const [selectedCompanyDetail, setSelectedCompanyDetail] = useState<CompanyDetail | null>(null);
+  const [activityForm, setActivityForm] = useState<ActivityForm>({
+    activityType: "note",
+    subject: "",
+    notes: "",
+    dueDate: "",
+  });
   const [crmSummary, setCrmSummary] = useState<CrmSummary>({
     companies: [],
     contacts: [],
@@ -607,6 +660,57 @@ export default function Home() {
     }
   }
 
+  async function handleSaveActivity() {
+    if (!selectedCompanyDetail?.company?.id) return;
+
+    setIsSavingActivity(true);
+    setErrorMessage("");
+    setImportMessage("");
+
+    try {
+      const primaryContact = selectedCompanyDetail.contacts?.[0];
+      const primaryProspect = selectedCompanyDetail.primaryProspect;
+
+      const response = await fetch("/api/activities", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          companyId: selectedCompanyDetail.company.id,
+          contactId: primaryContact?.id ?? null,
+          prospectId: primaryProspect?.id ?? null,
+          activityType: activityForm.activityType,
+          subject: activityForm.subject,
+          notes: activityForm.notes,
+          dueDate: activityForm.dueDate || null,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to save activity.");
+      }
+
+      setImportMessage("Activity saved.");
+
+      setActivityForm({
+        activityType: "note",
+        subject: "",
+        notes: "",
+        dueDate: "",
+      });
+
+      await loadCompanyDetail(String(selectedCompanyDetail.company.id));
+      await loadCrmSummary();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to save activity.");
+    } finally {
+      setIsSavingActivity(false);
+    }
+  }
+
   const tabs: { key: TabKey; label: string }[] = [
     { key: "dashboard", label: "Dashboard" },
     { key: "companies", label: "Companies" },
@@ -703,32 +807,31 @@ export default function Home() {
             </div>
 
             <div className="rounded-2xl bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-bold">Rev 1.05 Objective</h2>
+              <h2 className="text-xl font-bold">Rev 1.07 Objective</h2>
               <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-600">
-                This revision adds company drill-down. Sales users can open a company
-                record and see the attached contacts, scored prospect hypothesis, Graymills
-                fit intelligence, discovery questions, first call opener, email draft, and
-                copyable sales block.
+                This revision improves the company detail page by displaying recommended
+                product paths and likely objections as readable sales guidance rather than
+                raw JSON objects.
               </p>
 
               <div className="mt-6 grid gap-4 md:grid-cols-3">
                 <InfoPanel
                   title="What works now"
                   items={[
-                    "Company row click-through",
-                    "Company overview",
-                    "Attached contacts",
-                    "Prospect intelligence view",
+                    "Readable product path cards",
+                    "Readable objection / response cards",
+                    "Company detail activity form",
+                    "Activity history",
                     "Copyable sales block",
                   ]}
                 />
                 <InfoPanel
                   title="What comes next"
                   items={[
-                    "Editable activity notes",
-                    "Follow-up tasks",
-                    "Prospect package print view",
-                    "Search and filtering",
+                    "Complete activity button",
+                    "Overdue task dashboard",
+                    "Search and filters",
+                    "Print-ready prospecting package",
                   ]}
                 />
                 <InfoPanel
@@ -760,6 +863,10 @@ export default function Home() {
         {activeTab === "companyDetail" && (
           <CompanyDetailSection
             detail={selectedCompanyDetail}
+            activityForm={activityForm}
+            setActivityForm={setActivityForm}
+            isSavingActivity={isSavingActivity}
+            onSaveActivity={handleSaveActivity}
             onBack={() => setActiveTab("companies")}
           />
         )}
@@ -1239,9 +1346,17 @@ function ContactsSection({ contacts }: { contacts: ContactSummary[] }) {
 
 function CompanyDetailSection({
   detail,
+  activityForm,
+  setActivityForm,
+  isSavingActivity,
+  onSaveActivity,
   onBack,
 }: {
   detail: CompanyDetail | null;
+  activityForm: ActivityForm;
+  setActivityForm: (form: ActivityForm) => void;
+  isSavingActivity: boolean;
+  onSaveActivity: () => void;
   onBack: () => void;
 }) {
   if (!detail) {
@@ -1334,6 +1449,116 @@ function CompanyDetailSection({
             {displayValue(primaryProspect?.next_best_action)}
           </p>
         </DetailCard>
+      </div>
+
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
+        <h3 className="text-xl font-bold">Add Activity / Follow-Up</h3>
+        <p className="mt-2 text-sm text-slate-600">
+          Save notes, calls, emails, meetings, tasks, and quote follow-ups directly to this company record.
+        </p>
+
+        <div className="mt-4 grid gap-4 lg:grid-cols-4">
+          <div>
+            <label className="text-sm font-semibold text-slate-700">Activity Type</label>
+            <select
+              value={activityForm.activityType}
+              onChange={(event) =>
+                setActivityForm({
+                  ...activityForm,
+                  activityType: event.target.value as ActivityForm["activityType"],
+                })
+              }
+              className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
+            >
+              <option value="note">Note</option>
+              <option value="call">Call</option>
+              <option value="email">Email</option>
+              <option value="meeting">Meeting</option>
+              <option value="task">Task</option>
+              <option value="quote_followup">Quote Follow-Up</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="text-sm font-semibold text-slate-700">Due Date</label>
+            <input
+              type="date"
+              value={activityForm.dueDate}
+              onChange={(event) =>
+                setActivityForm({ ...activityForm, dueDate: event.target.value })
+              }
+              className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
+            />
+          </div>
+
+          <div className="lg:col-span-2">
+            <label className="text-sm font-semibold text-slate-700">Subject</label>
+            <input
+              type="text"
+              value={activityForm.subject}
+              onChange={(event) =>
+                setActivityForm({ ...activityForm, subject: event.target.value })
+              }
+              placeholder="Example: Left voicemail for maintenance manager"
+              className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
+            />
+          </div>
+
+          <div className="lg:col-span-4">
+            <label className="text-sm font-semibold text-slate-700">Notes</label>
+            <textarea
+              value={activityForm.notes}
+              onChange={(event) =>
+                setActivityForm({ ...activityForm, notes: event.target.value })
+              }
+              placeholder="Add call notes, follow-up details, discovery findings, or next steps."
+              rows={4}
+              className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
+            />
+          </div>
+        </div>
+
+        <div className="mt-4 flex justify-start">
+          <button
+            onClick={onSaveActivity}
+            disabled={isSavingActivity}
+            className="rounded-xl bg-green-700 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-green-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+          >
+            {isSavingActivity ? "Saving..." : "Save Activity"}
+          </button>
+        </div>
+      </div>
+
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
+        <h3 className="text-xl font-bold">Activity History</h3>
+
+        {detail.activities.length === 0 ? (
+          <p className="mt-3 text-sm text-slate-600">No activities saved yet.</p>
+        ) : (
+          <div className="mt-4 grid gap-3">
+            {detail.activities.map((activity) => (
+              <div key={activity.id} className="rounded-xl border border-slate-200 p-4">
+                <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800">
+                      {getActivityLabel(activity.activity_type)}
+                    </span>
+                    <p className="mt-3 font-semibold">
+                      {activity.subject || "No subject"}
+                    </p>
+                    <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+                      {activity.notes || "No notes"}
+                    </p>
+                  </div>
+                  <div className="text-sm text-slate-500 md:text-right">
+                    <p>Created: {formatDate(activity.created_at)}</p>
+                    <p>Due: {formatDate(activity.due_date)}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="rounded-2xl bg-white p-6 shadow-sm">
@@ -1440,8 +1665,18 @@ function CompanyDetailSection({
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <JsonListCard title="Recommended Product Paths" items={recommendedProductPaths} />
-        <JsonListCard title="Likely Objections and Responses" items={likelyObjections} />
+        <ReadableListCard
+          title="Recommended Product Paths"
+          items={recommendedProductPaths}
+          primaryKeys={["path", "product_path", "name", "title"]}
+          secondaryKeys={["when_relevant", "description", "rationale", "notes"]}
+        />
+        <ReadableListCard
+          title="Likely Objections and Responses"
+          items={likelyObjections}
+          primaryKeys={["objection", "title", "concern"]}
+          secondaryKeys={["response", "answer", "recommended_response", "notes"]}
+        />
       </div>
 
       <div className="rounded-2xl bg-white p-6 shadow-sm">
@@ -1471,7 +1706,7 @@ function DetailCard({
   children,
 }: {
   title: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <div className="rounded-2xl bg-white p-6 shadow-sm">
@@ -1490,21 +1725,83 @@ function DetailRow({ label, value }: { label: string; value: unknown }) {
   );
 }
 
-function JsonListCard({ title, items }: { title: string; items: unknown[] }) {
+function ReadableListCard({
+  title,
+  items,
+  primaryKeys,
+  secondaryKeys,
+}: {
+  title: string;
+  items: unknown[];
+  primaryKeys: string[];
+  secondaryKeys: string[];
+}) {
   return (
     <div className="rounded-2xl bg-white p-6 shadow-sm">
       <h3 className="text-lg font-bold">{title}</h3>
+
       {items.length === 0 ? (
         <p className="mt-3 text-sm text-slate-600">No items generated.</p>
       ) : (
         <div className="mt-4 grid gap-3">
           {items.map((item, index) => (
-            <pre
+            <ReadableListItem
               key={index}
-              className="whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs leading-5 text-slate-700"
-            >
-              {typeof item === "string" ? item : JSON.stringify(item, null, 2)}
-            </pre>
+              item={item}
+              primaryKeys={primaryKeys}
+              secondaryKeys={secondaryKeys}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ReadableListItem({
+  item,
+  primaryKeys,
+  secondaryKeys,
+}: {
+  item: unknown;
+  primaryKeys: string[];
+  secondaryKeys: string[];
+}) {
+  if (!isRecord(item)) {
+    return (
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <p className="text-sm leading-6 text-slate-700">{displayValue(item)}</p>
+      </div>
+    );
+  }
+
+  const primaryKey = primaryKeys.find((key) => item[key]);
+  const secondaryKey = secondaryKeys.find((key) => item[key]);
+
+  const primaryText = primaryKey ? displayValue(item[primaryKey]) : `Item`;
+  const secondaryText = secondaryKey ? displayValue(item[secondaryKey]) : "";
+
+  const remainingEntries = Object.entries(item).filter(
+    ([key]) => key !== primaryKey && key !== secondaryKey
+  );
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+      <p className="font-semibold text-slate-900">{primaryText}</p>
+
+      {secondaryText && (
+        <p className="mt-2 text-sm leading-6 text-slate-700">{secondaryText}</p>
+      )}
+
+      {remainingEntries.length > 0 && (
+        <div className="mt-3 grid gap-2 text-sm text-slate-600">
+          {remainingEntries.map(([key, value]) => (
+            <div key={key}>
+              <span className="font-semibold text-slate-700">
+                {formatTitleFromKey(key)}:
+              </span>{" "}
+              <span>{displayValue(value)}</span>
+            </div>
           ))}
         </div>
       )}

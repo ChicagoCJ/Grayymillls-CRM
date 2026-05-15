@@ -22,10 +22,7 @@ export async function GET(request: Request) {
     const companyId = searchParams.get("id");
 
     if (!companyId) {
-      return NextResponse.json(
-        { error: "Missing company id." },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Missing company id." }, { status: 400 });
     }
 
     const supabase = getSupabaseAdmin();
@@ -74,12 +71,23 @@ export async function GET(request: Request) {
       intelligence = intelligenceData;
     }
 
+    const { data: activities, error: activitiesError } = await supabase
+      .from("activities")
+      .select("*")
+      .eq("company_id", companyId)
+      .is("archived_at", null)
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (activitiesError) throw activitiesError;
+
     return NextResponse.json({
       company,
       contacts: contacts ?? [],
       prospects: prospects ?? [],
       primaryProspect,
       intelligence,
+      activities: activities ?? [],
     });
   } catch (error) {
     return NextResponse.json(
