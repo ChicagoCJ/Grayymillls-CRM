@@ -14,6 +14,11 @@ type ActivityPayload = {
   dueDate?: string | null;
 };
 
+type CompleteActivityPayload = {
+  activityId: string;
+  completed: boolean;
+};
+
 function getSupabaseAdmin() {
   if (!supabaseUrl || !serviceRoleKey) {
     throw new Error("Missing Supabase environment variables.");
@@ -76,8 +81,39 @@ export async function POST(request: Request) {
   } catch (error) {
     return NextResponse.json(
       {
-        error:
-          error instanceof Error ? error.message : "Failed to save activity.",
+        error: error instanceof Error ? error.message : "Failed to save activity.",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const payload = (await request.json()) as CompleteActivityPayload;
+
+    if (!payload.activityId) {
+      return NextResponse.json({ error: "Activity id is required." }, { status: 400 });
+    }
+
+    const supabase = getSupabaseAdmin();
+
+    const { data, error } = await supabase
+      .from("activities")
+      .update({
+        completed_at: payload.completed ? new Date().toISOString() : null,
+      })
+      .eq("id", payload.activityId)
+      .select("*")
+      .single();
+
+    if (error) throw error;
+
+    return NextResponse.json({ activity: data });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: error instanceof Error ? error.message : "Failed to update activity.",
       },
       { status: 500 }
     );

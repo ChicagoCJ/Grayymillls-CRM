@@ -92,12 +92,20 @@ type ActivityRecord = {
   due_date: string | null;
   completed_at: string | null;
   created_at: string;
+  companies?: {
+    company_name: string;
+  } | null;
 };
 
 type CrmSummary = {
   companies: CompanySummary[];
   contacts: ContactSummary[];
   imports: ImportSummary[];
+  activities: {
+    open: ActivityRecord[];
+    dueToday: ActivityRecord[];
+    overdue: ActivityRecord[];
+  };
 };
 
 type CompanyDetail = {
@@ -116,9 +124,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.07 — Format Product Paths + Objections";
+const APP_VERSION = "Rev 1.08 — Complete Activity + Overdue Follow-Up Dashboard";
 const REVISION_NOTE =
-  "Product paths and objections now display as clean sales cards instead of raw JSON.";
+  "Activities can now be marked complete, and the dashboard shows open, due-today, and overdue follow-ups.";
 
 const REQUIRED_FIELDS = ["Company Name"];
 
@@ -442,9 +450,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function formatTitleFromKey(key: string) {
-  return key
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+  return key.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function isOverdue(activity: ActivityRecord) {
+  if (!activity.due_date || activity.completed_at) return false;
+  const today = new Date().toISOString().slice(0, 10);
+  return activity.due_date < today;
 }
 
 export default function Home() {
@@ -457,6 +469,7 @@ export default function Home() {
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
   const [isLoadingCompanyDetail, setIsLoadingCompanyDetail] = useState(false);
   const [isSavingActivity, setIsSavingActivity] = useState(false);
+  const [isCompletingActivity, setIsCompletingActivity] = useState("");
   const [selectedCompanyDetail, setSelectedCompanyDetail] = useState<CompanyDetail | null>(null);
   const [activityForm, setActivityForm] = useState<ActivityForm>({
     activityType: "note",
@@ -468,6 +481,11 @@ export default function Home() {
     companies: [],
     contacts: [],
     imports: [],
+    activities: {
+      open: [],
+      dueToday: [],
+      overdue: [],
+    },
   });
 
   const mappingSuggestions = useMemo(() => {
@@ -544,6 +562,42 @@ export default function Home() {
       setErrorMessage(error instanceof Error ? error.message : "Could not load company detail.");
     } finally {
       setIsLoadingCompanyDetail(false);
+    }
+  }
+
+  async function handleCompleteActivity(activityId: string, companyId?: string | null) {
+    setIsCompletingActivity(activityId);
+    setErrorMessage("");
+    setImportMessage("");
+
+    try {
+      const response = await fetch("/api/activities", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          activityId,
+          completed: true,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to complete activity.");
+      }
+
+      setImportMessage("Activity marked complete.");
+      await loadCrmSummary();
+
+      if (companyId && selectedCompanyDetail?.company?.id === companyId) {
+        await loadCompanyDetail(companyId);
+      }
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to complete activity.");
+    } finally {
+      setIsCompletingActivity("");
     }
   }
 
@@ -790,48 +844,48 @@ export default function Home() {
                 note="Loaded from Supabase"
               />
               <MetricCard
-                label="Contacts in CRM"
-                value={crmSummary.contacts.length.toString()}
-                note="Loaded from Supabase"
+                label="Open follow-ups"
+                value={crmSummary.activities.open.length.toString()}
+                note="Incomplete activities"
               />
               <MetricCard
-                label="A / A+ prospects"
-                value={aTierCompanies.toString()}
-                note="Based on current score"
+                label="Due today"
+                value={crmSummary.activities.dueToday.length.toString()}
+                note="Incomplete and due today"
               />
               <MetricCard
-                label="Recent imports"
-                value={crmSummary.imports.length.toString()}
-                note="Last 20 import records"
+                label="Overdue"
+                value={crmSummary.activities.overdue.length.toString()}
+                note="Incomplete and past due"
               />
             </div>
 
             <div className="rounded-2xl bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-bold">Rev 1.07 Objective</h2>
+              <h2 className="text-xl font-bold">Rev 1.08 Objective</h2>
               <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-600">
-                This revision improves the company detail page by displaying recommended
-                product paths and likely objections as readable sales guidance rather than
-                raw JSON objects.
+                This revision makes follow-up management actionable. Activities can be
+                completed, and the dashboard now shows overdue, due-today, and open
+                follow-up work so sales users can see what needs attention.
               </p>
 
               <div className="mt-6 grid gap-4 md:grid-cols-3">
                 <InfoPanel
                   title="What works now"
                   items={[
-                    "Readable product path cards",
-                    "Readable objection / response cards",
-                    "Company detail activity form",
-                    "Activity history",
-                    "Copyable sales block",
+                    "Mark activity complete",
+                    "Open follow-up dashboard",
+                    "Due-today dashboard",
+                    "Overdue follow-up dashboard",
+                    "Company detail completion button",
                   ]}
                 />
                 <InfoPanel
                   title="What comes next"
                   items={[
-                    "Complete activity button",
-                    "Overdue task dashboard",
                     "Search and filters",
                     "Print-ready prospecting package",
+                    "Graymills knowledge base tables",
+                    "OpenAI prospect analysis later",
                   ]}
                 />
                 <InfoPanel
@@ -845,6 +899,36 @@ export default function Home() {
                 />
               </div>
             </div>
+
+            <FollowUpDashboard
+              title="Overdue Follow-Ups"
+              activities={crmSummary.activities.overdue}
+              emptyText="No overdue follow-ups."
+              emphasis="overdue"
+              onOpenCompany={loadCompanyDetail}
+              onCompleteActivity={handleCompleteActivity}
+              completingActivityId={isCompletingActivity}
+            />
+
+            <FollowUpDashboard
+              title="Due Today"
+              activities={crmSummary.activities.dueToday}
+              emptyText="No follow-ups due today."
+              emphasis="today"
+              onOpenCompany={loadCompanyDetail}
+              onCompleteActivity={handleCompleteActivity}
+              completingActivityId={isCompletingActivity}
+            />
+
+            <FollowUpDashboard
+              title="All Open Follow-Ups"
+              activities={crmSummary.activities.open}
+              emptyText="No open follow-ups."
+              emphasis="open"
+              onOpenCompany={loadCompanyDetail}
+              onCompleteActivity={handleCompleteActivity}
+              completingActivityId={isCompletingActivity}
+            />
 
             <RecentImports imports={crmSummary.imports} />
           </section>
@@ -866,7 +950,9 @@ export default function Home() {
             activityForm={activityForm}
             setActivityForm={setActivityForm}
             isSavingActivity={isSavingActivity}
+            isCompletingActivity={isCompletingActivity}
             onSaveActivity={handleSaveActivity}
+            onCompleteActivity={handleCompleteActivity}
             onBack={() => setActiveTab("companies")}
           />
         )}
@@ -1162,6 +1248,93 @@ function InfoPanel({ title, items }: { title: string; items: string[] }) {
   );
 }
 
+function FollowUpDashboard({
+  title,
+  activities,
+  emptyText,
+  emphasis,
+  onOpenCompany,
+  onCompleteActivity,
+  completingActivityId,
+}: {
+  title: string;
+  activities: ActivityRecord[];
+  emptyText: string;
+  emphasis: "overdue" | "today" | "open";
+  onOpenCompany: (companyId: string) => void;
+  onCompleteActivity: (activityId: string, companyId?: string | null) => void;
+  completingActivityId: string;
+}) {
+  const titleClass =
+    emphasis === "overdue"
+      ? "text-red-800"
+      : emphasis === "today"
+        ? "text-yellow-800"
+        : "text-slate-900";
+
+  return (
+    <section className="rounded-2xl bg-white p-6 shadow-sm">
+      <h2 className={`text-xl font-bold ${titleClass}`}>{title}</h2>
+
+      {activities.length === 0 ? (
+        <p className="mt-3 text-sm text-slate-600">{emptyText}</p>
+      ) : (
+        <div className="mt-4 grid gap-3">
+          {activities.slice(0, 12).map((activity) => (
+            <div key={activity.id} className="rounded-xl border border-slate-200 p-4">
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800">
+                      {getActivityLabel(activity.activity_type)}
+                    </span>
+                    {isOverdue(activity) && (
+                      <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-800">
+                        Overdue
+                      </span>
+                    )}
+                    {activity.due_date && !isOverdue(activity) && (
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                        Due {formatDate(activity.due_date)}
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="mt-3 font-semibold">{activity.subject || "No subject"}</p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {activity.companies?.company_name || "Company not attached"}
+                  </p>
+                  {activity.notes && (
+                    <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-700">
+                      {activity.notes}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  <button
+                    onClick={() => onOpenCompany(activity.company_id)}
+                    className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+                  >
+                    Open Company
+                  </button>
+                  <button
+                    onClick={() => onCompleteActivity(activity.id, activity.company_id)}
+                    disabled={completingActivityId === activity.id}
+                    className="rounded-lg bg-green-700 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-green-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                  >
+                    {completingActivityId === activity.id ? "Completing..." : "Complete"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function RecentImports({ imports }: { imports: ImportSummary[] }) {
   return (
     <section className="rounded-2xl bg-white p-6 shadow-sm">
@@ -1349,14 +1522,18 @@ function CompanyDetailSection({
   activityForm,
   setActivityForm,
   isSavingActivity,
+  isCompletingActivity,
   onSaveActivity,
+  onCompleteActivity,
   onBack,
 }: {
   detail: CompanyDetail | null;
   activityForm: ActivityForm;
   setActivityForm: (form: ActivityForm) => void;
   isSavingActivity: boolean;
+  isCompletingActivity: string;
   onSaveActivity: () => void;
+  onCompleteActivity: (activityId: string, companyId?: string | null) => void;
   onBack: () => void;
 }) {
   if (!detail) {
@@ -1537,22 +1714,56 @@ function CompanyDetailSection({
         ) : (
           <div className="mt-4 grid gap-3">
             {detail.activities.map((activity) => (
-              <div key={activity.id} className="rounded-xl border border-slate-200 p-4">
+              <div
+                key={activity.id}
+                className={`rounded-xl border p-4 ${
+                  activity.completed_at
+                    ? "border-green-200 bg-green-50"
+                    : isOverdue(activity)
+                      ? "border-red-200 bg-red-50"
+                      : "border-slate-200 bg-white"
+                }`}
+              >
                 <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                   <div>
-                    <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800">
-                      {getActivityLabel(activity.activity_type)}
-                    </span>
-                    <p className="mt-3 font-semibold">
-                      {activity.subject || "No subject"}
-                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800">
+                        {getActivityLabel(activity.activity_type)}
+                      </span>
+                      {activity.completed_at ? (
+                        <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-800">
+                          Completed
+                        </span>
+                      ) : isOverdue(activity) ? (
+                        <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-800">
+                          Overdue
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                          Open
+                        </span>
+                      )}
+                    </div>
+
+                    <p className="mt-3 font-semibold">{activity.subject || "No subject"}</p>
                     <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
                       {activity.notes || "No notes"}
                     </p>
                   </div>
-                  <div className="text-sm text-slate-500 md:text-right">
+
+                  <div className="flex flex-col gap-2 text-sm text-slate-500 md:items-end md:text-right">
                     <p>Created: {formatDate(activity.created_at)}</p>
                     <p>Due: {formatDate(activity.due_date)}</p>
+                    {activity.completed_at && <p>Completed: {formatDate(activity.completed_at)}</p>}
+                    {!activity.completed_at && (
+                      <button
+                        onClick={() => onCompleteActivity(activity.id, activity.company_id)}
+                        disabled={isCompletingActivity === activity.id}
+                        className="mt-2 rounded-lg bg-green-700 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-green-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                      >
+                        {isCompletingActivity === activity.id ? "Completing..." : "Complete"}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1778,7 +1989,7 @@ function ReadableListItem({
   const primaryKey = primaryKeys.find((key) => item[key]);
   const secondaryKey = secondaryKeys.find((key) => item[key]);
 
-  const primaryText = primaryKey ? displayValue(item[primaryKey]) : `Item`;
+  const primaryText = primaryKey ? displayValue(item[primaryKey]) : "Item";
   const secondaryText = secondaryKey ? displayValue(item[secondaryKey]) : "";
 
   const remainingEntries = Object.entries(item).filter(

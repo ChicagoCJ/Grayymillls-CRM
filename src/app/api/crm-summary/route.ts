@@ -19,6 +19,7 @@ function getSupabaseAdmin() {
 export async function GET() {
   try {
     const supabase = getSupabaseAdmin();
+    const today = new Date().toISOString().slice(0, 10);
 
     const { data: companies, error: companiesError } = await supabase
       .from("companies")
@@ -100,10 +101,96 @@ export async function GET() {
 
     if (importsError) throw importsError;
 
+    const { data: openActivities, error: openActivitiesError } = await supabase
+      .from("activities")
+      .select(
+        `
+        id,
+        company_id,
+        contact_id,
+        prospect_id,
+        activity_type,
+        subject,
+        notes,
+        due_date,
+        completed_at,
+        created_at,
+        companies (
+          company_name
+        )
+      `
+      )
+      .is("archived_at", null)
+      .is("completed_at", null)
+      .order("due_date", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: false })
+      .limit(100);
+
+    if (openActivitiesError) throw openActivitiesError;
+
+    const { data: dueTodayActivities, error: dueTodayError } = await supabase
+      .from("activities")
+      .select(
+        `
+        id,
+        company_id,
+        contact_id,
+        prospect_id,
+        activity_type,
+        subject,
+        notes,
+        due_date,
+        completed_at,
+        created_at,
+        companies (
+          company_name
+        )
+      `
+      )
+      .is("archived_at", null)
+      .is("completed_at", null)
+      .eq("due_date", today)
+      .order("created_at", { ascending: false })
+      .limit(100);
+
+    if (dueTodayError) throw dueTodayError;
+
+    const { data: overdueActivities, error: overdueError } = await supabase
+      .from("activities")
+      .select(
+        `
+        id,
+        company_id,
+        contact_id,
+        prospect_id,
+        activity_type,
+        subject,
+        notes,
+        due_date,
+        completed_at,
+        created_at,
+        companies (
+          company_name
+        )
+      `
+      )
+      .is("archived_at", null)
+      .is("completed_at", null)
+      .lt("due_date", today)
+      .order("due_date", { ascending: true })
+      .limit(100);
+
+    if (overdueError) throw overdueError;
+
     return NextResponse.json({
       companies: companies ?? [],
       contacts: contacts ?? [],
       imports: imports ?? [],
+      activities: {
+        open: openActivities ?? [],
+        dueToday: dueTodayActivities ?? [],
+        overdue: overdueActivities ?? [],
+      },
     });
   } catch (error) {
     return NextResponse.json(
