@@ -547,6 +547,9 @@ Keep all language commercially useful, technically cautious, and application-dri
       .insert({
         company_id: payload.companyId,
         prospect_id: prospectId,
+        is_ai_generated: true,
+        ai_generated_at: new Date().toISOString(),
+        ai_generation_source: "openai_analyze_prospect_rev_1_15_3",
         what_they_do: analysis.what_they_do,
         likely_relevance: analysis.likely_relevance,
         likely_parts_cleaned: analysis.likely_parts_cleaned,
