@@ -483,11 +483,6 @@ export default function Home() {
   const [companyTierFilter, setCompanyTierFilter] = useState("All");
   const [companyStatusFilter, setCompanyStatusFilter] = useState("All");
   const [companyProductPathFilter, setCompanyProductPathFilter] = useState("All");
-  const [companyMarketTagFilter, setCompanyMarketTagFilter] = useState("All");
-  const [companySectorTagFilter, setCompanySectorTagFilter] = useState("All");
-  const [companyCategoryTagFilter, setCompanyCategoryTagFilter] = useState("All");
-  const [allCrmTags, setAllCrmTags] = useState<CrmTag[]>([]);
-  const [allCompanyTags, setAllCompanyTags] = useState<CompanyTagSummary[]>([]);
   const [selectedCompanyDetail, setSelectedCompanyDetail] = useState<CompanyDetail | null>(null);
   const [activityForm, setActivityForm] = useState<ActivityForm>({
     activityType: "note",
@@ -3067,10 +3062,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
-
-
 
 
 

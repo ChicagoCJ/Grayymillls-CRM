@@ -124,9 +124,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.18 - Company Tag Filters";
+const APP_VERSION = "Rev 1.17C.2 - Contact Tag Insert Fix";
 const REVISION_NOTE =
-  "Companies can now be filtered by assigned Market, Sector, and Category tags.";
+  "Contact cards now display contact-level Market, Sector, and Category tag controls.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -483,11 +483,6 @@ export default function Home() {
   const [companyTierFilter, setCompanyTierFilter] = useState("All");
   const [companyStatusFilter, setCompanyStatusFilter] = useState("All");
   const [companyProductPathFilter, setCompanyProductPathFilter] = useState("All");
-  const [companyMarketTagFilter, setCompanyMarketTagFilter] = useState("All");
-  const [companySectorTagFilter, setCompanySectorTagFilter] = useState("All");
-  const [companyCategoryTagFilter, setCompanyCategoryTagFilter] = useState("All");
-  const [allCrmTags, setAllCrmTags] = useState<CrmTag[]>([]);
-  const [allCompanyTags, setAllCompanyTags] = useState<CompanyTagSummary[]>([]);
   const [selectedCompanyDetail, setSelectedCompanyDetail] = useState<CompanyDetail | null>(null);
   const [activityForm, setActivityForm] = useState<ActivityForm>({
     activityType: "note",
@@ -573,23 +568,6 @@ export default function Home() {
     return crmSummary.companies.filter((company) => {
       const prospect = getLatestProspect(company);
 
-      const companyTags = allCompanyTags
-        .filter((tag) => tag.company_id === company.id)
-        .map((tag) => tag.crm_tags)
-        .filter((tag): tag is CrmTag => Boolean(tag));
-
-      const companyMarketNames = companyTags
-        .filter((tag) => tag.tag_type === "market")
-        .map((tag) => tag.tag_name);
-
-      const companySectorNames = companyTags
-        .filter((tag) => tag.tag_type === "sector")
-        .map((tag) => tag.tag_name);
-
-      const companyCategoryNames = companyTags
-        .filter((tag) => tag.tag_type === "category")
-        .map((tag) => tag.tag_name);
-
       const searchableText = [
         company.company_name,
         company.domain,
@@ -603,9 +581,6 @@ export default function Home() {
         prospect?.confidence,
         prospect?.likely_product_path,
         prospect?.next_best_action,
-        ...companyMarketNames,
-        ...companySectorNames,
-        ...companyCategoryNames,
       ]
         .map(normalizeForSearch)
         .join(" ");
@@ -618,35 +593,17 @@ export default function Home() {
       const matchesProductPath =
         companyProductPathFilter === "All" ||
         prospect?.likely_product_path === companyProductPathFilter;
-      const matchesMarketTag =
-        companyMarketTagFilter === "All" || companyMarketNames.includes(companyMarketTagFilter);
-      const matchesSectorTag =
-        companySectorTagFilter === "All" || companySectorNames.includes(companySectorTagFilter);
-      const matchesCategoryTag =
-        companyCategoryTagFilter === "All" ||
-        companyCategoryNames.includes(companyCategoryTagFilter);
 
-      return (
-        matchesSearch &&
-        matchesTier &&
-        matchesStatus &&
-        matchesProductPath &&
-        matchesMarketTag &&
-        matchesSectorTag &&
-        matchesCategoryTag
-      );
+      return matchesSearch && matchesTier && matchesStatus && matchesProductPath;
     });
   }, [
     crmSummary.companies,
-    allCompanyTags,
     companySearchTerm,
     companyTierFilter,
     companyStatusFilter,
     companyProductPathFilter,
-    companyMarketTagFilter,
-    companySectorTagFilter,
-    companyCategoryTagFilter,
   ]);
+
   function clearCompanyFilters() {
     setCompanySearchTerm("");
     setCompanyTierFilter("All");
@@ -1550,97 +1507,6 @@ function RecentImports({ imports }: { imports: ImportSummary[] }) {
           </table>
         </div>
       )}
-    </section>
-  );
-}
-
-function CompanyTagFilterPanel({
-  companyMarketTagFilter,
-  setCompanyMarketTagFilter,
-  companyMarketTagOptions,
-  companySectorTagFilter,
-  setCompanySectorTagFilter,
-  companySectorTagOptions,
-  companyCategoryTagFilter,
-  setCompanyCategoryTagFilter,
-  companyCategoryTagOptions,
-  clearCompanyFilters,
-}: {
-  companyMarketTagFilter: string;
-  setCompanyMarketTagFilter: (value: string) => void;
-  companyMarketTagOptions: string[];
-  companySectorTagFilter: string;
-  setCompanySectorTagFilter: (value: string) => void;
-  companySectorTagOptions: string[];
-  companyCategoryTagFilter: string;
-  setCompanyCategoryTagFilter: (value: string) => void;
-  companyCategoryTagOptions: string[];
-  clearCompanyFilters: () => void;
-}) {
-  return (
-    <section className="rounded-2xl bg-white p-6 shadow-sm">
-      <div>
-        <h2 className="text-xl font-bold">Market / Sector / Category Filters</h2>
-        <p className="mt-2 text-sm leading-6 text-slate-600">
-          Filter the company list by assigned segmentation tags.
-        </p>
-      </div>
-
-      <div className="mt-5 grid gap-4 lg:grid-cols-4">
-        <div>
-          <label className="text-sm font-semibold text-slate-700">Market</label>
-          <select
-            value={companyMarketTagFilter}
-            onChange={(event) => setCompanyMarketTagFilter(event.target.value)}
-            className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-          >
-            {companyMarketTagOptions.map((option) => (
-              <option key={`market-filter-${option}`} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="text-sm font-semibold text-slate-700">Sector</label>
-          <select
-            value={companySectorTagFilter}
-            onChange={(event) => setCompanySectorTagFilter(event.target.value)}
-            className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-          >
-            {companySectorTagOptions.map((option) => (
-              <option key={`sector-filter-${option}`} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="text-sm font-semibold text-slate-700">Category</label>
-          <select
-            value={companyCategoryTagFilter}
-            onChange={(event) => setCompanyCategoryTagFilter(event.target.value)}
-            className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-          >
-            {companyCategoryTagOptions.map((option) => (
-              <option key={`category-filter-${option}`} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="flex items-end">
-          <button
-            onClick={clearCompanyFilters}
-            className="w-full rounded-xl bg-slate-800 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-slate-900"
-          >
-            Clear All Filters
-          </button>
-        </div>
-      </div>
     </section>
   );
 }
@@ -3067,11 +2933,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
-
-
-
 
 
 
