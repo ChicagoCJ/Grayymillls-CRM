@@ -124,9 +124,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.09 — Search + Filter Companies";
+const APP_VERSION = "Rev 1.11 — Print Package Button + Graymills Knowledge Base Tables";
 const REVISION_NOTE =
-  "Companies can now be searched and filtered by tier, status, and product path.";
+  "Company detail now links to the print package, and Supabase now has Graymills knowledge-base tables for later AI analysis.";
 
 const REQUIRED_FIELDS = ["Company Name"];
 
@@ -942,31 +942,31 @@ export default function Home() {
             </div>
 
             <div className="rounded-2xl bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-bold">Rev 1.09 Objective</h2>
+              <h2 className="text-xl font-bold">Rev 1.11 Objective</h2>
               <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-600">
-                This revision adds search and filtering to the company list so sales users can
-                quickly focus by company name, industry, location, score tier, status, and likely
-                product path.
+                This revision adds a Print Package button to company detail pages and creates
+                the database foundation for Graymills product, application, and prompt context
+                knowledge that will later support OpenAI-powered prospect analysis.
               </p>
 
               <div className="mt-6 grid gap-4 md:grid-cols-3">
                 <InfoPanel
                   title="What works now"
                   items={[
-                    "Company text search",
-                    "Priority tier filter",
-                    "Status filter",
-                    "Product path filter",
-                    "Clear filters button",
+                    "Print package button on company detail",
+                    "Dedicated print prospect package",
+                    "Company search and filters",
+                    "Follow-up dashboard",
+                    "Graymills knowledge tables in Supabase",
                   ]}
                 />
                 <InfoPanel
                   title="What comes next"
                   items={[
-                    "Print-ready prospecting package",
-                    "Graymills knowledge base tables",
+                    "Seed Graymills knowledge into Supabase",
+                    "Curate product and application context",
+                    "Prepare AI-safe prompt guardrails",
                     "OpenAI prospect analysis later",
-                    "Bulk edit/archive controls later",
                   ]}
                 />
                 <InfoPanel
@@ -1759,12 +1759,23 @@ function CompanyDetailSection({
   return (
     <section className="grid gap-6">
       <div className="rounded-2xl bg-white p-6 shadow-sm">
-        <button
-          onClick={onBack}
-          className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
-        >
-          Back to Companies
-        </button>
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={onBack}
+            className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+          >
+            Back to Companies
+          </button>
+
+          <a
+            href={`/prospect-package?companyId=${String(detail.company.id)}`}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-800"
+          >
+            Print Package
+          </a>
+        </div>
 
         <div className="mt-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
