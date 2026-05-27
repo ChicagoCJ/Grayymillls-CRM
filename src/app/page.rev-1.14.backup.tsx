@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { ChangeEvent, ReactNode, useEffect, useMemo, useState } from "react";
 
@@ -124,9 +124,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.15 - Hide AI Intelligence Until Analyzed";
+const APP_VERSION = "Rev 1.14 — Analyze Prospect Button";
 const REVISION_NOTE =
-  "AI intelligence sections now stay hidden until a real prospect analysis has been generated and saved.";
+  "Company detail now includes an Analyze Prospect button that runs the OpenAI prospect analysis route and refreshes the CRM record.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -461,56 +461,6 @@ function isOverdue(activity: ActivityRecord) {
 
 function normalizeForSearch(value: unknown) {
   return String(value ?? "").toLowerCase().trim();
-}
-
-function hasMeaningfulAnalysis(intelligence: Record<string, unknown> | null) {
-  if (!intelligence) return false;
-
-  const meaningfulStringFields = [
-    "what_they_do",
-    "likely_relevance",
-    "likely_parts_cleaned",
-    "likely_soils_contaminants",
-    "likely_pain_points",
-    "suggested_sales_angle",
-    "buyer_persona",
-    "reason_to_believe",
-    "first_call_opener",
-    "email_subject",
-    "email_message",
-    "copyable_sales_block",
-  ];
-
-  const placeholderValues = new Set([
-    "Not provided",
-    "Requires discovery",
-    "Requires discovery.",
-    "Potential relevance requires discovery.",
-    "Not enough information provided.",
-    "Worth validating",
-    "Unknown",
-  ]);
-
-  const hasMeaningfulText = meaningfulStringFields.some((field) => {
-    const value = intelligence[field];
-
-    if (typeof value !== "string") return false;
-
-    const cleaned = value.trim();
-
-    return cleaned.length > 0 && !placeholderValues.has(cleaned);
-  });
-
-  const hasMeaningfulArray = [
-    "discovery_questions",
-    "recommended_product_paths",
-    "likely_objections",
-    "buying_committee_hypothesis",
-    "trigger_events",
-    "what_not_to_say",
-  ].some((field) => Array.isArray(intelligence[field]) && (intelligence[field] as unknown[]).length > 0);
-
-  return hasMeaningfulText || hasMeaningfulArray;
 }
 
 export default function Home() {
@@ -1029,9 +979,9 @@ async function handleAnalyzeProspect() {
             </div>
 
             <div className="rounded-2xl bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-bold">Rev 1.15 Objective</h2>
+              <h2 className="text-xl font-bold">Rev 1.14 Objective</h2>
                 <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-600">
-                This revision protects CRM trust by hiding AI-generated intelligence sections until a real prospect analysis has been generated and saved. Users will see a clear unanalyzed state instead of placeholder text.
+                This revision makes the AI prospect analysis operational from the CRM. Sales users can open a company record, click Analyze Prospect, generate a structured Graymills sales hypothesis, save it to Supabase, and refresh the company detail and print package.
                 </p>
 
               <div className="mt-6 grid gap-4 md:grid-cols-3">
@@ -1258,7 +1208,7 @@ async function handleAnalyzeProspect() {
                   <h3 className="text-lg font-bold">Manual CRM Field Mapping</h3>
                   <p className="mt-2 text-sm text-slate-600">
                     Review each CRM field and choose the correct ZoomInfo CSV column. Use
-                    â€œSkip / Not mappedâ€ for optional fields you do not want to import.
+                    “Skip / Not mapped” for optional fields you do not want to import.
                   </p>
 
                   <div className="mt-4 max-w-4xl overflow-x-auto">
@@ -1350,7 +1300,7 @@ async function handleAnalyzeProspect() {
                                 className="max-w-[220px] truncate px-3 py-3 text-slate-700"
                                 title={row[header]}
                               >
-                                {row[header] || "â€”"}
+                                {row[header] || "—"}
                               </td>
                             ))}
                           </tr>
@@ -1721,14 +1671,14 @@ function CompaniesSection({
                       {[company.city, company.state].filter(Boolean).join(", ") || "Not provided"}
                     </td>
                     <td className="py-3 pr-4 text-slate-700">
-                      {company.employee_count ?? "â€”"}
+                      {company.employee_count ?? "—"}
                     </td>
                     <td className="py-3 pr-4 font-semibold">
-                      {prospect?.priority_score ?? "â€”"}
+                      {prospect?.priority_score ?? "—"}
                     </td>
                     <td className="py-3 pr-4">
                       <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800">
-                        {prospect?.priority_tier ?? "â€”"}
+                        {prospect?.priority_tier ?? "—"}
                       </span>
                     </td>
                     <td className="max-w-[320px] py-3 pr-4 text-slate-700">
@@ -1789,9 +1739,9 @@ function ContactsSection({ contacts }: { contacts: ContactSummary[] }) {
                   <td className="py-3 pr-4 text-slate-700">
                     {contact.function_area || contact.department || "Not provided"}
                   </td>
-                  <td className="py-3 pr-4 text-slate-700">{contact.email || "â€”"}</td>
-                  <td className="py-3 pr-4 text-slate-700">{contact.direct_phone || "â€”"}</td>
-                  <td className="py-3 pr-4 text-slate-700">{contact.mobile_phone || "â€”"}</td>
+                  <td className="py-3 pr-4 text-slate-700">{contact.email || "—"}</td>
+                  <td className="py-3 pr-4 text-slate-700">{contact.direct_phone || "—"}</td>
+                  <td className="py-3 pr-4 text-slate-700">{contact.mobile_phone || "—"}</td>
                 </tr>
               ))}
             </tbody>
@@ -1843,7 +1793,6 @@ function CompanyDetailSection({
   const company = detail.company;
   const primaryProspect = detail.primaryProspect;
   const intelligence = detail.intelligence;
-  const hasAiAnalysis = hasMeaningfulAnalysis(intelligence);
 
   const discoveryQuestions = parseJsonArray(intelligence?.discovery_questions);
   const recommendedProductPaths = parseJsonArray(intelligence?.recommended_product_paths);
@@ -1899,11 +1848,11 @@ function CompanyDetailSection({
             />
             <SmallScoreCard
               label="Tier"
-              value={primaryProspect ? displayValue(primaryProspect.priority_tier) : "â€”"}
+              value={primaryProspect ? displayValue(primaryProspect.priority_tier) : "—"}
             />
             <SmallScoreCard
               label="Fit"
-              value={primaryProspect ? displayValue(primaryProspect.fit_rating) : "â€”"}
+              value={primaryProspect ? displayValue(primaryProspect.fit_rating) : "—"}
             />
           </div>
         </div>
@@ -1923,31 +1872,17 @@ function CompanyDetailSection({
         </DetailCard>
 
         <DetailCard title="Prospect Summary">
-          {hasAiAnalysis ? (
-            <>
-              <DetailRow label="Product Line" value={primaryProspect?.product_line} />
-              <DetailRow label="Product Path" value={primaryProspect?.likely_product_path} />
-              <DetailRow label="Use Case" value={primaryProspect?.primary_use_case} />
-              <DetailRow label="Likely Soils" value={primaryProspect?.likely_soils} />
-              <DetailRow label="Confidence" value={primaryProspect?.confidence} />
-            </>
-          ) : (
-            <p className="text-sm leading-6 text-slate-600">
-              No AI prospect analysis has been generated yet. Click Analyze Prospect to create a Graymills sales hypothesis.
-            </p>
-          )}
+          <DetailRow label="Product Line" value={primaryProspect?.product_line} />
+          <DetailRow label="Product Path" value={primaryProspect?.likely_product_path} />
+          <DetailRow label="Use Case" value={primaryProspect?.primary_use_case} />
+          <DetailRow label="Likely Soils" value={primaryProspect?.likely_soils} />
+          <DetailRow label="Confidence" value={primaryProspect?.confidence} />
         </DetailCard>
 
         <DetailCard title="Next Best Action">
-          {hasAiAnalysis ? (
-            <p className="text-sm leading-6 text-slate-700">
-              {displayValue(primaryProspect?.next_best_action)}
-            </p>
-          ) : (
-            <p className="text-sm leading-6 text-slate-600">
-              No next-best action is available until analysis is generated.
-            </p>
-          )}
+          <p className="text-sm leading-6 text-slate-700">
+            {displayValue(primaryProspect?.next_best_action)}
+          </p>
         </DetailCard>
       </div>
 
@@ -2118,8 +2053,6 @@ function CompanyDetailSection({
         )}
       </div>
 
-      {hasAiAnalysis ? (
-        <>
       <div className="grid gap-6 lg:grid-cols-2">
         <DetailCard title="What They Do">
           <p className="text-sm leading-6 text-slate-700">
@@ -2224,24 +2157,6 @@ function CompanyDetailSection({
           {displayValue(intelligence?.copyable_sales_block)}
         </div>
       </div>
-        </>
-      ) : (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center shadow-sm">
-          <h3 className="text-xl font-bold text-slate-900">No AI analysis generated yet</h3>
-          <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-            Click Analyze Prospect to generate a Graymills sales hypothesis for this company. Until analysis is generated, the CRM will not display placeholder intelligence that could be mistaken for sales guidance.
-          </p>
-          <div className="mt-5 flex justify-center">
-            <button
-              onClick={onAnalyzeProspect}
-              disabled={isAnalyzingProspect}
-              className="rounded-xl bg-green-700 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-green-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-            >
-              {isAnalyzingProspect ? "Analyzing..." : "Analyze Prospect"}
-            </button>
-          </div>
-        </div>
-      )}
     </section>
   );
 }
@@ -2362,4 +2277,3 @@ function ReadableListItem({
     </div>
   );
 }
-
