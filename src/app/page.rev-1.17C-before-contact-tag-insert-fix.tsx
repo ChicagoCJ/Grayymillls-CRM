@@ -124,9 +124,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.17C.2 - Contact Tag Insert Fix";
+const APP_VERSION = "Rev 1.17C - Contact Tag Assignment UI";
 const REVISION_NOTE =
-  "Contact cards now display contact-level Market, Sector, and Category tag controls.";
+  "Company detail now supports assigning and removing Market, Sector, and Category tags on individual contacts.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -2074,8 +2074,6 @@ function CompanyDetailSection({
                   <p>Mobile: {displayValue(contact.mobile_phone)}</p>
                   <p>Function: {displayValue(contact.function_area || contact.department)}</p>
                 </div>
-
-                <ContactTagManager contactId={String(contact.id)} />
               </div>
             ))}
           </div>
@@ -2933,7 +2931,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 
