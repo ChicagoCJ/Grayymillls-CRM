@@ -124,9 +124,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.17B.3 - Separate Company Tag Controls";
+const APP_VERSION = "Rev 1.17B - Company Tag Assignment UI";
 const REVISION_NOTE =
-  "Company detail now has separate add controls for Market, Sector, and Category tags.";
+  "Company detail now supports assigning and removing Market, Sector, and Category tags.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -2213,9 +2213,7 @@ function CompanyDetailSection({
 function CompanyTagManager({ companyId }: { companyId: string }) {
   const [allTags, setAllTags] = useState<CrmTag[]>([]);
   const [assignedTags, setAssignedTags] = useState<AssignedCompanyTag[]>([]);
-  const [selectedMarketTagId, setSelectedMarketTagId] = useState("");
-  const [selectedSectorTagId, setSelectedSectorTagId] = useState("");
-  const [selectedCategoryTagId, setSelectedCategoryTagId] = useState("");
+  const [selectedTagId, setSelectedTagId] = useState("");
   const [tagMessage, setTagMessage] = useState("");
   const [tagError, setTagError] = useState("");
   const [isLoadingTags, setIsLoadingTags] = useState(false);
@@ -2279,8 +2277,8 @@ function CompanyTagManager({ companyId }: { companyId: string }) {
     };
   }, [availableTags]);
 
-  async function handleAddTag(tagId: string, label: string, resetSelection: () => void) {
-    if (!tagId) return;
+  async function handleAddTag() {
+    if (!selectedTagId) return;
 
     setIsSavingTag(true);
     setTagMessage("");
@@ -2294,21 +2292,21 @@ function CompanyTagManager({ companyId }: { companyId: string }) {
         },
         body: JSON.stringify({
           companyId,
-          tagId,
+          tagId: selectedTagId,
         }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || `Could not add ${label}.`);
+        throw new Error(data.error || "Could not add company tag.");
       }
 
-      resetSelection();
-      setTagMessage(`${label} added.`);
+      setSelectedTagId("");
+      setTagMessage("Tag added.");
       await loadTags();
     } catch (error) {
-      setTagError(error instanceof Error ? error.message : `Could not add ${label}.`);
+      setTagError(error instanceof Error ? error.message : "Could not add company tag.");
     } finally {
       setIsSavingTag(false);
     }
@@ -2381,92 +2379,100 @@ function CompanyTagManager({ companyId }: { companyId: string }) {
       )}
 
       <div className="mt-5 grid gap-4 lg:grid-cols-3">
-        <TagAssignmentColumn
+        <AssignedTagGroup
           title="Markets"
-          emptyText="No markets assigned."
-          selectLabel="Choose Market"
-          addLabel="Add Market"
-          selectedTagId={selectedMarketTagId}
-          setSelectedTagId={setSelectedMarketTagId}
-          availableTags={groupedAvailableTags.market}
-          assignedTags={groupedAssignedTags.market}
+          tags={groupedAssignedTags.market}
           isSavingTag={isSavingTag}
-          onAddTag={() =>
-            handleAddTag(selectedMarketTagId, "Market", () => setSelectedMarketTagId(""))
-          }
           onRemoveTag={handleRemoveTag}
         />
-
-        <TagAssignmentColumn
+        <AssignedTagGroup
           title="Sectors"
-          emptyText="No sectors assigned."
-          selectLabel="Choose Sector"
-          addLabel="Add Sector"
-          selectedTagId={selectedSectorTagId}
-          setSelectedTagId={setSelectedSectorTagId}
-          availableTags={groupedAvailableTags.sector}
-          assignedTags={groupedAssignedTags.sector}
+          tags={groupedAssignedTags.sector}
           isSavingTag={isSavingTag}
-          onAddTag={() =>
-            handleAddTag(selectedSectorTagId, "Sector", () => setSelectedSectorTagId(""))
-          }
           onRemoveTag={handleRemoveTag}
         />
-
-        <TagAssignmentColumn
+        <AssignedTagGroup
           title="Categories"
-          emptyText="No categories assigned."
-          selectLabel="Choose Category"
-          addLabel="Add Category"
-          selectedTagId={selectedCategoryTagId}
-          setSelectedTagId={setSelectedCategoryTagId}
-          availableTags={groupedAvailableTags.category}
-          assignedTags={groupedAssignedTags.category}
+          tags={groupedAssignedTags.category}
           isSavingTag={isSavingTag}
-          onAddTag={() =>
-            handleAddTag(selectedCategoryTagId, "Category", () => setSelectedCategoryTagId(""))
-          }
           onRemoveTag={handleRemoveTag}
         />
+      </div>
+
+      <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <h4 className="font-semibold">Add Tag</h4>
+        <div className="mt-3 grid gap-3 md:grid-cols-[1fr_auto]">
+          <select
+            value={selectedTagId}
+            onChange={(event) => setSelectedTagId(event.target.value)}
+            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+          >
+            <option value="">Choose a Market, Sector, or Category</option>
+
+            {groupedAvailableTags.market.length > 0 && (
+              <optgroup label="Markets">
+                {groupedAvailableTags.market.map((tag) => (
+                  <option key={tag.id} value={tag.id}>
+                    {tag.tag_name}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+
+            {groupedAvailableTags.sector.length > 0 && (
+              <optgroup label="Sectors">
+                {groupedAvailableTags.sector.map((tag) => (
+                  <option key={tag.id} value={tag.id}>
+                    {tag.tag_name}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+
+            {groupedAvailableTags.category.length > 0 && (
+              <optgroup label="Categories">
+                {groupedAvailableTags.category.map((tag) => (
+                  <option key={tag.id} value={tag.id}>
+                    {tag.tag_name}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+          </select>
+
+          <button
+            onClick={handleAddTag}
+            disabled={!selectedTagId || isSavingTag}
+            className="rounded-xl bg-blue-700 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+          >
+            {isSavingTag ? "Saving..." : "Add Tag"}
+          </button>
+        </div>
       </div>
     </section>
   );
 }
 
-function TagAssignmentColumn({
+function AssignedTagGroup({
   title,
-  emptyText,
-  selectLabel,
-  addLabel,
-  selectedTagId,
-  setSelectedTagId,
-  availableTags,
-  assignedTags,
+  tags,
   isSavingTag,
-  onAddTag,
   onRemoveTag,
 }: {
   title: string;
-  emptyText: string;
-  selectLabel: string;
-  addLabel: string;
-  selectedTagId: string;
-  setSelectedTagId: (value: string) => void;
-  availableTags: CrmTag[];
-  assignedTags: AssignedCompanyTag[];
+  tags: AssignedCompanyTag[];
   isSavingTag: boolean;
-  onAddTag: () => void;
   onRemoveTag: (tagId: string) => void;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-      <h4 className="text-lg font-bold text-slate-900">{title}</h4>
+    <div className="rounded-xl border border-slate-200 p-4">
+      <h4 className="font-semibold">{title}</h4>
 
-      {assignedTags.length === 0 ? (
-        <p className="mt-3 text-sm text-slate-500">{emptyText}</p>
+      {tags.length === 0 ? (
+        <p className="mt-3 text-sm text-slate-500">No tags assigned.</p>
       ) : (
         <div className="mt-3 flex flex-wrap gap-2">
-          {assignedTags.map((tag) => (
+          {tags.map((tag) => (
             <span
               key={tag.id}
               className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-800 ring-1 ring-blue-100"
@@ -2485,33 +2491,9 @@ function TagAssignmentColumn({
           ))}
         </div>
       )}
-
-      <div className="mt-4 grid gap-2">
-        <select
-          value={selectedTagId}
-          onChange={(event) => setSelectedTagId(event.target.value)}
-          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-        >
-          <option value="">{selectLabel}</option>
-          {availableTags.map((tag) => (
-            <option key={tag.id} value={tag.id}>
-              {tag.tag_name}
-            </option>
-          ))}
-        </select>
-
-        <button
-          onClick={onAddTag}
-          disabled={!selectedTagId || isSavingTag}
-          className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-        >
-          {isSavingTag ? "Saving..." : addLabel}
-        </button>
-      </div>
     </div>
   );
 }
-
 
 function SmallScoreCard({ label, value }: { label: string; value: string }) {
   return (
@@ -2629,7 +2611,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 
