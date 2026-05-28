@@ -130,9 +130,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.34.3.1 - Industry Options Insert Fix";
+const APP_VERSION = "Rev 1.32.9 - Enrichment Update Call Fix";
 const REVISION_NOTE =
-  "Company industry filter option lists are now generated safely from imported company enrichment data.";
+  "ZoomInfo industry enrichment is now explicitly applied to existing companies during import.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -754,31 +754,6 @@ export default function Home() {
     contactSectorTagFilter,
     contactCategoryTagFilter,
   ]);
-  const companyPrimaryIndustryOptions = useMemo(() => {
-    return [
-      "All",
-      ...Array.from(
-        new Set(
-          crmSummary.companies
-            .map((company) => company.primary_industry)
-            .filter((value): value is string => Boolean(value))
-        )
-      ).sort((a, b) => a.localeCompare(b)),
-    ];
-  }, [crmSummary.companies]);
-
-  const companyPrimarySubIndustryOptions = useMemo(() => {
-    return [
-      "All",
-      ...Array.from(
-        new Set(
-          crmSummary.companies
-            .map((company) => company.primary_sub_industry)
-            .filter((value): value is string => Boolean(value))
-        )
-      ).sort((a, b) => a.localeCompare(b)),
-    ];
-  }, [crmSummary.companies]);
   const filteredCompanies = useMemo(() => {
     const search = normalizeForSearch(companySearchTerm);
 
@@ -865,8 +840,6 @@ export default function Home() {
     setCompanyStatusFilter("All");
     setCompanyProductPathFilter("All");
     setCompanyOwnerFilter("All");
-    setCompanyPrimaryIndustryFilter("All");
-    setCompanyPrimarySubIndustryFilter("All");
   }
 
   function clearContactFilters() {
@@ -4625,12 +4598,6 @@ function CompaniesSection({
   companyOwnerFilter: string;
   setCompanyOwnerFilter: (value: string) => void;
   companyOwnerOptions: CrmUser[];
-  companyPrimaryIndustryFilter?: string;
-  setCompanyPrimaryIndustryFilter?: (value: string) => void;
-  companyPrimaryIndustryOptions?: string[];
-  companyPrimarySubIndustryFilter?: string;
-  setCompanyPrimarySubIndustryFilter?: (value: string) => void;
-  companyPrimarySubIndustryOptions?: string[];
   companyPrimaryIndustryFilter: string;
   setCompanyPrimaryIndustryFilter: (value: string) => void;
   companyPrimaryIndustryOptions: string[];
@@ -7902,7 +7869,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 
