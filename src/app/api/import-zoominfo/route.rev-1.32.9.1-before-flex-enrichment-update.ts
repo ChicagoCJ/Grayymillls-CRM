@@ -783,16 +783,7 @@ export async function POST(request: Request) {
         };
 
         const company = await findOrCreateCompany(supabase, companyBeforeInsert);
-        
-        await updateCompanyIndustryEnrichment(supabase, company.id, {
-          naics,
-          sic,
-          naics_codes: zoomInfoNaicsCodes,
-          sic_codes: zoomInfoSicCodes,
-          primary_industry: zoomInfoPrimaryIndustry,
-          primary_sub_industry: zoomInfoPrimarySubIndustry,
-        });
-const companyWasDuplicate = company.created_at !== company.updated_at;
+        const companyWasDuplicate = company.created_at !== company.updated_at;
 
         const contactBeforeInsert = {
           company_id: company.id,
@@ -1093,7 +1084,6 @@ const companyWasDuplicate = company.created_at !== company.updated_at;
     );
   }
 }
-
 
 
 

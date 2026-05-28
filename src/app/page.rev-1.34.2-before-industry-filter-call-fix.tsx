@@ -130,9 +130,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.32.9 - Enrichment Update Call Fix";
+const APP_VERSION = "Rev 1.34.1 - Industry Filter Props Fix";
 const REVISION_NOTE =
-  "ZoomInfo industry enrichment is now explicitly applied to existing companies during import.";
+  "Company Primary Industry and Primary Sub-Industry filters are now wired correctly into CompaniesSection.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -4571,13 +4571,12 @@ function CompaniesSection({
   companyOwnerFilter,
   setCompanyOwnerFilter,
   companyOwnerOptions,
-  companyPrimaryIndustryFilter = "All",
-  setCompanyPrimaryIndustryFilter = () => {},
-  companyPrimaryIndustryOptions = ["All"],
-  companyPrimarySubIndustryFilter = "All",
-  setCompanyPrimarySubIndustryFilter = () => {},
-  companyPrimarySubIndustryOptions = ["All"],
-  clearCompanyFilters,
+  companyPrimaryIndustryFilter,
+  setCompanyPrimaryIndustryFilter,
+  companyPrimaryIndustryOptions,
+  companyPrimarySubIndustryFilter,
+  setCompanyPrimarySubIndustryFilter,
+  companyPrimarySubIndustryOptions,clearCompanyFilters,
   onOpenCompany,
   isLoadingCompanyDetail,
 }: {
@@ -7869,8 +7868,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
 
 
 

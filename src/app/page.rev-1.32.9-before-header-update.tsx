@@ -130,9 +130,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.32.9 - Enrichment Update Call Fix";
+const APP_VERSION = "Rev 1.34.2 - Industry Filter Call Fix";
 const REVISION_NOTE =
-  "ZoomInfo industry enrichment is now explicitly applied to existing companies during import.";
+  "CompaniesSection now safely receives Primary Industry and Primary Sub-Industry filter props.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -7869,7 +7869,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 

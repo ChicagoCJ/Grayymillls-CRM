@@ -207,6 +207,33 @@ function getValueByHeaderNames(row: Record<string, string>, headerNames: string[
   return null;
 }
 
+function getCsvValueByExcelColumn(
+  row: Record<string, string>,
+  headers: string[],
+  column: string
+) {
+  const index = excelColumnToIndex(column);
+  const header = headers[index];
+
+  if (!header) return null;
+
+  const value = row[header];
+
+  if (typeof value !== "string") return null;
+
+  const cleaned = value.trim();
+  return cleaned.length > 0 ? cleaned : null;
+}
+
+function firstNonBlank(...values: Array<string | null | undefined>) {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+
+  return null;
+}
 function getMappedValue(
   row: Record<string, string>,
   mapping: Record<string, string>,
@@ -721,42 +748,6 @@ export async function POST(request: Request) {
           throw new Error("Company Name is missing after mapping.");
         }
 
-        const zoomInfoSicCode1 = firstNonBlank(
-          getValueByHeaderNames(row, ["SIC Code 1"]),
-          getCsvValueByExcelColumn(row, payload.headers, "AM")
-        );
-
-        const zoomInfoSicCodes = firstNonBlank(
-          getValueByHeaderNames(row, ["SIC Codes"]),
-          getCsvValueByExcelColumn(row, payload.headers, "AO"),
-          zoomInfoSicCode1
-        );
-
-        const zoomInfoNaicsCode1 = firstNonBlank(
-          getValueByHeaderNames(row, ["NAICS Code 1"]),
-          getCsvValueByExcelColumn(row, payload.headers, "AP")
-        );
-
-        const zoomInfoNaicsCodes = firstNonBlank(
-          getValueByHeaderNames(row, ["NAICS Codes"]),
-          getCsvValueByExcelColumn(row, payload.headers, "AR"),
-          zoomInfoNaicsCode1
-        );
-
-        const zoomInfoPrimaryIndustry = firstNonBlank(
-          getValueByHeaderNames(row, ["Primary Industry"]),
-          getCsvValueByExcelColumn(row, payload.headers, "AS")
-        );
-
-        const zoomInfoPrimarySubIndustry = firstNonBlank(
-          getValueByHeaderNames(row, [
-            "Primary Sub-Industry",
-            "Primary Sub Industry",
-            "Primary SubIndustry"
-          ]),
-          getCsvValueByExcelColumn(row, payload.headers, "AT")
-        );
-
         const companyBeforeInsert = {
           company_name: companyName,
           website,
@@ -775,24 +766,11 @@ export async function POST(request: Request) {
           country: getMappedValue(row, payload.mapping, "Company Country") ?? "United States",
           company_type: "Prospect",
           source: "ZoomInfo",
-          naics_codes: zoomInfoNaicsCodes,
-          sic_codes: zoomInfoSicCodes,
-          primary_industry: zoomInfoPrimaryIndustry,
-          primary_sub_industry: zoomInfoPrimarySubIndustry,
           status: "new",
         };
 
         const company = await findOrCreateCompany(supabase, companyBeforeInsert);
-        
-        await updateCompanyIndustryEnrichment(supabase, company.id, {
-          naics,
-          sic,
-          naics_codes: zoomInfoNaicsCodes,
-          sic_codes: zoomInfoSicCodes,
-          primary_industry: zoomInfoPrimaryIndustry,
-          primary_sub_industry: zoomInfoPrimarySubIndustry,
-        });
-const companyWasDuplicate = company.created_at !== company.updated_at;
+        const companyWasDuplicate = company.created_at !== company.updated_at;
 
         const contactBeforeInsert = {
           company_id: company.id,
@@ -1093,9 +1071,6 @@ const companyWasDuplicate = company.created_at !== company.updated_at;
     );
   }
 }
-
-
-
 
 
 

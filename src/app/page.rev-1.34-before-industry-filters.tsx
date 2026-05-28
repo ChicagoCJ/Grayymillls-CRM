@@ -130,9 +130,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.32.9 - Enrichment Update Call Fix";
+const APP_VERSION = "Rev 1.32.7.1 - Active Mapping Postal Code Override";
 const REVISION_NOTE =
-  "ZoomInfo industry enrichment is now explicitly applied to existing companies during import.";
+  "Import mapping now overrides Person Zip Code with Company Postal Code when the ZoomInfo company postal field exists.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -553,8 +553,6 @@ export default function Home() {
   const [allCrmTags, setAllCrmTags] = useState<CrmTag[]>([]);
   const [allCompanyTags, setAllCompanyTags] = useState<CompanyTagSummary[]>([]);
   const [companyOwnerFilter, setCompanyOwnerFilter] = useState("All");
-  const [companyPrimaryIndustryFilter, setCompanyPrimaryIndustryFilter] = useState("All");
-  const [companyPrimarySubIndustryFilter, setCompanyPrimarySubIndustryFilter] = useState("All");
   const [companyOwnerOptions, setCompanyOwnerOptions] = useState<CrmUser[]>([]);
   const [allCompanyOwners, setAllCompanyOwners] = useState<CompanyOwnerSummary[]>([]);
   const [contactSearchTerm, setContactSearchTerm] = useState("");
@@ -4570,14 +4568,7 @@ function CompaniesSection({
   
   companyOwnerFilter,
   setCompanyOwnerFilter,
-  companyOwnerOptions,
-  companyPrimaryIndustryFilter = "All",
-  setCompanyPrimaryIndustryFilter = () => {},
-  companyPrimaryIndustryOptions = ["All"],
-  companyPrimarySubIndustryFilter = "All",
-  setCompanyPrimarySubIndustryFilter = () => {},
-  companyPrimarySubIndustryOptions = ["All"],
-  clearCompanyFilters,
+  companyOwnerOptions,clearCompanyFilters,
   onOpenCompany,
   isLoadingCompanyDetail,
 }: {
@@ -4598,12 +4589,6 @@ function CompaniesSection({
   companyOwnerFilter: string;
   setCompanyOwnerFilter: (value: string) => void;
   companyOwnerOptions: CrmUser[];
-  companyPrimaryIndustryFilter: string;
-  setCompanyPrimaryIndustryFilter: (value: string) => void;
-  companyPrimaryIndustryOptions: string[];
-  companyPrimarySubIndustryFilter: string;
-  setCompanyPrimarySubIndustryFilter: (value: string) => void;
-  companyPrimarySubIndustryOptions: string[];
   clearCompanyFilters: () => void;
   onOpenCompany: (companyId: string) => void;
   isLoadingCompanyDetail: boolean;
@@ -4698,36 +4683,6 @@ function CompaniesSection({
                 ))}
               </select>
             </div>
-            <div>
-              <label className="text-sm font-semibold text-slate-700">Primary Industry</label>
-              <select
-                value={companyPrimaryIndustryFilter}
-                onChange={(event) => setCompanyPrimaryIndustryFilter(event.target.value)}
-                className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-              >
-                {companyPrimaryIndustryOptions.map((industry) => (
-                  <option key={industry} value={industry}>
-                    {industry}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="text-sm font-semibold text-slate-700">Primary Sub-Industry</label>
-              <select
-                value={companyPrimarySubIndustryFilter}
-                onChange={(event) => setCompanyPrimarySubIndustryFilter(event.target.value)}
-                className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-              >
-                {companyPrimarySubIndustryOptions.map((subIndustry) => (
-                  <option key={subIndustry} value={subIndustry}>
-                    {subIndustry}
-                  </option>
-                ))}
-              </select>
-            </div>
-
 
 
           <div className="flex items-end">
@@ -7869,10 +7824,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
-
-
 
 
 
