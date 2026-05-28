@@ -108,12 +108,6 @@ type CrmSummary = {
   };
 };
 
-type CompanyOwnerSummary = {
-  company_id: string;
-  assigned_user_id: string | null;
-  crm_users: CrmUser | null;
-};
-
 type CompanyDetail = {
   company: Record<string, string | number | null>;
   contacts: Record<string, string | boolean | null>[];
@@ -130,9 +124,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.27.8.7 - Owner Filter Cleanup";
+const APP_VERSION = "Rev 1.27.7 - Clean Header Copy";
 const REVISION_NOTE =
-  "Companies owner filter wiring and prop definitions have been cleaned up.";
+  "The main header has been simplified by removing the large CRM headline and explanatory subcopy.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -494,9 +488,6 @@ export default function Home() {
   const [companyCategoryTagFilter, setCompanyCategoryTagFilter] = useState("All");
   const [allCrmTags, setAllCrmTags] = useState<CrmTag[]>([]);
   const [allCompanyTags, setAllCompanyTags] = useState<CompanyTagSummary[]>([]);
-  const [companyOwnerFilter, setCompanyOwnerFilter] = useState("All");
-  const [companyOwnerOptions, setCompanyOwnerOptions] = useState<CrmUser[]>([]);
-  const [allCompanyOwners, setAllCompanyOwners] = useState<CompanyOwnerSummary[]>([]);
   const [contactSearchTerm, setContactSearchTerm] = useState("");
   const [contactMarketTagFilter, setContactMarketTagFilter] = useState("All");
   const [contactSectorTagFilter, setContactSectorTagFilter] = useState("All");
@@ -754,7 +745,6 @@ export default function Home() {
     setCompanyTierFilter("All");
     setCompanyStatusFilter("All");
     setCompanyProductPathFilter("All");
-    setCompanyOwnerFilter("All");
   }
 
   function clearContactFilters() {
@@ -762,32 +752,6 @@ export default function Home() {
     setContactMarketTagFilter("All");
     setContactSectorTagFilter("All");
     setContactCategoryTagFilter("All");
-  }
-  async function loadCompanyOwnerFilterData() {
-    try {
-      const [usersResponse, ownersResponse] = await Promise.all([
-        fetch("/api/crm-users"),
-        fetch("/api/company-owner-summary"),
-      ]);
-
-      const usersData = await usersResponse.json();
-      const ownersData = await ownersResponse.json();
-
-      if (!usersResponse.ok) {
-        throw new Error(usersData.error || "Could not load CRM owners.");
-      }
-
-      if (!ownersResponse.ok) {
-        throw new Error(ownersData.error || "Could not load company owner assignments.");
-      }
-
-      setCompanyOwnerOptions(usersData.users ?? []);
-      setAllCompanyOwners(ownersData.companyOwners ?? []);
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Could not load company owner filters."
-      );
-    }
   }
   async function loadCrmSummary() {
     setIsLoadingSummary(true);
@@ -1230,10 +1194,7 @@ async function handleAnalyzeProspect() {
             companyProductPathFilter={companyProductPathFilter}
             setCompanyProductPathFilter={setCompanyProductPathFilter}
             companyProductPathOptions={companyProductPathOptions}
-            
-            companyOwnerFilter={companyOwnerFilter}
-            setCompanyOwnerFilter={setCompanyOwnerFilter}
-            companyOwnerOptions={companyOwnerOptions}clearCompanyFilters={clearCompanyFilters}
+            clearCompanyFilters={clearCompanyFilters}
             onOpenCompany={loadCompanyDetail}
             isLoadingCompanyDetail={isLoadingCompanyDetail}
           />
@@ -3576,10 +3537,7 @@ function CompaniesSection({
   companyProductPathFilter,
   setCompanyProductPathFilter,
   companyProductPathOptions,
-  
-  companyOwnerFilter,
-  setCompanyOwnerFilter,
-  companyOwnerOptions,clearCompanyFilters,
+  clearCompanyFilters,
   onOpenCompany,
   isLoadingCompanyDetail,
 }: {
@@ -3596,10 +3554,6 @@ function CompaniesSection({
   companyProductPathFilter: string;
   setCompanyProductPathFilter: (value: string) => void;
   companyProductPathOptions: string[];
-  
-  companyOwnerFilter: string;
-  setCompanyOwnerFilter: (value: string) => void;
-  companyOwnerOptions: CrmUser[];
   clearCompanyFilters: () => void;
   onOpenCompany: (companyId: string) => void;
   isLoadingCompanyDetail: boolean;
@@ -3677,24 +3631,6 @@ function CompaniesSection({
               ))}
             </select>
           </div>
-            <div>
-              <label className="text-sm font-semibold text-slate-700">Assigned Owner</label>
-              <select
-                value={companyOwnerFilter}
-                onChange={(event) => setCompanyOwnerFilter(event.target.value)}
-                className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-              >
-                <option value="All">All</option>
-                <option value="Unassigned">Unassigned</option>
-                {companyOwnerOptions.map((owner) => (
-                  <option key={owner.id} value={owner.display_name}>
-                    {owner.display_name}
-                    {owner.user_role === "admin" ? " — Admin" : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-
 
           <div className="flex items-end">
             <button
@@ -5848,16 +5784,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
 
 
 

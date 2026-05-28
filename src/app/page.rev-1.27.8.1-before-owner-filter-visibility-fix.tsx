@@ -130,9 +130,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.27.8.7 - Owner Filter Cleanup";
+const APP_VERSION = "Rev 1.27.8 - Filter Companies by Owner";
 const REVISION_NOTE =
-  "Companies owner filter wiring and prop definitions have been cleaned up.";
+  "Companies can now be filtered by assigned CRM owner.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -754,7 +754,6 @@ export default function Home() {
     setCompanyTierFilter("All");
     setCompanyStatusFilter("All");
     setCompanyProductPathFilter("All");
-    setCompanyOwnerFilter("All");
   }
 
   function clearContactFilters() {
@@ -1230,10 +1229,7 @@ async function handleAnalyzeProspect() {
             companyProductPathFilter={companyProductPathFilter}
             setCompanyProductPathFilter={setCompanyProductPathFilter}
             companyProductPathOptions={companyProductPathOptions}
-            
-            companyOwnerFilter={companyOwnerFilter}
-            setCompanyOwnerFilter={setCompanyOwnerFilter}
-            companyOwnerOptions={companyOwnerOptions}clearCompanyFilters={clearCompanyFilters}
+            clearCompanyFilters={clearCompanyFilters}
             onOpenCompany={loadCompanyDetail}
             isLoadingCompanyDetail={isLoadingCompanyDetail}
           />
@@ -3562,6 +3558,69 @@ function CompanyTagFilterPanel({
   );
 }
 
+function CompanyOwnerFilterPanel({
+  companyOwnerFilter,
+  setCompanyOwnerFilter,
+  companyOwnerOptions,
+  clearCompanyFilters,
+  onRefreshOwners,
+}: {
+  companyOwnerFilter: string;
+  setCompanyOwnerFilter: (value: string) => void;
+  companyOwnerOptions: CrmUser[];
+  clearCompanyFilters: () => void;
+  onRefreshOwners: () => void;
+}) {
+  return (
+    <section className="rounded-2xl bg-white p-6 shadow-sm">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <h2 className="text-xl font-bold">Owner Filter</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Filter the company list by the assigned CRM owner.
+          </p>
+        </div>
+
+        <button
+          onClick={onRefreshOwners}
+          className="w-fit rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+        >
+          Refresh Owners
+        </button>
+      </div>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_auto]">
+        <div>
+          <label className="text-sm font-semibold text-slate-700">Assigned Owner</label>
+          <select
+            value={companyOwnerFilter}
+            onChange={(event) => setCompanyOwnerFilter(event.target.value)}
+            className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+          >
+            <option value="All">All</option>
+            <option value="Unassigned">Unassigned</option>
+            {companyOwnerOptions.map((owner) => (
+              <option key={owner.id} value={owner.display_name}>
+                {owner.display_name}
+                {owner.user_role === "admin" ? " — Admin" : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex items-end">
+          <button
+            onClick={clearCompanyFilters}
+            className="rounded-xl bg-slate-800 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-slate-900"
+          >
+            Clear Company Filters
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function CompaniesSection({
   companies,
   totalCompanyCount,
@@ -3576,10 +3635,7 @@ function CompaniesSection({
   companyProductPathFilter,
   setCompanyProductPathFilter,
   companyProductPathOptions,
-  
-  companyOwnerFilter,
-  setCompanyOwnerFilter,
-  companyOwnerOptions,clearCompanyFilters,
+  clearCompanyFilters,
   onOpenCompany,
   isLoadingCompanyDetail,
 }: {
@@ -3596,10 +3652,6 @@ function CompaniesSection({
   companyProductPathFilter: string;
   setCompanyProductPathFilter: (value: string) => void;
   companyProductPathOptions: string[];
-  
-  companyOwnerFilter: string;
-  setCompanyOwnerFilter: (value: string) => void;
-  companyOwnerOptions: CrmUser[];
   clearCompanyFilters: () => void;
   onOpenCompany: (companyId: string) => void;
   isLoadingCompanyDetail: boolean;
@@ -3677,24 +3729,6 @@ function CompaniesSection({
               ))}
             </select>
           </div>
-            <div>
-              <label className="text-sm font-semibold text-slate-700">Assigned Owner</label>
-              <select
-                value={companyOwnerFilter}
-                onChange={(event) => setCompanyOwnerFilter(event.target.value)}
-                className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-              >
-                <option value="All">All</option>
-                <option value="Unassigned">Unassigned</option>
-                {companyOwnerOptions.map((owner) => (
-                  <option key={owner.id} value={owner.display_name}>
-                    {owner.display_name}
-                    {owner.user_role === "admin" ? " — Admin" : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-
 
           <div className="flex items-end">
             <button
@@ -5848,15 +5882,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
 
 
 

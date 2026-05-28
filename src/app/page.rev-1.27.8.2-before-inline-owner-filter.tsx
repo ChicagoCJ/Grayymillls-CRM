@@ -130,9 +130,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.27.8.7 - Owner Filter Cleanup";
+const APP_VERSION = "Rev 1.27.8.2 - Inline Company Owner Filter";
 const REVISION_NOTE =
-  "Companies owner filter wiring and prop definitions have been cleaned up.";
+  "Assigned Owner is now part of the main Companies filter block.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -754,7 +754,6 @@ export default function Home() {
     setCompanyTierFilter("All");
     setCompanyStatusFilter("All");
     setCompanyProductPathFilter("All");
-    setCompanyOwnerFilter("All");
   }
 
   function clearContactFilters() {
@@ -1230,10 +1229,7 @@ async function handleAnalyzeProspect() {
             companyProductPathFilter={companyProductPathFilter}
             setCompanyProductPathFilter={setCompanyProductPathFilter}
             companyProductPathOptions={companyProductPathOptions}
-            
-            companyOwnerFilter={companyOwnerFilter}
-            setCompanyOwnerFilter={setCompanyOwnerFilter}
-            companyOwnerOptions={companyOwnerOptions}clearCompanyFilters={clearCompanyFilters}
+            clearCompanyFilters={clearCompanyFilters}
             onOpenCompany={loadCompanyDetail}
             isLoadingCompanyDetail={isLoadingCompanyDetail}
           />
@@ -3576,10 +3572,7 @@ function CompaniesSection({
   companyProductPathFilter,
   setCompanyProductPathFilter,
   companyProductPathOptions,
-  
-  companyOwnerFilter,
-  setCompanyOwnerFilter,
-  companyOwnerOptions,clearCompanyFilters,
+  clearCompanyFilters,
   onOpenCompany,
   isLoadingCompanyDetail,
 }: {
@@ -3596,10 +3589,6 @@ function CompaniesSection({
   companyProductPathFilter: string;
   setCompanyProductPathFilter: (value: string) => void;
   companyProductPathOptions: string[];
-  
-  companyOwnerFilter: string;
-  setCompanyOwnerFilter: (value: string) => void;
-  companyOwnerOptions: CrmUser[];
   clearCompanyFilters: () => void;
   onOpenCompany: (companyId: string) => void;
   isLoadingCompanyDetail: boolean;
@@ -3677,24 +3666,6 @@ function CompaniesSection({
               ))}
             </select>
           </div>
-            <div>
-              <label className="text-sm font-semibold text-slate-700">Assigned Owner</label>
-              <select
-                value={companyOwnerFilter}
-                onChange={(event) => setCompanyOwnerFilter(event.target.value)}
-                className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-              >
-                <option value="All">All</option>
-                <option value="Unassigned">Unassigned</option>
-                {companyOwnerOptions.map((owner) => (
-                  <option key={owner.id} value={owner.display_name}>
-                    {owner.display_name}
-                    {owner.user_role === "admin" ? " — Admin" : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-
 
           <div className="flex items-end">
             <button
@@ -5848,13 +5819,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
-
-
-
-
-
 
 
 

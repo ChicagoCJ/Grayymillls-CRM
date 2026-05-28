@@ -130,9 +130,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.27.8.7 - Owner Filter Cleanup";
+const APP_VERSION = "Rev 1.27.8.6 - Companies Owner Props Hard Fix";
 const REVISION_NOTE =
-  "Companies owner filter wiring and prop definitions have been cleaned up.";
+  "Assigned Owner filter props are now wired into CompaniesSection.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -3599,8 +3599,7 @@ function CompaniesSection({
   
   companyOwnerFilter: string;
   setCompanyOwnerFilter: (value: string) => void;
-  companyOwnerOptions: CrmUser[];
-  clearCompanyFilters: () => void;
+  companyOwnerOptions: CrmUser[];clearCompanyFilters: () => void;
   onOpenCompany: (companyId: string) => void;
   isLoadingCompanyDetail: boolean;
 }) {
@@ -5848,7 +5847,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 

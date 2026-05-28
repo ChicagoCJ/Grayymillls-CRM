@@ -130,9 +130,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.27.8.7 - Owner Filter Cleanup";
+const APP_VERSION = "Rev 1.27.8.4 - Companies Owner Filter Fix";
 const REVISION_NOTE =
-  "Companies owner filter wiring and prop definitions have been cleaned up.";
+  "Assigned Owner now appears directly inside the Companies filter block.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1230,10 +1230,7 @@ async function handleAnalyzeProspect() {
             companyProductPathFilter={companyProductPathFilter}
             setCompanyProductPathFilter={setCompanyProductPathFilter}
             companyProductPathOptions={companyProductPathOptions}
-            
-            companyOwnerFilter={companyOwnerFilter}
-            setCompanyOwnerFilter={setCompanyOwnerFilter}
-            companyOwnerOptions={companyOwnerOptions}clearCompanyFilters={clearCompanyFilters}
+            clearCompanyFilters={clearCompanyFilters}
             onOpenCompany={loadCompanyDetail}
             isLoadingCompanyDetail={isLoadingCompanyDetail}
           />
@@ -3576,10 +3573,7 @@ function CompaniesSection({
   companyProductPathFilter,
   setCompanyProductPathFilter,
   companyProductPathOptions,
-  
-  companyOwnerFilter,
-  setCompanyOwnerFilter,
-  companyOwnerOptions,clearCompanyFilters,
+  clearCompanyFilters,
   onOpenCompany,
   isLoadingCompanyDetail,
 }: {
@@ -3596,10 +3590,6 @@ function CompaniesSection({
   companyProductPathFilter: string;
   setCompanyProductPathFilter: (value: string) => void;
   companyProductPathOptions: string[];
-  
-  companyOwnerFilter: string;
-  setCompanyOwnerFilter: (value: string) => void;
-  companyOwnerOptions: CrmUser[];
   clearCompanyFilters: () => void;
   onOpenCompany: (companyId: string) => void;
   isLoadingCompanyDetail: boolean;
@@ -5848,9 +5838,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
-
 
 
 
