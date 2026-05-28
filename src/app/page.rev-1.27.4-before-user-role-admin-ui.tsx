@@ -124,9 +124,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.27.4 - CRM User Role Flag";
+const APP_VERSION = "Rev 1.27.3 - Admin CRM User Management";
 const REVISION_NOTE =
-  "CRM owners can now be marked as Admin or User in the Admin panel.";
+  "Admin now supports creating, editing, archiving, and reactivating CRM owners.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1712,7 +1712,6 @@ function AdminUsersSection() {
   const [form, setForm] = useState({
     displayName: "",
     roleName: "",
-    userRole: "user" as "admin" | "user",
     email: "",
     phone: "",
     notes: "",
@@ -1749,7 +1748,6 @@ function AdminUsersSection() {
     setForm({
       displayName: "",
       roleName: "",
-      userRole: "user",
       email: "",
       phone: "",
       notes: "",
@@ -1763,7 +1761,6 @@ function AdminUsersSection() {
     setForm({
       displayName: user.display_name,
       roleName: user.role_name ?? "",
-      userRole: user.user_role ?? "user",
       email: user.email ?? "",
       phone: user.phone ?? "",
       notes: user.notes ?? "",
@@ -1791,7 +1788,6 @@ function AdminUsersSection() {
           id: editingUserId || undefined,
           displayName: form.displayName,
           roleName: form.roleName,
-          userRole: form.userRole,
           email: form.email,
           phone: form.phone,
           notes: form.notes,
@@ -1903,7 +1899,7 @@ function AdminUsersSection() {
           </div>
 
           <div>
-            <label className="text-sm font-semibold text-slate-700">Role / Function</label>
+            <label className="text-sm font-semibold text-slate-700">Role</label>
             <input
               type="text"
               value={form.roleName}
@@ -1911,20 +1907,6 @@ function AdminUsersSection() {
               className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
               placeholder="Sales"
             />
-          </div>
-
-          <div>
-            <label className="text-sm font-semibold text-slate-700">Access Type</label>
-            <select
-              value={form.userRole}
-              onChange={(event) =>
-                setForm({ ...form, userRole: event.target.value as "admin" | "user" })
-              }
-              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
-            >
-              <option value="user">User</option>
-              <option value="admin">Admin</option>
-            </select>
           </div>
 
           <div>
@@ -2033,8 +2015,7 @@ function AdminUsersSection() {
                     </div>
 
                     <div className="mt-2 grid gap-1 text-sm text-slate-600">
-                      <p>Role / Function: {displayValue(user.role_name)}</p>
-                      <p>Access Type: {user.user_role === "admin" ? "Admin" : "User"}</p>
+                      <p>Role: {displayValue(user.role_name)}</p>
                       <p>Email: {displayValue(user.email)}</p>
                       <p>Phone: {displayValue(user.phone)}</p>
                       <p>Sort: {user.sort_order ?? 100}</p>
@@ -5567,7 +5548,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 
