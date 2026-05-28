@@ -130,9 +130,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.30.2 - Funnel Inline Open Company Fix";
+const APP_VERSION = "Rev 1.29.3.1 - Document Panel Visibility Fix";
 const REVISION_NOTE =
-  "The Funnel Open Company action now uses inline company-detail navigation.";
+  "Opportunity document upload panels now appear inside each opportunity card.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -372,15 +372,7 @@ function suggestMappings(headers: string[]): MappingSuggestion[] {
     const containsMatch = normalizedHeaders.find((header) =>
       crmField.aliases.some((alias) => {
         const normalizedAlias = normalizeHeader(alias);
-        function openCompanyDetail(companyId: string) {
-    loadCompanyDetail(companyId);
-    setActiveTab("companyDetail");
-
-    if (typeof window !== "undefined") {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-  }
-  return (
+        return (
           header.normalized.includes(normalizedAlias) ||
           normalizedAlias.includes(header.normalized)
         );
@@ -1271,18 +1263,7 @@ async function handleAnalyzeProspect() {
           </section>
         )}
 
-        {activeTab === "funnel" && (
-          <FunnelDashboardSection
-            onOpenCompany={(companyId) => {
-              loadCompanyDetail(companyId);
-              setActiveTab("companyDetail");
-
-              if (typeof window !== "undefined") {
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }
-            }}
-          />
-        )}
+        {activeTab === "funnel" && <FunnelDashboardSection />}
 
         {activeTab === "companyDetail" && (
           <CompanyDetailSection
@@ -3172,16 +3153,10 @@ function AdminTagGroup({
   );
 }
 
-function FunnelDashboardSection({
-  onOpenCompany,
-}: {
-  onOpenCompany: (companyId: string) => void;
-}) {
+function FunnelDashboardSection() {
   const [stages, setStages] = useState<SalesFunnelStage[]>([]);
   const [opportunities, setOpportunities] = useState<SalesOpportunity[]>([]);
   const [statusFilter, setStatusFilter] = useState("open");
-  const [stageFilter, setStageFilter] = useState("All");
-  const [typeFilter, setTypeFilter] = useState("All");
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [funnelError, setFunnelError] = useState("");
@@ -3220,19 +3195,6 @@ function FunnelDashboardSection({
     loadFunnelDashboard();
   }, [statusFilter]);
 
-  const typeOptions = useMemo(() => {
-    return [
-      "All",
-      ...Array.from(
-        new Set(
-          opportunities
-            .map((opportunity) => opportunity.opportunity_type)
-            .filter((value): value is string => Boolean(value))
-        )
-      ).sort((a, b) => a.localeCompare(b)),
-    ];
-  }, [opportunities]);
-
   const filteredOpportunities = useMemo(() => {
     const search = normalizeForSearch(searchTerm);
 
@@ -3252,23 +3214,13 @@ function FunnelDashboardSection({
         .map(normalizeForSearch)
         .join(" ");
 
-      const matchesSearch = !search || searchableText.includes(search);
-      const matchesStage = stageFilter === "All" || opportunity.stage_id === stageFilter;
-      const matchesType = typeFilter === "All" || opportunity.opportunity_type === typeFilter;
-
-      return matchesSearch && matchesStage && matchesType;
+      return !search || searchableText.includes(search);
     });
-  }, [opportunities, searchTerm, stageFilter, typeFilter]);
+  }, [opportunities, searchTerm]);
 
-  const statusCounts = useMemo(() => {
-    return {
-      open: opportunities.filter((opportunity) => opportunity.status === "open").length,
-      won: opportunities.filter((opportunity) => opportunity.status === "won").length,
-      lost: opportunities.filter((opportunity) => opportunity.status === "lost").length,
-      archived: opportunities.filter((opportunity) => opportunity.status === "archived").length,
-      total: opportunities.length,
-    };
-  }, [opportunities]);
+  const openOpportunities = filteredOpportunities.filter(
+    (opportunity) => opportunity.status === "open"
+  );
 
   const totalPipelineValue = filteredOpportunities.reduce((total, opportunity) => {
     return total + Number(opportunity.estimated_value ?? 0);
@@ -3324,13 +3276,6 @@ function FunnelDashboardSection({
     });
   }
 
-  function clearFunnelFilters() {
-    setStatusFilter("open");
-    setStageFilter("All");
-    setTypeFilter("All");
-    setSearchTerm("");
-  }
-
   return (
     <section className="grid gap-6">
       <div className="rounded-2xl bg-white p-6 shadow-sm">
@@ -3341,7 +3286,7 @@ function FunnelDashboardSection({
             </p>
             <h2 className="mt-2 text-2xl font-bold">Pipeline Dashboard</h2>
             <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-600">
-              Track opportunities by stage, status, product path, probability, expected value, and next step.
+              Track open, won, lost, and archived opportunities across the CRM. This dashboard is opportunity-based, so one company can have multiple product-path opportunities.
             </p>
           </div>
 
@@ -3363,9 +3308,9 @@ function FunnelDashboardSection({
 
       <div className="grid gap-4 md:grid-cols-4">
         <MetricCard
-          label="Filtered opportunities"
-          value={filteredOpportunities.length.toString()}
-          note={`Open ${statusCounts.open} · Won ${statusCounts.won} · Lost ${statusCounts.lost}`}
+          label={statusFilter === "open" ? "Open opportunities" : "Filtered opportunities"}
+          value={(statusFilter === "open" ? openOpportunities.length : filteredOpportunities.length).toString()}
+          note={`${filteredOpportunities.length} shown after search`}
         />
         <MetricCard
           label="Pipeline value"
@@ -3385,9 +3330,9 @@ function FunnelDashboardSection({
       </div>
 
       <div className="rounded-2xl bg-white p-6 shadow-sm">
-        <h3 className="text-xl font-bold">Funnel Filters</h3>
+        <h3 className="text-xl font-bold">Funnel Controls</h3>
 
-        <div className="mt-5 grid gap-4 lg:grid-cols-5">
+        <div className="mt-5 grid gap-4 lg:grid-cols-4">
           <div>
             <label className="text-sm font-semibold text-slate-700">Status</label>
             <select
@@ -3403,55 +3348,15 @@ function FunnelDashboardSection({
             </select>
           </div>
 
-          <div>
-            <label className="text-sm font-semibold text-slate-700">Stage</label>
-            <select
-              value={stageFilter}
-              onChange={(event) => setStageFilter(event.target.value)}
-              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-            >
-              <option value="All">All</option>
-              {stages.map((stage) => (
-                <option key={stage.id} value={stage.id}>
-                  {stage.stage_name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="text-sm font-semibold text-slate-700">Opportunity Type</label>
-            <select
-              value={typeFilter}
-              onChange={(event) => setTypeFilter(event.target.value)}
-              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-            >
-              {typeOptions.map((typeOption) => (
-                <option key={typeOption} value={typeOption}>
-                  {typeOption}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="lg:col-span-2">
-            <label className="text-sm font-semibold text-slate-700">Search</label>
+          <div className="lg:col-span-3">
+            <label className="text-sm font-semibold text-slate-700">Search Opportunities</label>
             <input
               type="text"
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="Search company, opportunity, product path, contact, next step..."
+              placeholder="Search company, opportunity, product path, stage, contact, next step..."
               className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
             />
-          </div>
-
-          <div className="lg:col-span-5 flex justify-start">
-            <button
-              onClick={clearFunnelFilters}
-              className="rounded-xl bg-slate-800 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-slate-900"
-            >
-              Clear Funnel Filters
-            </button>
           </div>
         </div>
       </div>
@@ -3464,15 +3369,7 @@ function FunnelDashboardSection({
         ) : (
           <div className="mt-5 grid gap-4 lg:grid-cols-4">
             {stageSummaries.map((summary) => (
-              <button
-                key={summary.stage.id}
-                onClick={() => setStageFilter(summary.stage.id)}
-                className={`rounded-2xl border p-4 text-left transition ${
-                  stageFilter === summary.stage.id
-                    ? "border-blue-400 bg-blue-50"
-                    : "border-slate-200 bg-white hover:border-blue-200"
-                }`}
-              >
+              <div key={summary.stage.id} className="rounded-2xl border border-slate-200 p-4">
                 <p className="text-sm font-semibold text-slate-900">{summary.stage.stage_name}</p>
                 <p className="mt-2 text-2xl font-bold">{summary.count}</p>
                 <div className="mt-3 grid gap-1 text-xs text-slate-600">
@@ -3480,21 +3377,14 @@ function FunnelDashboardSection({
                   <p>Weighted: {formatCurrency(summary.weightedValue)}</p>
                   <p>Default probability: {summary.stage.default_probability}%</p>
                 </div>
-              </button>
+              </div>
             ))}
           </div>
         )}
       </div>
 
       <div className="rounded-2xl bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-          <div>
-            <h3 className="text-xl font-bold">Opportunities</h3>
-            <p className="mt-2 text-sm text-slate-600">
-              Showing {filteredOpportunities.length} opportunities after filters.
-            </p>
-          </div>
-        </div>
+        <h3 className="text-xl font-bold">Opportunities</h3>
 
         {filteredOpportunities.length === 0 ? (
           <p className="mt-3 text-sm text-slate-600">
@@ -3502,7 +3392,7 @@ function FunnelDashboardSection({
           </p>
         ) : (
           <div className="mt-5 overflow-x-auto">
-            <table className="w-full min-w-[1200px] border-collapse text-left text-sm">
+            <table className="w-full min-w-[1100px] border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-slate-200">
                   <th className="py-3 pr-4 font-semibold">Opportunity</th>
@@ -3514,7 +3404,6 @@ function FunnelDashboardSection({
                   <th className="py-3 pr-4 font-semibold">Weighted</th>
                   <th className="py-3 pr-4 font-semibold">Close Date</th>
                   <th className="py-3 pr-4 font-semibold">Next Step</th>
-                  <th className="py-3 pr-4 font-semibold">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -3522,7 +3411,6 @@ function FunnelDashboardSection({
                   const value = Number(opportunity.estimated_value ?? 0);
                   const probability = Number(opportunity.probability ?? 0) / 100;
                   const weighted = value * probability;
-                  const companyId = opportunity.companies?.id;
 
                   return (
                     <tr key={opportunity.id} className="border-b border-slate-100 align-top">
@@ -3549,18 +3437,6 @@ function FunnelDashboardSection({
                       <td className="py-3 pr-4">{formatDate(opportunity.expected_close_date)}</td>
                       <td className="max-w-[320px] py-3 pr-4 text-slate-700">
                         {displayValue(opportunity.next_step)}
-                      </td>
-                      <td className="py-3 pr-4">
-                        {companyId ? (
-                          <button
-                            onClick={() => onOpenCompany(String(companyId))}
-                            className="rounded-lg bg-blue-700 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-800"
-                          >
-                            Open Company
-                          </button>
-                        ) : (
-                          <span className="text-xs text-slate-500">No company</span>
-                        )}
                       </td>
                     </tr>
                   );
@@ -7303,10 +7179,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
-
-
 
 
 

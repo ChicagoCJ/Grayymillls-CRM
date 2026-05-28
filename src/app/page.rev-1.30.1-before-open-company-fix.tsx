@@ -130,9 +130,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.30.2 - Funnel Inline Open Company Fix";
+const APP_VERSION = "Rev 1.30 - Funnel Stage Filter and UX";
 const REVISION_NOTE =
-  "The Funnel Open Company action now uses inline company-detail navigation.";
+  "The Funnel tab now includes stage and opportunity type filters plus quick company navigation.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -372,15 +372,7 @@ function suggestMappings(headers: string[]): MappingSuggestion[] {
     const containsMatch = normalizedHeaders.find((header) =>
       crmField.aliases.some((alias) => {
         const normalizedAlias = normalizeHeader(alias);
-        function openCompanyDetail(companyId: string) {
-    loadCompanyDetail(companyId);
-    setActiveTab("companyDetail");
-
-    if (typeof window !== "undefined") {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-  }
-  return (
+        return (
           header.normalized.includes(normalizedAlias) ||
           normalizedAlias.includes(header.normalized)
         );
@@ -1271,18 +1263,7 @@ async function handleAnalyzeProspect() {
           </section>
         )}
 
-        {activeTab === "funnel" && (
-          <FunnelDashboardSection
-            onOpenCompany={(companyId) => {
-              loadCompanyDetail(companyId);
-              setActiveTab("companyDetail");
-
-              if (typeof window !== "undefined") {
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }
-            }}
-          />
-        )}
+        {activeTab === "funnel" && <FunnelDashboardSection onOpenCompany={openCompanyDetail} />}
 
         {activeTab === "companyDetail" && (
           <CompanyDetailSection
@@ -7303,9 +7284,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
-
 
 
 
