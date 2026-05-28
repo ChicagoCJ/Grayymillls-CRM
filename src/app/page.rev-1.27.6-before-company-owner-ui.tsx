@@ -124,9 +124,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.27.6 - Company Owner Assignment";
+const APP_VERSION = "Rev 1.27.5 - Admin-Gated Owner Editing";
 const REVISION_NOTE =
-  "Company detail now supports assigning one CRM owner to each company.";
+  "Admin remains visible to all users, but CRM owner editing is gated behind temporary Admin Mode.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -4040,12 +4040,7 @@ function CompanyDetailSection({
             </p>
           )}
         </DetailCard>
-      </div>      <CompanyOwnerPanel
-        companyId={String(detail.company.id)}
-        currentOwnerId={detail.company.assigned_user_id ? String(detail.company.assigned_user_id) : ""}
-      />
-
-      <CompanyTagManager companyId={String(detail.company.id)} />
+      </div>      <CompanyTagManager companyId={String(detail.company.id)} />
 
       <CompanyOpportunityPanel
         companyId={String(detail.company.id)}
@@ -4352,154 +4347,6 @@ function CompanyDetailSection({
           </div>
         </div>
       )}
-    </section>
-  );
-}
-
-function CompanyOwnerPanel({
-  companyId,
-  currentOwnerId,
-}: {
-  companyId: string;
-  currentOwnerId: string;
-}) {
-  const [owners, setOwners] = useState<CrmUser[]>([]);
-  const [selectedOwnerId, setSelectedOwnerId] = useState(currentOwnerId);
-  const [isLoadingOwners, setIsLoadingOwners] = useState(false);
-  const [isSavingOwner, setIsSavingOwner] = useState(false);
-  const [ownerMessage, setOwnerMessage] = useState("");
-  const [ownerError, setOwnerError] = useState("");
-
-  async function loadOwners() {
-    setIsLoadingOwners(true);
-    setOwnerError("");
-
-    try {
-      const response = await fetch("/api/crm-users");
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Could not load CRM owners.");
-      }
-
-      setOwners(data.users ?? []);
-    } catch (error) {
-      setOwnerError(error instanceof Error ? error.message : "Could not load CRM owners.");
-    } finally {
-      setIsLoadingOwners(false);
-    }
-  }
-
-  useEffect(() => {
-    loadOwners();
-  }, []);
-
-  useEffect(() => {
-    setSelectedOwnerId(currentOwnerId);
-  }, [currentOwnerId]);
-
-  async function saveOwnerAssignment() {
-    setIsSavingOwner(true);
-    setOwnerMessage("");
-    setOwnerError("");
-
-    try {
-      const response = await fetch("/api/company-owner", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          companyId,
-          assignedUserId: selectedOwnerId || null,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Could not update company owner.");
-      }
-
-      setOwnerMessage("Company owner updated.");
-    } catch (error) {
-      setOwnerError(error instanceof Error ? error.message : "Could not update company owner.");
-    } finally {
-      setIsSavingOwner(false);
-    }
-  }
-
-  const selectedOwner = owners.find((owner) => owner.id === selectedOwnerId);
-
-  return (
-    <section className="rounded-2xl bg-white p-6 shadow-sm">
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
-            Ownership
-          </p>
-          <h3 className="mt-2 text-xl font-bold">Company Owner</h3>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-            Assign one accountable CRM owner for follow-up, funnel ownership, and list management.
-          </p>
-        </div>
-
-        <button
-          onClick={loadOwners}
-          disabled={isLoadingOwners}
-          className="w-fit rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
-        >
-          {isLoadingOwners ? "Refreshing..." : "Refresh Owners"}
-        </button>
-      </div>
-
-      {(ownerMessage || ownerError) && (
-        <div className="mt-4 grid gap-2">
-          {ownerMessage && (
-            <div className="rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-800">
-              {ownerMessage}
-            </div>
-          )}
-          {ownerError && (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-              {ownerError}
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_auto]">
-        <div>
-          <label className="text-sm font-semibold text-slate-700">Assigned Owner</label>
-          <select
-            value={selectedOwnerId}
-            onChange={(event) => setSelectedOwnerId(event.target.value)}
-            className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-          >
-            <option value="">Unassigned</option>
-            {owners.map((owner) => (
-              <option key={owner.id} value={owner.id}>
-                {owner.display_name}
-                {owner.user_role === "admin" ? " — Admin" : ""}
-              </option>
-            ))}
-          </select>
-
-          <p className="mt-2 text-xs text-slate-500">
-            Current selection: {selectedOwner ? selectedOwner.display_name : "Unassigned"}
-          </p>
-        </div>
-
-        <div className="flex items-end">
-          <button
-            onClick={saveOwnerAssignment}
-            disabled={isSavingOwner || selectedOwnerId === currentOwnerId}
-            className="rounded-xl bg-blue-700 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-          >
-            {isSavingOwner ? "Saving..." : "Save Owner"}
-          </button>
-        </div>
-      </div>
     </section>
   );
 }
@@ -5791,7 +5638,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 
