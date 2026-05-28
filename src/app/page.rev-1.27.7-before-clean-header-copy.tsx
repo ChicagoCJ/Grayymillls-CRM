@@ -124,9 +124,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.27.7 - Clean Header Copy";
+const APP_VERSION = "Rev 1.27.6 - Company Owner Assignment";
 const REVISION_NOTE =
-  "The main header has been simplified by removing the large CRM headline and explanatory subcopy.";
+  "Company detail now supports assigning one CRM owner to each company.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1072,6 +1072,13 @@ async function handleAnalyzeProspect() {
             <div>
               <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
                 Graymills Prospecting Tool
+              </p>
+              <h1 className="mt-2 text-3xl font-bold tracking-tight">
+                CRM for Application-Driven Sales Prospecting
+              </h1>
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
+                Import ZoomInfo prospect data, map it into structured CRM records, and
+                prepare Graymills-specific sales intelligence for each company and contact.
               </p>
             </div>
 
@@ -5784,7 +5791,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 
