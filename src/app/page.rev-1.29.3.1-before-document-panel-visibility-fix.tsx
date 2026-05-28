@@ -130,9 +130,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.29.3.1 - Document Panel Visibility Fix";
+const APP_VERSION = "Rev 1.29.3 - Opportunity Document Attachments";
 const REVISION_NOTE =
-  "Opportunity document upload panels now appear inside each opportunity card.";
+  "Opportunity cards now support attaching and viewing documents.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -6386,12 +6386,6 @@ function CompanyOpportunityPanel({
                         </div>
                       </div>
                     )}
-                    <OpportunityDocumentsPanel
-                      opportunityId={opportunity.id}
-                      companyId={companyId}
-                      contactId={opportunity.contact_id}
-                    />
-
 
                     <label className="text-xs font-semibold text-slate-600">Update Stage</label>
                     <select
@@ -7179,7 +7173,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 
