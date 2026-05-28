@@ -131,24 +131,6 @@ function cleanText(value: unknown): string | null {
   return cleaned;
 }
 
-function preferNewValue(existingValue: unknown, newValue: unknown) {
-  const existingText =
-    typeof existingValue === "string" ? existingValue.trim() : existingValue ?? null;
-  const newText = typeof newValue === "string" ? newValue.trim() : newValue ?? null;
-
-  if (newText === null || newText === undefined || newText === "") {
-    return existingText;
-  }
-
-  if (existingText === null || existingText === undefined || existingText === "") {
-    return newText;
-  }
-
-  const existingLength = String(existingText).length;
-  const newLength = String(newText).length;
-
-  return newLength > existingLength ? newText : existingText;
-}
 function getMappedValue(
   row: Record<string, string>,
   mapping: Record<string, string>,
@@ -491,44 +473,6 @@ function buildCopyableSalesBlock(input: {
   }Graymills fit hypothesis: likely parts-cleaning opportunity worth validating through discovery; potential product path is ${input.productPath}. Priority ${input.priorityScore}/100 (${input.priorityTier}). Next best action: ${input.nextBestAction}`;
 }
 
-async function updateCompanyIndustryEnrichment(
-  supabase: ReturnType<typeof getSupabaseAdmin>,
-  companyId: string,
-  enrichment: Record<string, unknown>
-) {
-  const cleanedEntries = Object.entries(enrichment).filter(([, value]) => {
-    if (value === null || value === undefined) return false;
-    if (typeof value === "string" && value.trim().length === 0) return false;
-    return true;
-  });
-
-  if (cleanedEntries.length === 0) return;
-
-  const { data: existingCompany, error: loadError } = await supabase
-    .from("companies")
-    .select(
-      "industry, naics, sic, naics_codes, naics_descriptions, sic_codes, sic_descriptions, primary_industry, primary_sub_industry"
-    )
-    .eq("id", companyId)
-    .single();
-
-  if (loadError) throw loadError;
-
-  const update: Record<string, unknown> = {
-    updated_at: new Date().toISOString(),
-  };
-
-  for (const [key, value] of cleanedEntries) {
-    update[key] = preferNewValue(existingCompany?.[key], value);
-  }
-
-  const { error: updateError } = await supabase
-    .from("companies")
-    .update(update)
-    .eq("id", companyId);
-
-  if (updateError) throw updateError;
-}
 async function findOrCreateCompany(supabase: ReturnType<typeof getSupabaseAdmin>, company: CompanyInsert) {
   if (company.domain) {
     const { data: existingByDomain, error } = await supabase
@@ -986,4 +930,3 @@ export async function POST(request: Request) {
     );
   }
 }
-

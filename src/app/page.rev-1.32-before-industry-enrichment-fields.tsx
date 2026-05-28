@@ -130,9 +130,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.32 - Import Industry Enrichment Fields";
+const APP_VERSION = "Rev 1.31 - Opportunity Activities Dashboard";
 const REVISION_NOTE =
-  "ZoomInfo imports now support NAICS/SIC detail fields plus Primary Industry and Primary Sub-Industry.";
+  "The Funnel tab now includes an opportunity activities dashboard for open, due, and overdue follow-ups.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -7656,7 +7656,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 
