@@ -124,9 +124,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.27.5 - Admin-Gated Owner Editing";
+const APP_VERSION = "Rev 1.27.4 - CRM User Role Flag";
 const REVISION_NOTE =
-  "Admin remains visible to all users, but CRM owner editing is gated behind temporary Admin Mode.";
+  "CRM owners can now be marked as Admin or User in the Admin panel.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1704,7 +1704,6 @@ function ImportTagPicker({
 
 function AdminUsersSection() {
   const [users, setUsers] = useState<CrmUser[]>([]);
-  const [isAdminMode, setIsAdminMode] = useState(false);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [isSavingUser, setIsSavingUser] = useState(false);
   const [userMessage, setUserMessage] = useState("");
@@ -1759,17 +1758,7 @@ function AdminUsersSection() {
     });
   }
 
-  function requireAdminMode() {
-    if (isAdminMode) return true;
-
-    setUserMessage("");
-    setUserError("Owner editing is restricted to Admin Mode. Turn on Admin Mode to create, edit, archive, or reactivate owners.");
-    return false;
-  }
-
   function startEditingUser(user: CrmUser) {
-    if (!requireAdminMode()) return;
-
     setEditingUserId(user.id);
     setForm({
       displayName: user.display_name,
@@ -1784,8 +1773,6 @@ function AdminUsersSection() {
   }
 
   async function saveUser() {
-    if (!requireAdminMode()) return;
-
     setIsSavingUser(true);
     setUserMessage("");
     setUserError("");
@@ -1830,8 +1817,6 @@ function AdminUsersSection() {
   }
 
   async function updateUserStatus(user: CrmUser, status: "active" | "archived") {
-    if (!requireAdminMode()) return;
-
     setIsSavingUser(true);
     setUserMessage("");
     setUserError("");
@@ -1863,8 +1848,6 @@ function AdminUsersSection() {
     }
   }
 
-  const ownerControlsDisabled = !isAdminMode || isSavingUser;
-
   return (
     <section className="grid gap-6">
       <div className="rounded-2xl bg-white p-6 shadow-sm">
@@ -1875,7 +1858,7 @@ function AdminUsersSection() {
             </p>
             <h2 className="mt-2 text-2xl font-bold">Manage CRM Owners</h2>
             <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-600">
-              Everyone can view CRM owners. Creating, editing, archiving, and reactivating owners is restricted to Admin Mode until formal login-based permissions are added.
+              Create and maintain the owner list used for assigning companies. Archived owners remain in history but should not appear in future assignment dropdowns.
             </p>
           </div>
 
@@ -1886,34 +1869,6 @@ function AdminUsersSection() {
           >
             {isLoadingUsers ? "Refreshing..." : "Refresh Owners"}
           </button>
-        </div>
-
-        <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="font-semibold text-amber-950">Temporary Admin Mode</p>
-              <p className="mt-1 text-sm leading-6 text-amber-900">
-                This is a temporary UI gate. Later, true permissions should come from the signed-in user account.
-              </p>
-            </div>
-
-            <label className="flex w-fit cursor-pointer items-center gap-3 rounded-xl bg-white px-4 py-3 text-sm font-semibold text-slate-800 shadow-sm ring-1 ring-amber-200">
-              <input
-                type="checkbox"
-                checked={isAdminMode}
-                onChange={(event) => {
-                  setIsAdminMode(event.target.checked);
-                  setUserMessage("");
-                  setUserError("");
-                  if (!event.target.checked) {
-                    resetUserForm();
-                  }
-                }}
-                className="h-4 w-4 rounded border-slate-300 text-blue-700 focus:ring-blue-600"
-              />
-              Admin Mode {isAdminMode ? "On" : "Off"}
-            </label>
-          </div>
         </div>
 
         {(userMessage || userError) && (
@@ -1932,17 +1887,8 @@ function AdminUsersSection() {
         )}
       </div>
 
-      <div className={`rounded-2xl bg-white p-6 shadow-sm ${!isAdminMode ? "opacity-75" : ""}`}>
-        <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-          <div>
-            <h3 className="text-xl font-bold">{editingUserId ? "Edit Owner" : "Create Owner"}</h3>
-            {!isAdminMode && (
-              <p className="mt-2 text-sm text-slate-600">
-                Turn on Admin Mode to create or edit owners.
-              </p>
-            )}
-          </div>
-        </div>
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
+        <h3 className="text-xl font-bold">{editingUserId ? "Edit Owner" : "Create Owner"}</h3>
 
         <div className="mt-5 grid gap-4 lg:grid-cols-5">
           <div className="lg:col-span-2">
@@ -1950,9 +1896,8 @@ function AdminUsersSection() {
             <input
               type="text"
               value={form.displayName}
-              disabled={!isAdminMode}
               onChange={(event) => setForm({ ...form, displayName: event.target.value })}
-              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm disabled:cursor-not-allowed disabled:bg-slate-100"
+              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
               placeholder="Example: Jane Smith"
             />
           </div>
@@ -1962,9 +1907,8 @@ function AdminUsersSection() {
             <input
               type="text"
               value={form.roleName}
-              disabled={!isAdminMode}
               onChange={(event) => setForm({ ...form, roleName: event.target.value })}
-              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm disabled:cursor-not-allowed disabled:bg-slate-100"
+              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
               placeholder="Sales"
             />
           </div>
@@ -1973,11 +1917,10 @@ function AdminUsersSection() {
             <label className="text-sm font-semibold text-slate-700">Access Type</label>
             <select
               value={form.userRole}
-              disabled={!isAdminMode}
               onChange={(event) =>
                 setForm({ ...form, userRole: event.target.value as "admin" | "user" })
               }
-              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm disabled:cursor-not-allowed disabled:bg-slate-100"
+              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
             >
               <option value="user">User</option>
               <option value="admin">Admin</option>
@@ -1989,9 +1932,8 @@ function AdminUsersSection() {
             <input
               type="number"
               value={form.sortOrder}
-              disabled={!isAdminMode}
               onChange={(event) => setForm({ ...form, sortOrder: event.target.value })}
-              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm disabled:cursor-not-allowed disabled:bg-slate-100"
+              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
             />
           </div>
 
@@ -1999,9 +1941,8 @@ function AdminUsersSection() {
             <label className="text-sm font-semibold text-slate-700">Status</label>
             <select
               value={form.status}
-              disabled={!isAdminMode}
               onChange={(event) => setForm({ ...form, status: event.target.value })}
-              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm disabled:cursor-not-allowed disabled:bg-slate-100"
+              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
             >
               <option value="active">Active</option>
               <option value="archived">Archived</option>
@@ -2013,9 +1954,8 @@ function AdminUsersSection() {
             <input
               type="email"
               value={form.email}
-              disabled={!isAdminMode}
               onChange={(event) => setForm({ ...form, email: event.target.value })}
-              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm disabled:cursor-not-allowed disabled:bg-slate-100"
+              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
             />
           </div>
 
@@ -2024,9 +1964,8 @@ function AdminUsersSection() {
             <input
               type="text"
               value={form.phone}
-              disabled={!isAdminMode}
               onChange={(event) => setForm({ ...form, phone: event.target.value })}
-              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm disabled:cursor-not-allowed disabled:bg-slate-100"
+              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
             />
           </div>
 
@@ -2035,9 +1974,8 @@ function AdminUsersSection() {
             <textarea
               rows={3}
               value={form.notes}
-              disabled={!isAdminMode}
               onChange={(event) => setForm({ ...form, notes: event.target.value })}
-              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm disabled:cursor-not-allowed disabled:bg-slate-100"
+              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
               placeholder="Owner notes, territory, routing rules, or assignment guidance."
             />
           </div>
@@ -2046,7 +1984,7 @@ function AdminUsersSection() {
         <div className="mt-5 flex flex-wrap gap-2">
           <button
             onClick={saveUser}
-            disabled={ownerControlsDisabled}
+            disabled={isSavingUser}
             className="rounded-xl bg-green-700 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-green-800 disabled:cursor-not-allowed disabled:bg-slate-300"
           >
             {isSavingUser ? "Saving..." : editingUserId ? "Save Owner" : "Create Owner"}
@@ -2055,8 +1993,7 @@ function AdminUsersSection() {
           {editingUserId && (
             <button
               onClick={resetUserForm}
-              disabled={!isAdminMode}
-              className="rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
+              className="rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
             >
               Cancel Edit
             </button>
@@ -2093,19 +2030,11 @@ function AdminUsersSection() {
                       >
                         {user.status}
                       </span>
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                          user.user_role === "admin"
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-slate-100 text-slate-700"
-                        }`}
-                      >
-                        {user.user_role === "admin" ? "Admin" : "User"}
-                      </span>
                     </div>
 
                     <div className="mt-2 grid gap-1 text-sm text-slate-600">
                       <p>Role / Function: {displayValue(user.role_name)}</p>
+                      <p>Access Type: {user.user_role === "admin" ? "Admin" : "User"}</p>
                       <p>Email: {displayValue(user.email)}</p>
                       <p>Phone: {displayValue(user.phone)}</p>
                       <p>Sort: {user.sort_order ?? 100}</p>
@@ -2119,7 +2048,7 @@ function AdminUsersSection() {
                   <div className="flex flex-wrap gap-2">
                     <button
                       onClick={() => startEditingUser(user)}
-                      disabled={ownerControlsDisabled}
+                      disabled={isSavingUser}
                       className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
                     >
                       Edit
@@ -2128,7 +2057,7 @@ function AdminUsersSection() {
                     {user.status === "archived" ? (
                       <button
                         onClick={() => updateUserStatus(user, "active")}
-                        disabled={ownerControlsDisabled}
+                        disabled={isSavingUser}
                         className="rounded-lg bg-blue-700 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                       >
                         Reactivate
@@ -2136,7 +2065,7 @@ function AdminUsersSection() {
                     ) : (
                       <button
                         onClick={() => updateUserStatus(user, "archived")}
-                        disabled={ownerControlsDisabled}
+                        disabled={isSavingUser}
                         className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                       >
                         Archive
@@ -5638,7 +5567,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 
