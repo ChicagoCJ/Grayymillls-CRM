@@ -124,9 +124,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.25.3 - Company Tag Duplicate Fix";
+const APP_VERSION = "Rev 1.25 - Company Opportunity Panel";
 const REVISION_NOTE =
-  "Company tag loading duplicate variable declaration has been cleaned up.";
+  "Company detail now includes a sales opportunity panel for creating and managing funnel opportunities.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -757,39 +757,14 @@ export default function Home() {
     setIsLoadingSummary(true);
 
     try {
-      const [summaryResponse, tagsResponse, companyTagsResponse, contactTagsResponse] =
-        await Promise.all([
-          fetch("/api/crm-summary"),
-          fetch("/api/tags"),
-          fetch("/api/company-tag-summary"),
-          fetch("/api/contact-tag-summary"),
-        ]);
+      const response = await fetch("/api/crm-summary");
+      const data = await response.json();
 
-      const summaryData = await summaryResponse.json();
-      const tagsData = await tagsResponse.json();
-      const companyTagsData = await companyTagsResponse.json();
-      const contactTagsData = await contactTagsResponse.json();
-
-      if (!summaryResponse.ok) {
-        throw new Error(summaryData.error || "Could not load CRM summary.");
+      if (!response.ok) {
+        throw new Error(data.error || "Could not load CRM summary.");
       }
 
-      if (!tagsResponse.ok) {
-        throw new Error(tagsData.error || "Could not load CRM tags.");
-      }
-
-      if (!companyTagsResponse.ok) {
-        throw new Error(companyTagsData.error || "Could not load company tags.");
-      }
-
-      if (!contactTagsResponse.ok) {
-        throw new Error(contactTagsData.error || "Could not load contact tags.");
-      }
-
-      setCrmSummary(summaryData);
-      setAllCrmTags(tagsData.tags ?? []);
-      setAllCompanyTags(companyTagsData.companyTags ?? []);
-      setAllContactTags(contactTagsData.contactTags ?? []);
+      setCrmSummary(data);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Could not load CRM summary.");
     } finally {
@@ -3393,18 +3368,18 @@ function CompanyOpportunityPanel({
 
             <div>
               <label className="text-sm font-semibold text-slate-700">Prospect</label>
-              <input
-                type="text"
-                value={form.primaryUseCase}
-                onChange={(event) =>
-                  setForm({ ...form, primaryUseCase: event.target.value })
-                }
-                placeholder="Example: Parts washer opportunity, pump replacement, inking system review..."
+              <select
+                value={form.prospectId}
+                onChange={(event) => setForm({ ...form, prospectId: event.target.value })}
                 className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
-              />
-              <p className="mt-1 text-xs text-slate-500">
-                Editable sales focus for this opportunity. The CRM will still link to the primary prospect record when available.
-              </p>
+              >
+                <option value="">No prospect selected</option>
+                {prospects.map((prospect) => (
+                  <option key={String(prospect.id)} value={String(prospect.id)}>
+                    {displayValue(prospect.likely_product_path || prospect.product_line || prospect.id)}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
@@ -3442,7 +3417,7 @@ function CompanyOpportunityPanel({
             </div>
 
             <div className="lg:col-span-2">
-              <label className="text-sm font-semibold text-slate-700">Products</label>
+              <label className="text-sm font-semibold text-slate-700">Product Line</label>
               <input
                 type="text"
                 value={form.productLine}
@@ -3536,7 +3511,7 @@ function CompanyOpportunityPanel({
 
                     <h4 className="mt-3 text-lg font-bold">{opportunity.opportunity_name}</h4>
                     <p className="mt-2 text-sm leading-6 text-slate-600">
-                      {displayValue(opportunity.likely_product_path || opportunity.product_line || opportunity.primary_use_case || opportunity.opportunity_type)}
+                      {displayValue(opportunity.likely_product_path || opportunity.product_line || opportunity.opportunity_type)}
                     </p>
 
                     <div className="mt-3 grid gap-2 text-sm text-slate-700 md:grid-cols-2">
@@ -3645,7 +3620,9 @@ function CompanyTagManager({ companyId }: { companyId: string }) {
 
       const tagsData = await tagsResponse.json();
       const companyTagsData = await companyTagsResponse.json();
-if (!tagsResponse.ok) {
+      const contactTagsData = await contactTagsResponse.json();
+
+      if (!tagsResponse.ok) {
         throw new Error(tagsData.error || "Could not load CRM tags.");
       }
 
@@ -3653,8 +3630,8 @@ if (!tagsResponse.ok) {
         throw new Error(companyTagsData.error || "Could not load company tags.");
       }
 
-      if (!companyTagsResponse.ok) {
-        throw new Error(companyTagsData.error || "Could not load company tags.");
+      if (!contactTagsResponse.ok) {
+        throw new Error(contactTagsData.error || "Could not load contact tags.");
       }
 
       setAllTags(tagsData.tags ?? []);
@@ -4346,10 +4323,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
-
-
 
 
 

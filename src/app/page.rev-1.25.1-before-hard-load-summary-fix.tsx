@@ -124,9 +124,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.25.3 - Company Tag Duplicate Fix";
+const APP_VERSION = "Rev 1.25.1 - Editable Prospect and Products Label";
 const REVISION_NOTE =
-  "Company tag loading duplicate variable declaration has been cleaned up.";
+  "The opportunity form now uses Products instead of Product Line and makes the prospect focus editable.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -3645,7 +3645,9 @@ function CompanyTagManager({ companyId }: { companyId: string }) {
 
       const tagsData = await tagsResponse.json();
       const companyTagsData = await companyTagsResponse.json();
-if (!tagsResponse.ok) {
+      const contactTagsData = await contactTagsResponse.json();
+
+      if (!tagsResponse.ok) {
         throw new Error(tagsData.error || "Could not load CRM tags.");
       }
 
@@ -3653,8 +3655,8 @@ if (!tagsResponse.ok) {
         throw new Error(companyTagsData.error || "Could not load company tags.");
       }
 
-      if (!companyTagsResponse.ok) {
-        throw new Error(companyTagsData.error || "Could not load company tags.");
+      if (!contactTagsResponse.ok) {
+        throw new Error(contactTagsData.error || "Could not load contact tags.");
       }
 
       setAllTags(tagsData.tags ?? []);
@@ -4346,8 +4348,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
 
 
 

@@ -124,9 +124,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.25.3 - Company Tag Duplicate Fix";
+const APP_VERSION = "Rev 1.25.2 - Company Tag Loading Fix";
 const REVISION_NOTE =
-  "Company tag loading duplicate variable declaration has been cleaned up.";
+  "Company tag loading now correctly references company tag responses instead of contact tag responses.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -3645,7 +3645,9 @@ function CompanyTagManager({ companyId }: { companyId: string }) {
 
       const tagsData = await tagsResponse.json();
       const companyTagsData = await companyTagsResponse.json();
-if (!tagsResponse.ok) {
+      const companyTagsData = await companyTagsResponse.json();
+
+      if (!tagsResponse.ok) {
         throw new Error(tagsData.error || "Could not load CRM tags.");
       }
 
@@ -4346,7 +4348,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 
