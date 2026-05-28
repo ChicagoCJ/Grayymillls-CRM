@@ -124,9 +124,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.27.1 - Bulk Admin Tag Actions";
+const APP_VERSION = "Rev 1.27 - Admin Tag Management";
 const REVISION_NOTE =
-  "Admin tag management now supports selecting multiple tags and bulk archiving or reactivating them.";
+  "An Admin tab now supports creating, editing, and archiving Markets, Sectors, and Categories.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1699,7 +1699,6 @@ function ImportTagPicker({
 
 function AdminTagsSection() {
   const [tags, setTags] = useState<CrmTag[]>([]);
-  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [isLoadingTags, setIsLoadingTags] = useState(false);
   const [isSavingTag, setIsSavingTag] = useState(false);
   const [adminMessage, setAdminMessage] = useState("");
@@ -1727,9 +1726,6 @@ function AdminTagsSection() {
       }
 
       setTags(data.tags ?? []);
-      setSelectedTagIds((current) =>
-        current.filter((tagId) => (data.tags ?? []).some((tag: CrmTag) => tag.id === tagId))
-      );
     } catch (error) {
       setAdminError(error instanceof Error ? error.message : "Could not load CRM tags.");
     } finally {
@@ -1771,18 +1767,6 @@ function AdminTagsSection() {
       sortOrder: String(tag.sort_order ?? 100),
       status: tag.status ?? "active",
     });
-  }
-
-  function toggleSelectedTag(tagId: string) {
-    setSelectedTagIds((current) =>
-      current.includes(tagId)
-        ? current.filter((id) => id !== tagId)
-        : [...current, tagId]
-    );
-  }
-
-  function clearSelectedTags() {
-    setSelectedTagIds([]);
   }
 
   async function saveTag() {
@@ -1827,32 +1811,29 @@ function AdminTagsSection() {
     }
   }
 
-  async function updateTagStatus(tagId: string, status: "active" | "archived") {
-    const response = await fetch("/api/tags", {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        id: tagId,
-        status,
-      }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || `Could not update tag to ${status}.`);
-    }
-  }
-
   async function archiveTag(tag: CrmTag) {
     setIsSavingTag(true);
     setAdminMessage("");
     setAdminError("");
 
     try {
-      await updateTagStatus(tag.id, "archived");
+      const response = await fetch("/api/tags", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: tag.id,
+          status: "archived",
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Could not archive tag.");
+      }
+
       setAdminMessage("Tag archived.");
       await loadAdminTags();
     } catch (error) {
@@ -1868,40 +1849,27 @@ function AdminTagsSection() {
     setAdminError("");
 
     try {
-      await updateTagStatus(tag.id, "active");
+      const response = await fetch("/api/tags", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: tag.id,
+          status: "active",
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Could not reactivate tag.");
+      }
+
       setAdminMessage("Tag reactivated.");
       await loadAdminTags();
     } catch (error) {
       setAdminError(error instanceof Error ? error.message : "Could not reactivate tag.");
-    } finally {
-      setIsSavingTag(false);
-    }
-  }
-
-  async function bulkUpdateSelectedTags(status: "active" | "archived") {
-    if (selectedTagIds.length === 0) return;
-
-    setIsSavingTag(true);
-    setAdminMessage("");
-    setAdminError("");
-
-    try {
-      await Promise.all(selectedTagIds.map((tagId) => updateTagStatus(tagId, status)));
-
-      setAdminMessage(
-        `${selectedTagIds.length} tag${selectedTagIds.length === 1 ? "" : "s"} ${
-          status === "archived" ? "archived" : "made active"
-        }.`
-      );
-
-      setSelectedTagIds([]);
-      await loadAdminTags();
-    } catch (error) {
-      setAdminError(
-        error instanceof Error
-          ? error.message
-          : `Could not update selected tags to ${status}.`
-      );
     } finally {
       setIsSavingTag(false);
     }
@@ -1945,44 +1913,6 @@ function AdminTagsSection() {
             )}
           </div>
         )}
-      </div>
-
-      <div className="rounded-2xl bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h3 className="text-xl font-bold">Bulk Tag Actions</h3>
-            <p className="mt-2 text-sm text-slate-600">
-              Select tags in any group below, then archive or reactivate them together.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <span className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700">
-              {selectedTagIds.length} selected
-            </span>
-            <button
-              onClick={() => bulkUpdateSelectedTags("archived")}
-              disabled={selectedTagIds.length === 0 || isSavingTag}
-              className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-            >
-              Archive Selected
-            </button>
-            <button
-              onClick={() => bulkUpdateSelectedTags("active")}
-              disabled={selectedTagIds.length === 0 || isSavingTag}
-              className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-            >
-              Make Selected Active
-            </button>
-            <button
-              onClick={clearSelectedTags}
-              disabled={selectedTagIds.length === 0 || isSavingTag}
-              className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
-            >
-              Clear Selection
-            </button>
-          </div>
-        </div>
       </div>
 
       <div className="rounded-2xl bg-white p-6 shadow-sm">
@@ -2087,9 +2017,7 @@ function AdminTagsSection() {
         <AdminTagGroup
           title="Markets"
           tags={groupedTags.market}
-          selectedTagIds={selectedTagIds}
           isSaving={isSavingTag}
-          onToggleSelected={toggleSelectedTag}
           onEdit={startEditingTag}
           onArchive={archiveTag}
           onReactivate={reactivateTag}
@@ -2097,9 +2025,7 @@ function AdminTagsSection() {
         <AdminTagGroup
           title="Sectors"
           tags={groupedTags.sector}
-          selectedTagIds={selectedTagIds}
           isSaving={isSavingTag}
-          onToggleSelected={toggleSelectedTag}
           onEdit={startEditingTag}
           onArchive={archiveTag}
           onReactivate={reactivateTag}
@@ -2107,9 +2033,7 @@ function AdminTagsSection() {
         <AdminTagGroup
           title="Categories"
           tags={groupedTags.category}
-          selectedTagIds={selectedTagIds}
           isSaving={isSavingTag}
-          onToggleSelected={toggleSelectedTag}
           onEdit={startEditingTag}
           onArchive={archiveTag}
           onReactivate={reactivateTag}
@@ -2122,18 +2046,14 @@ function AdminTagsSection() {
 function AdminTagGroup({
   title,
   tags,
-  selectedTagIds,
   isSaving,
-  onToggleSelected,
   onEdit,
   onArchive,
   onReactivate,
 }: {
   title: string;
   tags: CrmTag[];
-  selectedTagIds: string[];
   isSaving: boolean;
-  onToggleSelected: (tagId: string) => void;
   onEdit: (tag: CrmTag) => void;
   onArchive: (tag: CrmTag) => void;
   onReactivate: (tag: CrmTag) => void;
@@ -2146,84 +2066,66 @@ function AdminTagGroup({
         <p className="mt-3 text-sm text-slate-600">No tags found.</p>
       ) : (
         <div className="mt-4 grid gap-3">
-          {tags.map((tag) => {
-            const isSelected = selectedTagIds.includes(tag.id);
-
-            return (
-              <div
-                key={tag.id}
-                className={`rounded-xl border p-4 ${
-                  tag.status === "archived"
-                    ? "border-slate-200 bg-slate-50 opacity-70"
-                    : isSelected
-                      ? "border-blue-300 bg-blue-50"
-                      : "border-slate-200 bg-white"
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={() => onToggleSelected(tag.id)}
-                    className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-700 focus:ring-blue-600"
-                    aria-label={`Select ${tag.tag_name}`}
-                  />
-
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-semibold text-slate-900">{tag.tag_name}</p>
-                        <p className="mt-1 text-xs text-slate-500">
-                          Sort {tag.sort_order ?? 100} · {tag.color ?? "blue"} · {tag.status ?? "active"}
-                        </p>
-                      </div>
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                          tag.status === "archived"
-                            ? "bg-slate-200 text-slate-700"
-                            : "bg-green-100 text-green-800"
-                        }`}
-                      >
-                        {tag.status ?? "active"}
-                      </span>
-                    </div>
-
-                    {tag.description && (
-                      <p className="mt-3 text-sm leading-6 text-slate-600">{tag.description}</p>
-                    )}
-
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <button
-                        onClick={() => onEdit(tag)}
-                        disabled={isSaving}
-                        className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
-                      >
-                        Edit
-                      </button>
-
-                      {tag.status === "archived" ? (
-                        <button
-                          onClick={() => onReactivate(tag)}
-                          disabled={isSaving}
-                          className="rounded-lg bg-blue-700 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-                        >
-                          Reactivate
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => onArchive(tag)}
-                          disabled={isSaving}
-                          className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-                        >
-                          Archive
-                        </button>
-                      )}
-                    </div>
-                  </div>
+          {tags.map((tag) => (
+            <div
+              key={tag.id}
+              className={`rounded-xl border p-4 ${
+                tag.status === "archived"
+                  ? "border-slate-200 bg-slate-50 opacity-70"
+                  : "border-slate-200 bg-white"
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-slate-900">{tag.tag_name}</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Sort {tag.sort_order ?? 100} · {tag.color ?? "blue"} · {tag.status ?? "active"}
+                  </p>
                 </div>
+                <span
+                  className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                    tag.status === "archived"
+                      ? "bg-slate-200 text-slate-700"
+                      : "bg-green-100 text-green-800"
+                  }`}
+                >
+                  {tag.status ?? "active"}
+                </span>
               </div>
-            );
-          })}
+
+              {tag.description && (
+                <p className="mt-3 text-sm leading-6 text-slate-600">{tag.description}</p>
+              )}
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  onClick={() => onEdit(tag)}
+                  disabled={isSaving}
+                  className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
+                >
+                  Edit
+                </button>
+
+                {tag.status === "archived" ? (
+                  <button
+                    onClick={() => onReactivate(tag)}
+                    disabled={isSaving}
+                    className="rounded-lg bg-blue-700 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                  >
+                    Reactivate
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => onArchive(tag)}
+                    disabled={isSaving}
+                    className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                  >
+                    Archive
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </section>
@@ -5182,7 +5084,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 
