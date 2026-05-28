@@ -124,9 +124,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.24 - Sales Funnel API Routes";
+const APP_VERSION = "Rev 1.22 - Apply Import Tags";
 const REVISION_NOTE =
-  "Sales funnel API routes are now available for funnel stages, opportunities, and opportunity activities.";
+  "Selected import tags are now sent with the ZoomInfo import and applied to companies and contacts.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -3752,7 +3752,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 
