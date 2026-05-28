@@ -124,9 +124,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.21.2 - Import-Level Tag Assignment UI";
+const APP_VERSION = "Rev 1.21 - Import-Level Tag Assignment UI";
 const REVISION_NOTE =
-  "Import ZoomInfo now includes Market, Sector, and Category selectors for list-level segmentation planning.";
+  "Import ZoomInfo now includes Market, Sector, and Category tag selectors for list-level segmentation.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -493,6 +493,9 @@ export default function Home() {
   const [contactSectorTagFilter, setContactSectorTagFilter] = useState("All");
   const [contactCategoryTagFilter, setContactCategoryTagFilter] = useState("All");
   const [allContactTags, setAllContactTags] = useState<ContactTagSummary[]>([]);
+  const [selectedImportMarketTagIds, setSelectedImportMarketTagIds] = useState<string[]>([]);
+  const [selectedImportSectorTagIds, setSelectedImportSectorTagIds] = useState<string[]>([]);
+  const [selectedImportCategoryTagIds, setSelectedImportCategoryTagIds] = useState<string[]>([]);
   const [selectedCompanyDetail, setSelectedCompanyDetail] = useState<CompanyDetail | null>(null);
   const [activityForm, setActivityForm] = useState<ActivityForm>({
     activityType: "note",
@@ -601,6 +604,35 @@ export default function Home() {
         .map((tag) => tag.tag_name),
     ];
   }, [allCrmTags]);
+  const importMarketTagOptions = useMemo(() => {
+    return allCrmTags
+      .filter((tag) => tag.tag_type === "market")
+      .sort((a, b) => (a.sort_order ?? 100) - (b.sort_order ?? 100));
+  }, [allCrmTags]);
+
+  const importSectorTagOptions = useMemo(() => {
+    return allCrmTags
+      .filter((tag) => tag.tag_type === "sector")
+      .sort((a, b) => (a.sort_order ?? 100) - (b.sort_order ?? 100));
+  }, [allCrmTags]);
+
+  const importCategoryTagOptions = useMemo(() => {
+    return allCrmTags
+      .filter((tag) => tag.tag_type === "category")
+      .sort((a, b) => (a.sort_order ?? 100) - (b.sort_order ?? 100));
+  }, [allCrmTags]);
+
+  const selectedImportTagIds = useMemo(() => {
+    return [
+      ...selectedImportMarketTagIds,
+      ...selectedImportSectorTagIds,
+      ...selectedImportCategoryTagIds,
+    ];
+  }, [
+    selectedImportMarketTagIds,
+    selectedImportSectorTagIds,
+    selectedImportCategoryTagIds,
+  ]);
   const filteredContacts = useMemo(() => {
     const search = normalizeForSearch(contactSearchTerm);
 
@@ -1222,8 +1254,22 @@ async function handleAnalyzeProspect() {
         {activeTab === "releaseNotes" && <ReleaseNotesSection />}
 
         {activeTab === "import" && (
+          
           <section className="grid gap-6">
-            <ImportTagAssignmentPanel />
+            <ImportTagAssignmentPanel
+              marketTags={importMarketTagOptions}
+              sectorTags={importSectorTagOptions}
+              categoryTags={importCategoryTagOptions}
+              selectedMarketTagIds={selectedImportMarketTagIds}
+              setSelectedMarketTagIds={setSelectedImportMarketTagIds}
+              selectedSectorTagIds={selectedImportSectorTagIds}
+              setSelectedSectorTagIds={setSelectedImportSectorTagIds}
+              selectedCategoryTagIds={selectedImportCategoryTagIds}
+              setSelectedCategoryTagIds={setSelectedImportCategoryTagIds}
+              selectedTagCount={selectedImportTagIds.length}
+            />
+
+<section className="grid gap-6">
             <div className="rounded-2xl bg-white p-6 shadow-sm">
               <div className="flex flex-col gap-4">
                 <div>
@@ -1452,61 +1498,31 @@ async function handleAnalyzeProspect() {
   );
 }
 
-function ImportTagAssignmentPanel() {
-  const [tags, setTags] = useState<CrmTag[]>([]);
-  const [selectedMarketTagIds, setSelectedMarketTagIds] = useState<string[]>([]);
-  const [selectedSectorTagIds, setSelectedSectorTagIds] = useState<string[]>([]);
-  const [selectedCategoryTagIds, setSelectedCategoryTagIds] = useState<string[]>([]);
-  const [isLoadingTags, setIsLoadingTags] = useState(false);
-  const [tagError, setTagError] = useState("");
-
-  async function loadImportTags() {
-    setIsLoadingTags(true);
-    setTagError("");
-
-    try {
-      const response = await fetch("/api/tags");
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Could not load CRM tags.");
-      }
-
-      setTags(data.tags ?? []);
-    } catch (error) {
-      setTagError(error instanceof Error ? error.message : "Could not load CRM tags.");
-    } finally {
-      setIsLoadingTags(false);
-    }
-  }
-
-  useEffect(() => {
-    loadImportTags();
-  }, []);
-
-  const marketTags = useMemo(() => {
-    return tags
-      .filter((tag) => tag.tag_type === "market")
-      .sort((a, b) => (a.sort_order ?? 100) - (b.sort_order ?? 100));
-  }, [tags]);
-
-  const sectorTags = useMemo(() => {
-    return tags
-      .filter((tag) => tag.tag_type === "sector")
-      .sort((a, b) => (a.sort_order ?? 100) - (b.sort_order ?? 100));
-  }, [tags]);
-
-  const categoryTags = useMemo(() => {
-    return tags
-      .filter((tag) => tag.tag_type === "category")
-      .sort((a, b) => (a.sort_order ?? 100) - (b.sort_order ?? 100));
-  }, [tags]);
-
-  const selectedTagCount =
-    selectedMarketTagIds.length + selectedSectorTagIds.length + selectedCategoryTagIds.length;
-
+function ImportTagAssignmentPanel({
+  marketTags,
+  sectorTags,
+  categoryTags,
+  selectedMarketTagIds,
+  setSelectedMarketTagIds,
+  selectedSectorTagIds,
+  setSelectedSectorTagIds,
+  selectedCategoryTagIds,
+  setSelectedCategoryTagIds,
+  selectedTagCount,
+}: {
+  marketTags: CrmTag[];
+  sectorTags: CrmTag[];
+  categoryTags: CrmTag[];
+  selectedMarketTagIds: string[];
+  setSelectedMarketTagIds: (value: string[]) => void;
+  selectedSectorTagIds: string[];
+  setSelectedSectorTagIds: (value: string[]) => void;
+  selectedCategoryTagIds: string[];
+  setSelectedCategoryTagIds: (value: string[]) => void;
+  selectedTagCount: number;
+}) {
   return (
-    <div className="rounded-2xl bg-white p-6 shadow-sm">
+    <section className="rounded-2xl bg-white p-6 shadow-sm">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
@@ -1515,30 +1531,15 @@ function ImportTagAssignmentPanel() {
           <h2 className="mt-2 text-xl font-bold">Apply Tags to This Imported List</h2>
           <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
             Choose Market, Sector, and Category tags that describe the list you are about to upload.
-            Rev 1.21.2 captures the selections visually for list preparation. Rev 1.22 will save
-            these selected tags to every company and contact created or reused from the import.
+            In the next revision, these selected tags will be automatically applied to every company
+            and contact created or reused from the import.
           </p>
         </div>
 
-        <div className="flex flex-col gap-2 md:items-end">
-          <div className="rounded-xl bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-800 ring-1 ring-blue-100">
-            {selectedTagCount} selected
-          </div>
-          <button
-            onClick={loadImportTags}
-            disabled={isLoadingTags}
-            className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
-          >
-            {isLoadingTags ? "Refreshing..." : "Refresh Tags"}
-          </button>
+        <div className="rounded-xl bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-800 ring-1 ring-blue-100">
+          {selectedTagCount} selected
         </div>
       </div>
-
-      {tagError && (
-        <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-          {tagError}
-        </div>
-      )}
 
       <div className="mt-5 grid gap-4 lg:grid-cols-3">
         <ImportTagPicker
@@ -1568,10 +1569,11 @@ function ImportTagAssignmentPanel() {
 
       {selectedTagCount > 0 && (
         <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
-          These selections are not saved during import yet. Rev 1.22 will connect them to the import route.
+          These selections are visible for import planning in Rev 1.21. Rev 1.22 will connect them
+          to the import route so they are saved automatically to companies and contacts.
         </div>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -1596,6 +1598,10 @@ function ImportTagPicker({
     }
   }
 
+  function clearGroup() {
+    setSelectedTagIds([]);
+  }
+
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
       <div className="flex items-start justify-between gap-3">
@@ -1606,7 +1612,7 @@ function ImportTagPicker({
 
         {selectedTagIds.length > 0 && (
           <button
-            onClick={() => setSelectedTagIds([])}
+            onClick={clearGroup}
             className="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
           >
             Clear

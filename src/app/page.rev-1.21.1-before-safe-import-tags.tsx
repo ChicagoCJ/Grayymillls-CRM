@@ -124,9 +124,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.21.2 - Import-Level Tag Assignment UI";
+const APP_VERSION = "Rev 1.20.2 - Dashboard Release Notes Cleanup";
 const REVISION_NOTE =
-  "Import ZoomInfo now includes Market, Sector, and Category selectors for list-level segmentation planning.";
+  "Release notes now live in the Release Notes tab instead of the Dashboard objective block.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1223,7 +1223,6 @@ async function handleAnalyzeProspect() {
 
         {activeTab === "import" && (
           <section className="grid gap-6">
-            <ImportTagAssignmentPanel />
             <div className="rounded-2xl bg-white p-6 shadow-sm">
               <div className="flex flex-col gap-4">
                 <div>
@@ -1449,207 +1448,6 @@ async function handleAnalyzeProspect() {
         )}
       </div>
     </main>
-  );
-}
-
-function ImportTagAssignmentPanel() {
-  const [tags, setTags] = useState<CrmTag[]>([]);
-  const [selectedMarketTagIds, setSelectedMarketTagIds] = useState<string[]>([]);
-  const [selectedSectorTagIds, setSelectedSectorTagIds] = useState<string[]>([]);
-  const [selectedCategoryTagIds, setSelectedCategoryTagIds] = useState<string[]>([]);
-  const [isLoadingTags, setIsLoadingTags] = useState(false);
-  const [tagError, setTagError] = useState("");
-
-  async function loadImportTags() {
-    setIsLoadingTags(true);
-    setTagError("");
-
-    try {
-      const response = await fetch("/api/tags");
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Could not load CRM tags.");
-      }
-
-      setTags(data.tags ?? []);
-    } catch (error) {
-      setTagError(error instanceof Error ? error.message : "Could not load CRM tags.");
-    } finally {
-      setIsLoadingTags(false);
-    }
-  }
-
-  useEffect(() => {
-    loadImportTags();
-  }, []);
-
-  const marketTags = useMemo(() => {
-    return tags
-      .filter((tag) => tag.tag_type === "market")
-      .sort((a, b) => (a.sort_order ?? 100) - (b.sort_order ?? 100));
-  }, [tags]);
-
-  const sectorTags = useMemo(() => {
-    return tags
-      .filter((tag) => tag.tag_type === "sector")
-      .sort((a, b) => (a.sort_order ?? 100) - (b.sort_order ?? 100));
-  }, [tags]);
-
-  const categoryTags = useMemo(() => {
-    return tags
-      .filter((tag) => tag.tag_type === "category")
-      .sort((a, b) => (a.sort_order ?? 100) - (b.sort_order ?? 100));
-  }, [tags]);
-
-  const selectedTagCount =
-    selectedMarketTagIds.length + selectedSectorTagIds.length + selectedCategoryTagIds.length;
-
-  return (
-    <div className="rounded-2xl bg-white p-6 shadow-sm">
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
-            Import Segmentation
-          </p>
-          <h2 className="mt-2 text-xl font-bold">Apply Tags to This Imported List</h2>
-          <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
-            Choose Market, Sector, and Category tags that describe the list you are about to upload.
-            Rev 1.21.2 captures the selections visually for list preparation. Rev 1.22 will save
-            these selected tags to every company and contact created or reused from the import.
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-2 md:items-end">
-          <div className="rounded-xl bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-800 ring-1 ring-blue-100">
-            {selectedTagCount} selected
-          </div>
-          <button
-            onClick={loadImportTags}
-            disabled={isLoadingTags}
-            className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
-          >
-            {isLoadingTags ? "Refreshing..." : "Refresh Tags"}
-          </button>
-        </div>
-      </div>
-
-      {tagError && (
-        <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-          {tagError}
-        </div>
-      )}
-
-      <div className="mt-5 grid gap-4 lg:grid-cols-3">
-        <ImportTagPicker
-          title="Markets"
-          helperText="Broad Graymills commercial arena."
-          tags={marketTags}
-          selectedTagIds={selectedMarketTagIds}
-          setSelectedTagIds={setSelectedMarketTagIds}
-        />
-
-        <ImportTagPicker
-          title="Sectors"
-          helperText="Industry or application segment."
-          tags={sectorTags}
-          selectedTagIds={selectedSectorTagIds}
-          setSelectedTagIds={setSelectedSectorTagIds}
-        />
-
-        <ImportTagPicker
-          title="Categories"
-          helperText="CRM status, role, priority, or workflow label."
-          tags={categoryTags}
-          selectedTagIds={selectedCategoryTagIds}
-          setSelectedTagIds={setSelectedCategoryTagIds}
-        />
-      </div>
-
-      {selectedTagCount > 0 && (
-        <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
-          These selections are not saved during import yet. Rev 1.22 will connect them to the import route.
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ImportTagPicker({
-  title,
-  helperText,
-  tags,
-  selectedTagIds,
-  setSelectedTagIds,
-}: {
-  title: string;
-  helperText: string;
-  tags: CrmTag[];
-  selectedTagIds: string[];
-  setSelectedTagIds: (value: string[]) => void;
-}) {
-  function toggleTag(tagId: string) {
-    if (selectedTagIds.includes(tagId)) {
-      setSelectedTagIds(selectedTagIds.filter((id) => id !== tagId));
-    } else {
-      setSelectedTagIds([...selectedTagIds, tagId]);
-    }
-  }
-
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-lg font-bold">{title}</h3>
-          <p className="mt-1 text-sm leading-5 text-slate-600">{helperText}</p>
-        </div>
-
-        {selectedTagIds.length > 0 && (
-          <button
-            onClick={() => setSelectedTagIds([])}
-            className="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
-          >
-            Clear
-          </button>
-        )}
-      </div>
-
-      {tags.length === 0 ? (
-        <p className="mt-4 text-sm text-slate-500">No tags available.</p>
-      ) : (
-        <div className="mt-4 grid gap-2">
-          {tags.map((tag) => {
-            const isSelected = selectedTagIds.includes(tag.id);
-
-            return (
-              <label
-                key={tag.id}
-                className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm transition ${
-                  isSelected
-                    ? "border-blue-300 bg-blue-50 text-blue-950"
-                    : "border-slate-200 bg-white text-slate-700 hover:border-blue-200"
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  checked={isSelected}
-                  onChange={() => toggleTag(tag.id)}
-                  className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-700 focus:ring-blue-600"
-                />
-                <span>
-                  <span className="font-semibold">{tag.tag_name}</span>
-                  {tag.description && (
-                    <span className="mt-1 block text-xs leading-5 text-slate-500">
-                      {tag.description}
-                    </span>
-                  )}
-                </span>
-              </label>
-            );
-          })}
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -3739,7 +3537,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 
