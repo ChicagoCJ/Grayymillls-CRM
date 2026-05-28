@@ -124,9 +124,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.22 - Apply Import Tags";
+const APP_VERSION = "Rev 1.21.2 - Import-Level Tag Assignment UI";
 const REVISION_NOTE =
-  "Selected import tags are now sent with the ZoomInfo import and applied to companies and contacts.";
+  "Import ZoomInfo now includes Market, Sector, and Category selectors for list-level segmentation planning.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1452,20 +1452,6 @@ async function handleAnalyzeProspect() {
   );
 }
 
-function readSelectedImportTagIds() {
-  if (typeof window === "undefined") return [];
-
-  try {
-    const raw = window.localStorage.getItem("prospectingTool.selectedImportTagIds");
-    const parsed = raw ? JSON.parse(raw) : [];
-
-    if (!Array.isArray(parsed)) return [];
-
-    return parsed.filter((item): item is string => typeof item === "string" && item.length > 0);
-  } catch {
-    return [];
-  }
-}
 function ImportTagAssignmentPanel() {
   const [tags, setTags] = useState<CrmTag[]>([]);
   const [selectedMarketTagIds, setSelectedMarketTagIds] = useState<string[]>([]);
@@ -1529,7 +1515,8 @@ function ImportTagAssignmentPanel() {
           <h2 className="mt-2 text-xl font-bold">Apply Tags to This Imported List</h2>
           <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
             Choose Market, Sector, and Category tags that describe the list you are about to upload.
-            Rev 1.22 saves these selected tags to every company and contact created or reused from the import.
+            Rev 1.21.2 captures the selections visually for list preparation. Rev 1.22 will save
+            these selected tags to every company and contact created or reused from the import.
           </p>
         </div>
 
@@ -1581,7 +1568,7 @@ function ImportTagAssignmentPanel() {
 
       {selectedTagCount > 0 && (
         <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
-          These selections will be applied to every company and contact created or reused during this import.
+          These selections are not saved during import yet. Rev 1.22 will connect them to the import route.
         </div>
       )}
     </div>
@@ -3752,7 +3739,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 
