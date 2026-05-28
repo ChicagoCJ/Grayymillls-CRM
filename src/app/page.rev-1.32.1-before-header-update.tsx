@@ -130,9 +130,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.32.7.1 - Active Mapping Postal Code Override";
+const APP_VERSION = "Rev 1.33 - Company Industry Enrichment Display";
 const REVISION_NOTE =
-  "Import mapping now overrides Person Zip Code with Company Postal Code when the ZoomInfo company postal field exists.";
+  "Company detail now displays imported NAICS, SIC, Primary Industry, and Primary Sub-Industry enrichment.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -185,7 +185,7 @@ const CRM_FIELDS = [
   {
     field: "Company Address",
     required: false,
-    aliases: ["company address", "street address", "hq address"],
+    aliases: ["company address", "street address", "address", "hq address"],
   },
   {
     field: "Company City",
@@ -200,19 +200,12 @@ const CRM_FIELDS = [
   {
     field: "Company Postal Code",
     required: false,
-    aliases: [
-      "company postal code",
-      "company zip code",
-      "company zip",
-      "company postal",
-      "hq postal code",
-      "hq zip code"
-    ],
+    aliases: ["postal code", "zip", "zip code", "company zip"],
   },
   {
     field: "Company Country",
     required: false,
-    aliases: ["company country", "hq country", "country"],
+    aliases: ["country", "company country", "hq country"],
   },
   {
     field: "First Name",
@@ -430,56 +423,13 @@ function getLatestProspect(company: CompanySummary) {
   )[0];
 }
 
-function buildMappingObject(mappingSuggestions: MappingSuggestion[], headers: string[] = []) {
-  const mapping = mappingSuggestions.reduce<Record<string, string>>((accumulator, suggestion) => {
-    accumulator[suggestion.crmField] = suggestion.suggestedColumn;
+function buildMappingObject(mappingSuggestions: MappingSuggestion[]) {
+  return mappingSuggestions.reduce<Record<string, string>>((accumulator, mapping) => {
+    accumulator[mapping.crmField] = mapping.suggestedColumn;
     return accumulator;
   }, {});
-
-  const exactHeader = (headerName: string) =>
-    headers.find((header) => normalizeHeader(header) === normalizeHeader(headerName));
-
-  const forceIfHeaderExists = (crmFieldNames: string[], csvHeaderName: string) => {
-    const matchingHeader = exactHeader(csvHeaderName);
-    if (!matchingHeader) return;
-
-    crmFieldNames.forEach((crmFieldName) => {
-      mapping[crmFieldName] = matchingHeader;
-    });
-  };
-
-  forceIfHeaderExists(["Company Address"], "Company Address");
-  forceIfHeaderExists(["Company Postal Code"], "Company Postal Code");
-  forceIfHeaderExists(["Company Country"], "Company Country");
-
-  return mapping;
 }
 
-function applyZoomInfoMappingDefaults(
-  mapping: Record<string, string>,
-  headers: string[]
-) {
-  const exactHeader = (headerName: string) =>
-    headers.find((header) => normalizeHeader(header) === normalizeHeader(headerName));
-
-  const forcedDefaults: Record<string, string> = {
-    "Company Address": "Company Address",
-    "Company Postal Code": "Company Postal Code",
-    "Company Country": "Company Country",
-  };
-
-  const nextMapping = { ...mapping };
-
-  Object.entries(forcedDefaults).forEach(([crmField, csvHeader]) => {
-    const matchingHeader = exactHeader(csvHeader);
-
-    if (matchingHeader) {
-      nextMapping[crmField] = matchingHeader;
-    }
-  });
-
-  return nextMapping;
-}
 function isMapped(value: string | undefined) {
   return Boolean(value && value !== "Not detected" && value !== "__skip__");
 }
@@ -584,8 +534,8 @@ export default function Home() {
   }, [csvData]);
 
   const suggestedMappingObject = useMemo(() => {
-    return buildMappingObject(mappingSuggestions, csvData?.headers ?? []);
-  }, [csvData, mappingSuggestions]);
+    return buildMappingObject(mappingSuggestions);
+  }, [mappingSuggestions]);
 
   const activeMapping = useMemo(() => {
     const mapping: Record<string, string> = {};
@@ -597,34 +547,9 @@ export default function Home() {
         "Not detected";
     });
 
-    const exactHeader = (headerName: string) =>
-      csvData?.headers.find((header) => normalizeHeader(header) === normalizeHeader(headerName));
-
-    const companyAddressHeader =
-      exactHeader("Company Street Address") ??
-      exactHeader("Company Address");
-
-    const companyPostalHeader =
-      exactHeader("Company Postal Code") ??
-      exactHeader("Company Zip Code") ??
-      exactHeader("Company ZIP Code");
-
-    const companyCountryHeader = exactHeader("Company Country");
-
-    if (companyAddressHeader) {
-      mapping["Company Address"] = companyAddressHeader;
-    }
-
-    if (companyPostalHeader) {
-      mapping["Company Postal Code"] = companyPostalHeader;
-    }
-
-    if (companyCountryHeader) {
-      mapping["Company Country"] = companyCountryHeader;
-    }
-
     return mapping;
-  }, [csvData, manualMapping, suggestedMappingObject]);
+  }, [manualMapping, suggestedMappingObject]);
+
   const requiredMissingFields = REQUIRED_FIELDS.filter(
     (field) => !isMapped(activeMapping[field])
   );
@@ -983,7 +908,7 @@ export default function Home() {
       return;
     }
 
-    const initialMapping = buildMappingObject(suggestMappings(csvData.headers), csvData.headers);
+    const initialMapping = buildMappingObject(suggestMappings(csvData.headers));
     setManualMapping(initialMapping);
   }, [csvData]);
 
@@ -1033,9 +958,7 @@ export default function Home() {
 
   function resetMappingToSuggestions() {
     if (!csvData) return;
-    setManualMapping(
-      buildMappingObject(suggestMappings(csvData.headers), csvData.headers)
-    );
+    setManualMapping(buildMappingObject(suggestMappings(csvData.headers)));
   }
 
   async function handleImportToCrm() {
@@ -7824,16 +7747,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
 
 
 

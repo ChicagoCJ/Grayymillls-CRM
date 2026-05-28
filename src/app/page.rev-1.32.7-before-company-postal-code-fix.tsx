@@ -130,9 +130,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.32.7.1 - Active Mapping Postal Code Override";
+const APP_VERSION = "Rev 1.32.6 - Correct ZoomInfo Address Mapping Targets";
 const REVISION_NOTE =
-  "Import mapping now overrides Person Zip Code with Company Postal Code when the ZoomInfo company postal field exists.";
+  "Import mapping now forces ZoomInfo Company Address, Company Postal Code, and Company Country into the actual CRM address fields.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -200,14 +200,7 @@ const CRM_FIELDS = [
   {
     field: "Company Postal Code",
     required: false,
-    aliases: [
-      "company postal code",
-      "company zip code",
-      "company zip",
-      "company postal",
-      "hq postal code",
-      "hq zip code"
-    ],
+    aliases: ["postal code", "zip", "zip code", "company zip"],
   },
   {
     field: "Company Country",
@@ -597,34 +590,9 @@ export default function Home() {
         "Not detected";
     });
 
-    const exactHeader = (headerName: string) =>
-      csvData?.headers.find((header) => normalizeHeader(header) === normalizeHeader(headerName));
-
-    const companyAddressHeader =
-      exactHeader("Company Street Address") ??
-      exactHeader("Company Address");
-
-    const companyPostalHeader =
-      exactHeader("Company Postal Code") ??
-      exactHeader("Company Zip Code") ??
-      exactHeader("Company ZIP Code");
-
-    const companyCountryHeader = exactHeader("Company Country");
-
-    if (companyAddressHeader) {
-      mapping["Company Address"] = companyAddressHeader;
-    }
-
-    if (companyPostalHeader) {
-      mapping["Company Postal Code"] = companyPostalHeader;
-    }
-
-    if (companyCountryHeader) {
-      mapping["Company Country"] = companyCountryHeader;
-    }
-
     return mapping;
-  }, [csvData, manualMapping, suggestedMappingObject]);
+  }, [manualMapping, suggestedMappingObject]);
+
   const requiredMissingFields = REQUIRED_FIELDS.filter(
     (field) => !isMapped(activeMapping[field])
   );
@@ -7824,8 +7792,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
 
 
 

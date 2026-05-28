@@ -186,64 +186,6 @@ function firstNonBlank(...values: Array<string | null | undefined>) {
 
   return null;
 }
-function normalizeHeaderName(value: string) {
-  return value
-    .toLowerCase()
-    .replace(/[\uFEFF"]/g, "")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-}
-
-function getValueByHeaderNames(row: Record<string, string>, headerNames: string[]) {
-  const wanted = headerNames.map(normalizeHeaderName);
-
-  for (const [key, value] of Object.entries(row)) {
-    if (wanted.includes(normalizeHeaderName(key))) {
-      const cleaned = typeof value === "string" ? value.trim() : "";
-      if (cleaned.length > 0) return cleaned;
-    }
-  }
-
-  return null;
-}
-
-function excelColumnToIndex(column: string) {
-  let index = 0;
-
-  for (const char of column.toUpperCase()) {
-    index = index * 26 + (char.charCodeAt(0) - 64);
-  }
-
-  return index - 1;
-}
-
-function getCsvValueByExcelColumn(
-  row: Record<string, string>,
-  headers: string[],
-  column: string
-) {
-  const index = excelColumnToIndex(column);
-  const header = headers[index];
-
-  if (!header) return null;
-
-  const value = row[header];
-
-  if (typeof value !== "string") return null;
-
-  const cleaned = value.trim();
-  return cleaned.length > 0 ? cleaned : null;
-}
-
-function firstNonBlank(...values: Array<string | null | undefined>) {
-  for (const value of values) {
-    if (typeof value === "string" && value.trim().length > 0) {
-      return value.trim();
-    }
-  }
-
-  return null;
-}
 function getMappedValue(
   row: Record<string, string>,
   mapping: Record<string, string>,
@@ -1081,6 +1023,5 @@ export async function POST(request: Request) {
     );
   }
 }
-
 
 

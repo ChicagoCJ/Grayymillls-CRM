@@ -130,9 +130,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.32.7.1 - Active Mapping Postal Code Override";
+const APP_VERSION = "Rev 1.32.7 - Company Postal Code Mapping Fix";
 const REVISION_NOTE =
-  "Import mapping now overrides Person Zip Code with Company Postal Code when the ZoomInfo company postal field exists.";
+  "Import mapping now prevents Person Zip Code from being selected for Company Postal Code.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -597,34 +597,9 @@ export default function Home() {
         "Not detected";
     });
 
-    const exactHeader = (headerName: string) =>
-      csvData?.headers.find((header) => normalizeHeader(header) === normalizeHeader(headerName));
-
-    const companyAddressHeader =
-      exactHeader("Company Street Address") ??
-      exactHeader("Company Address");
-
-    const companyPostalHeader =
-      exactHeader("Company Postal Code") ??
-      exactHeader("Company Zip Code") ??
-      exactHeader("Company ZIP Code");
-
-    const companyCountryHeader = exactHeader("Company Country");
-
-    if (companyAddressHeader) {
-      mapping["Company Address"] = companyAddressHeader;
-    }
-
-    if (companyPostalHeader) {
-      mapping["Company Postal Code"] = companyPostalHeader;
-    }
-
-    if (companyCountryHeader) {
-      mapping["Company Country"] = companyCountryHeader;
-    }
-
     return mapping;
-  }, [csvData, manualMapping, suggestedMappingObject]);
+  }, [manualMapping, suggestedMappingObject]);
+
   const requiredMissingFields = REQUIRED_FIELDS.filter(
     (field) => !isMapped(activeMapping[field])
   );
@@ -7824,7 +7799,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 
