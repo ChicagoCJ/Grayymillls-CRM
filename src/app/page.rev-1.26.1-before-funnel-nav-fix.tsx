@@ -124,9 +124,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.26.1 - Funnel Nav Fix";
+const APP_VERSION = "Rev 1.26 - Funnel Dashboard";
 const REVISION_NOTE =
-  "The Funnel dashboard is now exposed in the main navigation.";
+  "A Funnel tab now shows open opportunities, stage distribution, pipeline value, and weighted value.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1058,7 +1058,6 @@ async function handleAnalyzeProspect() {
     { key: "dashboard", label: "Dashboard" },
     { key: "companies", label: "Companies" },
     { key: "contacts", label: "Contacts" },
-    { key: "funnel", label: "Funnel" },
     { key: "import", label: "Import ZoomInfo" },
     { key: "releaseNotes", label: "Release Notes" },
   ];
@@ -4646,7 +4645,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 

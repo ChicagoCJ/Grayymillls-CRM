@@ -2,7 +2,7 @@
 
 import { ChangeEvent, ReactNode, useEffect, useMemo, useState } from "react";
 
-type TabKey = "dashboard" | "companies" | "contacts" | "funnel" | "import" | "releaseNotes" | "companyDetail";
+type TabKey = "dashboard" | "companies" | "contacts" | "import" | "releaseNotes" | "companyDetail";
 
 type ParsedCsv = {
   fileName: string;
@@ -124,9 +124,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.26.1 - Funnel Nav Fix";
+const APP_VERSION = "Rev 1.25.3 - Company Tag Duplicate Fix";
 const REVISION_NOTE =
-  "The Funnel dashboard is now exposed in the main navigation.";
+  "Company tag loading duplicate variable declaration has been cleaned up.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1058,7 +1058,6 @@ async function handleAnalyzeProspect() {
     { key: "dashboard", label: "Dashboard" },
     { key: "companies", label: "Companies" },
     { key: "contacts", label: "Contacts" },
-    { key: "funnel", label: "Funnel" },
     { key: "import", label: "Import ZoomInfo" },
     { key: "releaseNotes", label: "Release Notes" },
   ];
@@ -1229,8 +1228,6 @@ async function handleAnalyzeProspect() {
             />
           </section>
         )}
-
-        {activeTab === "funnel" && <FunnelDashboardSection />}
 
         {activeTab === "companyDetail" && (
           <CompanyDetailSection
@@ -1691,303 +1688,6 @@ function ImportTagPicker({
         </div>
       )}
     </div>
-  );
-}
-
-function FunnelDashboardSection() {
-  const [stages, setStages] = useState<SalesFunnelStage[]>([]);
-  const [opportunities, setOpportunities] = useState<SalesOpportunity[]>([]);
-  const [statusFilter, setStatusFilter] = useState("open");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [funnelError, setFunnelError] = useState("");
-
-  async function loadFunnelDashboard() {
-    setIsLoading(true);
-    setFunnelError("");
-
-    try {
-      const [stagesResponse, opportunitiesResponse] = await Promise.all([
-        fetch("/api/funnel-stages"),
-        fetch(`/api/sales-opportunities?status=${statusFilter}`),
-      ]);
-
-      const stagesData = await stagesResponse.json();
-      const opportunitiesData = await opportunitiesResponse.json();
-
-      if (!stagesResponse.ok) {
-        throw new Error(stagesData.error || "Could not load funnel stages.");
-      }
-
-      if (!opportunitiesResponse.ok) {
-        throw new Error(opportunitiesData.error || "Could not load opportunities.");
-      }
-
-      setStages(stagesData.stages ?? []);
-      setOpportunities(opportunitiesData.opportunities ?? []);
-    } catch (error) {
-      setFunnelError(error instanceof Error ? error.message : "Could not load funnel dashboard.");
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    loadFunnelDashboard();
-  }, [statusFilter]);
-
-  const filteredOpportunities = useMemo(() => {
-    const search = normalizeForSearch(searchTerm);
-
-    return opportunities.filter((opportunity) => {
-      const searchableText = [
-        opportunity.opportunity_name,
-        opportunity.opportunity_type,
-        opportunity.product_line,
-        opportunity.likely_product_path,
-        opportunity.primary_use_case,
-        opportunity.next_step,
-        opportunity.status,
-        opportunity.companies?.company_name,
-        opportunity.contacts?.full_name,
-        opportunity.sales_funnel_stages?.stage_name,
-      ]
-        .map(normalizeForSearch)
-        .join(" ");
-
-      return !search || searchableText.includes(search);
-    });
-  }, [opportunities, searchTerm]);
-
-  const openOpportunities = filteredOpportunities.filter(
-    (opportunity) => opportunity.status === "open"
-  );
-
-  const totalPipelineValue = filteredOpportunities.reduce((total, opportunity) => {
-    return total + Number(opportunity.estimated_value ?? 0);
-  }, 0);
-
-  const weightedPipelineValue = filteredOpportunities.reduce((total, opportunity) => {
-    const value = Number(opportunity.estimated_value ?? 0);
-    const probability = Number(opportunity.probability ?? 0) / 100;
-
-    return total + value * probability;
-  }, 0);
-
-  const averageProbability =
-    filteredOpportunities.length === 0
-      ? 0
-      : Math.round(
-          filteredOpportunities.reduce((total, opportunity) => {
-            return total + Number(opportunity.probability ?? 0);
-          }, 0) / filteredOpportunities.length
-        );
-
-  const stageSummaries = useMemo(() => {
-    return stages.map((stage) => {
-      const stageOpportunities = filteredOpportunities.filter(
-        (opportunity) => opportunity.stage_id === stage.id
-      );
-
-      const stageValue = stageOpportunities.reduce((total, opportunity) => {
-        return total + Number(opportunity.estimated_value ?? 0);
-      }, 0);
-
-      const stageWeightedValue = stageOpportunities.reduce((total, opportunity) => {
-        const value = Number(opportunity.estimated_value ?? 0);
-        const probability = Number(opportunity.probability ?? stage.default_probability ?? 0) / 100;
-
-        return total + value * probability;
-      }, 0);
-
-      return {
-        stage,
-        count: stageOpportunities.length,
-        value: stageValue,
-        weightedValue: stageWeightedValue,
-      };
-    });
-  }, [stages, filteredOpportunities]);
-
-  function formatCurrency(value: number) {
-    return value.toLocaleString(undefined, {
-      style: "currency",
-      currency: "USD",
-      maximumFractionDigits: 0,
-    });
-  }
-
-  return (
-    <section className="grid gap-6">
-      <div className="rounded-2xl bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
-              Sales Funnel
-            </p>
-            <h2 className="mt-2 text-2xl font-bold">Pipeline Dashboard</h2>
-            <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-600">
-              Track open, won, lost, and archived opportunities across the CRM. This dashboard is opportunity-based, so one company can have multiple product-path opportunities.
-            </p>
-          </div>
-
-          <button
-            onClick={loadFunnelDashboard}
-            disabled={isLoading}
-            className="w-fit rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
-          >
-            {isLoading ? "Refreshing..." : "Refresh Funnel"}
-          </button>
-        </div>
-
-        {funnelError && (
-          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-            {funnelError}
-          </div>
-        )}
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-4">
-        <MetricCard
-          label={statusFilter === "open" ? "Open opportunities" : "Filtered opportunities"}
-          value={(statusFilter === "open" ? openOpportunities.length : filteredOpportunities.length).toString()}
-          note={`${filteredOpportunities.length} shown after search`}
-        />
-        <MetricCard
-          label="Pipeline value"
-          value={formatCurrency(totalPipelineValue)}
-          note="Estimated value before probability"
-        />
-        <MetricCard
-          label="Weighted value"
-          value={formatCurrency(weightedPipelineValue)}
-          note="Estimated value × probability"
-        />
-        <MetricCard
-          label="Avg. probability"
-          value={`${averageProbability}%`}
-          note="Average across filtered opportunities"
-        />
-      </div>
-
-      <div className="rounded-2xl bg-white p-6 shadow-sm">
-        <h3 className="text-xl font-bold">Funnel Controls</h3>
-
-        <div className="mt-5 grid gap-4 lg:grid-cols-4">
-          <div>
-            <label className="text-sm font-semibold text-slate-700">Status</label>
-            <select
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
-              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-            >
-              <option value="open">Open</option>
-              <option value="won">Won</option>
-              <option value="lost">Lost</option>
-              <option value="archived">Archived</option>
-              <option value="all">All</option>
-            </select>
-          </div>
-
-          <div className="lg:col-span-3">
-            <label className="text-sm font-semibold text-slate-700">Search Opportunities</label>
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="Search company, opportunity, product path, stage, contact, next step..."
-              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-2xl bg-white p-6 shadow-sm">
-        <h3 className="text-xl font-bold">Stage Summary</h3>
-
-        {stageSummaries.length === 0 ? (
-          <p className="mt-3 text-sm text-slate-600">No funnel stages loaded.</p>
-        ) : (
-          <div className="mt-5 grid gap-4 lg:grid-cols-4">
-            {stageSummaries.map((summary) => (
-              <div key={summary.stage.id} className="rounded-2xl border border-slate-200 p-4">
-                <p className="text-sm font-semibold text-slate-900">{summary.stage.stage_name}</p>
-                <p className="mt-2 text-2xl font-bold">{summary.count}</p>
-                <div className="mt-3 grid gap-1 text-xs text-slate-600">
-                  <p>Value: {formatCurrency(summary.value)}</p>
-                  <p>Weighted: {formatCurrency(summary.weightedValue)}</p>
-                  <p>Default probability: {summary.stage.default_probability}%</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="rounded-2xl bg-white p-6 shadow-sm">
-        <h3 className="text-xl font-bold">Opportunities</h3>
-
-        {filteredOpportunities.length === 0 ? (
-          <p className="mt-3 text-sm text-slate-600">
-            No opportunities match the current filter.
-          </p>
-        ) : (
-          <div className="mt-5 overflow-x-auto">
-            <table className="w-full min-w-[1100px] border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b border-slate-200">
-                  <th className="py-3 pr-4 font-semibold">Opportunity</th>
-                  <th className="py-3 pr-4 font-semibold">Company</th>
-                  <th className="py-3 pr-4 font-semibold">Stage</th>
-                  <th className="py-3 pr-4 font-semibold">Status</th>
-                  <th className="py-3 pr-4 font-semibold">Value</th>
-                  <th className="py-3 pr-4 font-semibold">Probability</th>
-                  <th className="py-3 pr-4 font-semibold">Weighted</th>
-                  <th className="py-3 pr-4 font-semibold">Close Date</th>
-                  <th className="py-3 pr-4 font-semibold">Next Step</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredOpportunities.map((opportunity) => {
-                  const value = Number(opportunity.estimated_value ?? 0);
-                  const probability = Number(opportunity.probability ?? 0) / 100;
-                  const weighted = value * probability;
-
-                  return (
-                    <tr key={opportunity.id} className="border-b border-slate-100 align-top">
-                      <td className="max-w-[260px] py-3 pr-4">
-                        <p className="font-semibold">{opportunity.opportunity_name}</p>
-                        <p className="mt-1 text-xs text-slate-500">
-                          {displayValue(opportunity.likely_product_path || opportunity.product_line || opportunity.opportunity_type)}
-                        </p>
-                      </td>
-                      <td className="py-3 pr-4">
-                        {displayValue(opportunity.companies?.company_name)}
-                      </td>
-                      <td className="py-3 pr-4">
-                        {displayValue(opportunity.sales_funnel_stages?.stage_name)}
-                      </td>
-                      <td className="py-3 pr-4">
-                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                          {opportunity.status}
-                        </span>
-                      </td>
-                      <td className="py-3 pr-4">{formatCurrency(value)}</td>
-                      <td className="py-3 pr-4">{opportunity.probability ?? 0}%</td>
-                      <td className="py-3 pr-4">{formatCurrency(weighted)}</td>
-                      <td className="py-3 pr-4">{formatDate(opportunity.expected_close_date)}</td>
-                      <td className="max-w-[320px] py-3 pr-4 text-slate-700">
-                        {displayValue(opportunity.next_step)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </section>
   );
 }
 
@@ -4646,8 +4346,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
 
 
 
