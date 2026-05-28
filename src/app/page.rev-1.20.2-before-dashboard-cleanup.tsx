@@ -124,9 +124,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.20.2 - Dashboard Release Notes Cleanup";
+const APP_VERSION = "Rev 1.20.1 - Release Notes Tab Fix";
 const REVISION_NOTE =
-  "Release notes now live in the Release Notes tab instead of the Dashboard objective block.";
+  "Release Notes is now available as a main navigation tab.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1123,6 +1123,44 @@ async function handleAnalyzeProspect() {
                 value={crmSummary.activities.overdue.length.toString()}
                 note="Incomplete and past due"
               />
+            </div>
+
+            <div className="rounded-2xl bg-white p-6 shadow-sm">
+              <h2 className="text-xl font-bold">Rev 1.20 Objective</h2>
+                <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-600">
+                This revision adds a Release Notes tab so revision history, testing notes, and near-term roadmap items are accessible from the main CRM navigation.
+                </p>
+
+              <div className="mt-6 grid gap-4 md:grid-cols-3">
+                <InfoPanel
+                  title="What works now"
+                  items={[
+                    "Print package button on company detail",
+                    "Dedicated print prospect package",
+                    "Company search and filters",
+                    "Follow-up dashboard",
+                    "Graymills knowledge tables in Supabase",
+                  ]}
+                />
+                <InfoPanel
+                  title="What comes next"
+                  items={[
+                    "Seed Graymills knowledge into Supabase",
+                    "Curate product and application context",
+                    "Prepare AI-safe prompt guardrails",
+                    "OpenAI prospect analysis later",
+                  ]}
+                />
+                <InfoPanel
+                  title="Future control note"
+                  items={[
+                    "Add prospect selection radio boxes or checkboxes",
+                    "Add modify tools for selected prospects",
+                    "Add safe delete/archive controls",
+                    "Add bulk actions with confirmation",
+                  ]}
+                />
+              </div>
             </div>
 
             <FollowUpDashboard
@@ -3537,7 +3575,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 

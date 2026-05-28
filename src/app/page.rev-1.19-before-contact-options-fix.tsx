@@ -2,7 +2,7 @@
 
 import { ChangeEvent, ReactNode, useEffect, useMemo, useState } from "react";
 
-type TabKey = "dashboard" | "companies" | "contacts" | "import" | "releaseNotes" | "companyDetail";
+type TabKey = "dashboard" | "companies" | "contacts" | "import" | "companyDetail";
 
 type ParsedCsv = {
   fileName: string;
@@ -124,9 +124,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.20.2 - Dashboard Release Notes Cleanup";
+const APP_VERSION = "Rev 1.19 - Contact Tag Filters";
 const REVISION_NOTE =
-  "Release notes now live in the Release Notes tab instead of the Dashboard objective block.";
+  "Contacts can now be filtered by assigned Market, Sector, and Category tags.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1034,7 +1034,6 @@ async function handleAnalyzeProspect() {
     { key: "companies", label: "Companies" },
     { key: "contacts", label: "Contacts" },
     { key: "import", label: "Import ZoomInfo" },
-    { key: "releaseNotes", label: "Release Notes" },
   ];
 
   return (
@@ -1123,6 +1122,44 @@ async function handleAnalyzeProspect() {
                 value={crmSummary.activities.overdue.length.toString()}
                 note="Incomplete and past due"
               />
+            </div>
+
+            <div className="rounded-2xl bg-white p-6 shadow-sm">
+              <h2 className="text-xl font-bold">Rev 1.17B Objective</h2>
+                <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-600">
+                This revision protects CRM trust by hiding AI-generated intelligence sections until a real prospect analysis has been generated and saved. Users will see a clear unanalyzed state instead of placeholder text.
+                </p>
+
+              <div className="mt-6 grid gap-4 md:grid-cols-3">
+                <InfoPanel
+                  title="What works now"
+                  items={[
+                    "Print package button on company detail",
+                    "Dedicated print prospect package",
+                    "Company search and filters",
+                    "Follow-up dashboard",
+                    "Graymills knowledge tables in Supabase",
+                  ]}
+                />
+                <InfoPanel
+                  title="What comes next"
+                  items={[
+                    "Seed Graymills knowledge into Supabase",
+                    "Curate product and application context",
+                    "Prepare AI-safe prompt guardrails",
+                    "OpenAI prospect analysis later",
+                  ]}
+                />
+                <InfoPanel
+                  title="Future control note"
+                  items={[
+                    "Add prospect selection radio boxes or checkboxes",
+                    "Add modify tools for selected prospects",
+                    "Add safe delete/archive controls",
+                    "Add bulk actions with confirmation",
+                  ]}
+                />
+              </div>
             </div>
 
             <FollowUpDashboard
@@ -1218,8 +1255,6 @@ async function handleAnalyzeProspect() {
             onBack={() => setActiveTab("companies")}
 />  
         )}
-
-        {activeTab === "releaseNotes" && <ReleaseNotesSection />}
 
         {activeTab === "import" && (
           <section className="grid gap-6">
@@ -1448,273 +1483,6 @@ async function handleAnalyzeProspect() {
         )}
       </div>
     </main>
-  );
-}
-
-function ReleaseNotesSection() {
-  const releases = [
-    {
-      version: "Rev 1.20",
-      title: "Release Notes Tab",
-      date: "Current",
-      summary:
-        "Adds a dedicated Release Notes tab to keep revision history, testing notes, and roadmap items visible inside the CRM.",
-      changes: [
-        "Added Release Notes to the main navigation.",
-        "Moved revision history into a dedicated app section.",
-        "Created a cleaner place to track what changed and what to test.",
-      ],
-      testNotes: [
-        "Confirm the Release Notes button appears beside Dashboard, Companies, Contacts, and Import ZoomInfo.",
-        "Open the tab and confirm revision cards display.",
-        "Confirm existing Dashboard, Companies, Contacts, Import, and Company Detail workflows still work.",
-      ],
-    },
-    {
-      version: "Rev 1.19",
-      title: "Contact Tag Filters",
-      date: "Completed",
-      summary:
-        "Contacts can be searched and filtered by assigned Market, Sector, and Category tags.",
-      changes: [
-        "Added contact tag summary loading.",
-        "Added Contact Search and Tag Filters panel.",
-        "Contact search now includes assigned tag names.",
-      ],
-      testNotes: [
-        "Assign a category such as Decision Maker to a contact.",
-        "Open Contacts and filter by that category.",
-        "Confirm the matching contact remains visible and unrelated contacts are filtered out.",
-      ],
-    },
-    {
-      version: "Rev 1.18",
-      title: "Company Tag Filters",
-      date: "Completed",
-      summary:
-        "Companies can be filtered by Market, Sector, and Category tags assigned on the company detail page.",
-      changes: [
-        "Added company tag summary loading.",
-        "Added Market, Sector, and Category filters above the Companies list.",
-        "Company search now includes assigned tag names.",
-      ],
-      testNotes: [
-        "Assign Parts Washing, Aviation MRO, or High Priority to a company.",
-        "Filter the Companies list by the assigned tag.",
-        "Confirm Clear All Filters resets the list.",
-      ],
-    },
-    {
-      version: "Rev 1.17C",
-      title: "Contact Tag Assignment UI",
-      date: "Completed",
-      summary:
-        "Contact cards now support Market, Sector, and Category tag assignment.",
-      changes: [
-        "Added Contact Tags controls inside each contact card.",
-        "Added separate controls for contact markets, sectors, and categories.",
-        "Contact tags can be added and removed from the company detail page.",
-      ],
-      testNotes: [
-        "Open a company with contacts.",
-        "Assign Decision Maker or Technical Influencer to a contact.",
-        "Refresh and confirm the tag persists.",
-      ],
-    },
-    {
-      version: "Rev 1.17B",
-      title: "Company Tag Assignment UI",
-      date: "Completed",
-      summary:
-        "Company detail pages now support Market, Sector, and Category tag assignment.",
-      changes: [
-        "Added company-level tag panel.",
-        "Added separate add controls for Markets, Sectors, and Categories.",
-        "Assigned tags can be removed from company records.",
-      ],
-      testNotes: [
-        "Open a company detail page.",
-        "Assign one Market, one Sector, and one Category.",
-        "Remove one tag and confirm it disappears.",
-      ],
-    },
-    {
-      version: "Rev 1.17A",
-      title: "Tag API Routes",
-      date: "Completed",
-      summary:
-        "Added backend API routes for loading tags and assigning/removing company and contact tags.",
-      changes: [
-        "Added /api/tags.",
-        "Added /api/company-tags.",
-        "Added /api/contact-tags.",
-      ],
-      testNotes: [
-        "Confirm /api/tags returns seeded tags.",
-        "Confirm company and contact tag routes can add and remove assignments.",
-      ],
-    },
-    {
-      version: "Rev 1.16",
-      title: "Market / Sector / Category Tables",
-      date: "Completed",
-      summary:
-        "Added the database foundation for flexible CRM segmentation.",
-      changes: [
-        "Created crm_tags.",
-        "Created company_tags.",
-        "Created contact_tags.",
-        "Seeded default Market, Sector, and Category values.",
-      ],
-      testNotes: [
-        "Confirm crm_tags contains Market, Sector, and Category rows.",
-        "Confirm company_tags and contact_tags accept assignments without duplicates.",
-      ],
-    },
-    {
-      version: "Rev 1.15.3",
-      title: "AI Intelligence Visibility Guard",
-      date: "Completed",
-      summary:
-        "AI intelligence sections now display only when a record was generated by the Analyze Prospect workflow.",
-      changes: [
-        "Added explicit AI-generated flag logic.",
-        "Prevented default or preloaded text from being mistaken for generated analysis.",
-        "Improved CRM trust by showing a clear unanalyzed state.",
-      ],
-      testNotes: [
-        "Open an unanalyzed company and confirm AI intelligence blocks are hidden.",
-        "Click Analyze Prospect and confirm blocks appear after analysis.",
-      ],
-    },
-    {
-      version: "Rev 1.14",
-      title: "Analyze Prospect Button",
-      date: "Completed",
-      summary:
-        "Added the Analyze Prospect button to company detail pages.",
-      changes: [
-        "Button calls the OpenAI prospect analysis API route.",
-        "Company detail refreshes after analysis.",
-        "Generated intelligence is saved to Supabase.",
-      ],
-      testNotes: [
-        "Open a company detail page.",
-        "Click Analyze Prospect.",
-        "Confirm score, product path, and intelligence update.",
-      ],
-    },
-    {
-      version: "Rev 1.13",
-      title: "OpenAI Prospect Analysis API Route",
-      date: "Completed",
-      summary:
-        "Added the backend route that analyzes a company using CRM data and approved Graymills knowledge context.",
-      changes: [
-        "Added OpenAI API integration.",
-        "Structured JSON analysis is saved into Supabase.",
-        "Prospect and prospect intelligence records are updated.",
-      ],
-      testNotes: [
-        "Test /api/analyze-prospect with a company ID.",
-        "Confirm prospect_intelligence receives a saved analysis.",
-      ],
-    },
-    {
-      version: "Rev 1.12",
-      title: "Graymills Knowledge Seed",
-      date: "Completed",
-      summary:
-        "Seeded Graymills product, application, and prompt-guardrail knowledge into Supabase.",
-      changes: [
-        "Added curated Graymills knowledge documents.",
-        "Added product family context.",
-        "Added application rules and AI guardrails.",
-      ],
-      testNotes: [
-        "Confirm Graymills knowledge tables are populated.",
-        "Confirm approved_for_ai records are active.",
-      ],
-    },
-  ];
-
-  const roadmap = [
-    "Import-Level Tag Assignment: choose Market, Sector, and Category tags during CSV upload.",
-    "Apply Import Tags: apply selected import tags to every company and contact created or reused from the upload.",
-    "Sales Funnel Tables: create opportunity/funnel structure separate from company records.",
-    "Funnel Stage Assignment: assign companies or opportunities to sales stages.",
-    "Funnel Dashboard: show pipeline counts, value, probability, next steps, and close dates.",
-  ];
-
-  return (
-    <section className="grid gap-6">
-      <div className="rounded-2xl bg-white p-6 shadow-sm">
-        <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
-          Product History
-        </p>
-        <h2 className="mt-2 text-2xl font-bold">Release Notes</h2>
-        <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-600">
-          A running record of major revisions to the Graymills prospecting CRM. Use this page to confirm what changed, why it matters, and what should be tested after each update.
-        </p>
-      </div>
-
-      <div className="rounded-2xl bg-white p-6 shadow-sm">
-        <h3 className="text-xl font-bold">Upcoming Roadmap</h3>
-        <div className="mt-4 grid gap-3">
-          {roadmap.map((item, index) => (
-            <div key={item} className="rounded-xl border border-slate-200 p-4">
-              <p className="text-sm font-semibold text-slate-900">
-                {index + 1}. {item}
-              </p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid gap-4">
-        {releases.map((release) => (
-          <article key={release.version} className="rounded-2xl bg-white p-6 shadow-sm">
-            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-              <div>
-                <p className="text-sm font-semibold text-blue-700">{release.version}</p>
-                <h3 className="mt-1 text-xl font-bold">{release.title}</h3>
-              </div>
-              <span className="w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                {release.date}
-              </span>
-            </div>
-
-            <p className="mt-4 text-sm leading-6 text-slate-700">{release.summary}</p>
-
-            <div className="mt-5 grid gap-4 lg:grid-cols-2">
-              <div className="rounded-xl border border-slate-200 p-4">
-                <h4 className="font-semibold">What changed</h4>
-                <ul className="mt-3 space-y-2 text-sm text-slate-600">
-                  {release.changes.map((change) => (
-                    <li key={change} className="flex gap-2">
-                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-600" />
-                      <span>{change}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="rounded-xl border border-slate-200 p-4">
-                <h4 className="font-semibold">Test notes</h4>
-                <ul className="mt-3 space-y-2 text-sm text-slate-600">
-                  {release.testNotes.map((note) => (
-                    <li key={note} className="flex gap-2">
-                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-green-600" />
-                      <span>{note}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </article>
-        ))}
-      </div>
-    </section>
   );
 }
 
@@ -3537,11 +3305,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
-
-
-
 
 
 
