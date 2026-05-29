@@ -151,9 +151,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.36.2.27 - Record Visibility Rules Draft";
+const APP_VERSION = "Rev 1.36.2.26 - Current User Selector";
 const REVISION_NOTE =
-  "Role Testing Mode now documents draft record-level visibility rules for Admins, Sales Managers, and Sales Reps.";
+  "Role Testing Mode now supports selecting an actual CRM user and applying that user role for permission testing.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -2823,40 +2823,6 @@ function RoleTestingPanel({
             <option value="sales_rep">Sales Rep</option>
           </select>
         </div>
-      </div>
-
-      <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-        <p className="text-sm font-semibold text-slate-900">Draft Record Visibility Rules</p>
-        <div className="mt-3 grid gap-3 text-xs leading-5 text-slate-600 lg:grid-cols-3">
-          <div className="rounded-xl bg-white p-3 ring-1 ring-slate-200">
-            <p className="font-bold text-slate-900">Admin</p>
-            <p className="mt-1">
-              Can view all companies, contacts, opportunities, activities, documents, import history,
-              sales assignments, and admin settings.
-            </p>
-          </div>
-
-          <div className="rounded-xl bg-white p-3 ring-1 ring-slate-200">
-            <p className="font-bold text-slate-900">Sales Manager</p>
-            <p className="mt-1">
-              Draft rule: can view companies and opportunities where they are assigned as Sales Manager,
-              plus related contacts, activities, notes, and documents. CSV import remains allowed.
-            </p>
-          </div>
-
-          <div className="rounded-xl bg-white p-3 ring-1 ring-slate-200">
-            <p className="font-bold text-slate-900">Sales Rep</p>
-            <p className="mt-1">
-              Draft rule: can view companies and opportunities where they are assigned as Salesperson / Rep,
-              plus related contacts, activities, notes, and documents. Can create and update opportunities,
-              move opportunity stages, and mark opportunities won or lost.
-            </p>
-          </div>
-        </div>
-
-        <p className="mt-3 text-xs font-semibold text-amber-700">
-          Draft only: these visibility rules are documented here but are not filtering records yet.
-        </p>
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
@@ -8786,7 +8752,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 
