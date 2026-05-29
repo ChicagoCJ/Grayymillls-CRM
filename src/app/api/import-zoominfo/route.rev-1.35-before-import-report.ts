@@ -554,14 +554,13 @@ async function updateCompanyIndustryEnrichment(
   companyId: string,
   enrichment: Record<string, unknown>
 ) {
-  let changed = false;
   const cleanedEntries = Object.entries(enrichment).filter(([, value]) => {
     if (value === null || value === undefined) return false;
     if (typeof value === "string" && value.trim().length === 0) return false;
     return true;
   });
 
-  if (cleanedEntries.length === 0) return false;
+  if (cleanedEntries.length === 0) return;
 
   const { data: existingCompany, error: loadError } = await supabase
     .from("companies")
@@ -578,18 +577,7 @@ async function updateCompanyIndustryEnrichment(
   };
 
   for (const [key, value] of cleanedEntries) {
-    const preferredValue = preferNewValue(existingCompany?.[key], value);
-    update[key] = preferredValue;
-
-    const existingValue = existingCompany?.[key];
-    const existingText =
-      existingValue === null || existingValue === undefined ? "" : String(existingValue).trim();
-    const preferredText =
-      preferredValue === null || preferredValue === undefined ? "" : String(preferredValue).trim();
-
-    if (preferredText.length > 0 && preferredText !== existingText) {
-      changed = true;
-    }
+    update[key] = preferNewValue(existingCompany?.[key], value);
   }
 
   const { error: updateError } = await supabase
@@ -598,8 +586,6 @@ async function updateCompanyIndustryEnrichment(
     .eq("id", companyId);
 
   if (updateError) throw updateError;
-
-  return changed;
 }
 async function findOrCreateCompany(supabase: ReturnType<typeof getSupabaseAdmin>, company: CompanyInsert) {
   if (company.domain) {
@@ -673,28 +659,9 @@ async function findOrCreateContact(supabase: ReturnType<typeof getSupabaseAdmin>
   return insertedContact;
 }
 
-function collectSelectedImportTagIds(payload: any) {
-  const ids = [
-    ...(Array.isArray(payload.selectedImportTagIds) ? payload.selectedImportTagIds : []),
-    ...(Array.isArray(payload.selectedMarketTagIds) ? payload.selectedMarketTagIds : []),
-    ...(Array.isArray(payload.selectedSectorTagIds) ? payload.selectedSectorTagIds : []),
-    ...(Array.isArray(payload.selectedCategoryTagIds) ? payload.selectedCategoryTagIds : []),
-  ];
-
-  return Array.from(
-    new Set(
-      ids
-        .filter((id) => typeof id === "string")
-        .map((id) => id.trim())
-        .filter((id) => id.length > 0)
-    )
-  );
-}
-
 export async function POST(request: Request) {
   try {
     const payload = (await request.json()) as ImportPayload;
-    const selectedImportTagIds = collectSelectedImportTagIds(payload);
 
     if (!payload.fileName || !Array.isArray(payload.rows) || payload.rows.length === 0) {
       return NextResponse.json(
@@ -817,7 +784,7 @@ export async function POST(request: Request) {
 
         const company = await findOrCreateCompany(supabase, companyBeforeInsert);
         
-        const companyWasEnriched = await updateCompanyIndustryEnrichment(supabase, company.id, {
+        await updateCompanyIndustryEnrichment(supabase, company.id, {
           naics,
           sic,
           naics_codes: zoomInfoNaicsCodes,
@@ -825,11 +792,6 @@ export async function POST(request: Request) {
           primary_industry: zoomInfoPrimaryIndustry,
           primary_sub_industry: zoomInfoPrimarySubIndustry,
         });
-
-        if (companyWasEnriched) {
-          companiesEnriched++;
-          importReport.companiesEnriched.push(company.company_name || companyName);
-        }
 const companyWasDuplicate = company.created_at !== company.updated_at;
 
         const contactBeforeInsert = {
@@ -855,10 +817,7 @@ const companyWasDuplicate = company.created_at !== company.updated_at;
 
         const contact = await findOrCreateContact(supabase, contactBeforeInsert);
 
-        
-        await applyImportTagsToCompany(supabase, company.id, selectedImportTagIds);
-        await applyImportTagsToContact(supabase, contact?.id, selectedImportTagIds);
-const industryFitScore = scoreIndustryFit(industry, naics);
+        const industryFitScore = scoreIndustryFit(industry, naics);
         const cleaningPainScore = scoreCleaningPain(industry);
         const buyerRelevanceScore = scoreBuyerRelevance(title, managementLevel);
         const companySizeScore = scoreCompanySize(employeeCount);
@@ -1134,10 +1093,6 @@ const industryFitScore = scoreIndustryFit(industry, naics);
     );
   }
 }
-
-
-
-
 
 
 

@@ -691,6 +691,43 @@ function collectSelectedImportTagIds(payload: any) {
   );
 }
 
+async function applyImportTagsToCompany(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  companyId: string,
+  tagIds: string[]
+) {
+  if (!companyId || tagIds.length === 0) return;
+
+  const rows = tagIds.map((tagId) => ({
+    company_id: companyId,
+    tag_id: tagId,
+  }));
+
+  const { error } = await supabase
+    .from("company_tags")
+    .upsert(rows, { onConflict: "company_id,tag_id" });
+
+  if (error) throw error;
+}
+
+async function applyImportTagsToContact(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  contactId: string | null | undefined,
+  tagIds: string[]
+) {
+  if (!contactId || tagIds.length === 0) return;
+
+  const rows = tagIds.map((tagId) => ({
+    contact_id: contactId,
+    tag_id: tagId,
+  }));
+
+  const { error } = await supabase
+    .from("contact_tags")
+    .upsert(rows, { onConflict: "contact_id,tag_id" });
+
+  if (error) throw error;
+}
 export async function POST(request: Request) {
   try {
     const payload = (await request.json()) as ImportPayload;
@@ -1134,8 +1171,6 @@ const industryFitScore = scoreIndustryFit(industry, naics);
     );
   }
 }
-
-
 
 
 

@@ -151,9 +151,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.35.5.3 - Import Tag Duplicate State Cleanup";
+const APP_VERSION = "Rev 1.35.5.2 - Duplicate Import Tag State Fix";
 const REVISION_NOTE =
-  "Duplicate local import tag selection state was removed so lifted import tag selections compile cleanly.";
+  "Duplicate local import tag state was removed so lifted tag selections can persist into CSV import.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1896,7 +1896,10 @@ function ImportTagAssignmentPanel({
   setSelectedCategoryTagIds: (value: string[]) => void;
 }) {
   const [tags, setTags] = useState<CrmTag[]>([]);
-const [isLoadingTags, setIsLoadingTags] = useState(false);
+  const [selectedMarketTagIds, setSelectedMarketTagIds] = useState<string[]>([]);
+  const [selectedSectorTagIds, setSelectedSectorTagIds] = useState<string[]>([]);
+  const [selectedCategoryTagIds, setSelectedCategoryTagIds] = useState<string[]>([]);
+  const [isLoadingTags, setIsLoadingTags] = useState(false);
   const [tagError, setTagError] = useState("");
 
   async function loadImportTags() {
@@ -8133,7 +8136,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 

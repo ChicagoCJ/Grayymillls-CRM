@@ -151,9 +151,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.35.5.3 - Import Tag Duplicate State Cleanup";
+const APP_VERSION = "Rev 1.35 - Import Results Report";
 const REVISION_NOTE =
-  "Duplicate local import tag selection state was removed so lifted import tag selections compile cleanly.";
+  "ZoomInfo imports now show a results report for created, reused, enriched, skipped, and errored records.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -559,10 +559,6 @@ export default function Home() {
   const [errorMessage, setErrorMessage] = useState("");
   const [importMessage, setImportMessage] = useState("");
   const [lastImportResults, setLastImportResults] = useState<ImportResultsSummary | null>(null);
-  const [importTagPanelResetKey, setImportTagPanelResetKey] = useState(0);
-  const [importMarketTagIds, setImportMarketTagIds] = useState<string[]>([]);
-  const [importSectorTagIds, setImportSectorTagIds] = useState<string[]>([]);
-  const [importCategoryTagIds, setImportCategoryTagIds] = useState<string[]>([]);
   const [isImporting, setIsImporting] = useState(false);
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
   const [isLoadingCompanyDetail, setIsLoadingCompanyDetail] = useState(false);
@@ -696,7 +692,7 @@ export default function Home() {
     return [
       "All",
       ...allCrmTags
-        .filter((tag) => ["market", "markets"].includes(String(tag.tag_type ?? "").toLowerCase().trim()))
+        .filter((tag) => tag.tag_type === "market")
         .sort((a, b) => (a.sort_order ?? 100) - (b.sort_order ?? 100))
         .map((tag) => tag.tag_name),
     ];
@@ -706,7 +702,7 @@ export default function Home() {
     return [
       "All",
       ...allCrmTags
-        .filter((tag) => ["sector", "sectors", "industry", "industries", "segment", "segments"].includes(String(tag.tag_type ?? "").toLowerCase().trim()))
+        .filter((tag) => tag.tag_type === "sector")
         .sort((a, b) => (a.sort_order ?? 100) - (b.sort_order ?? 100))
         .map((tag) => tag.tag_name),
     ];
@@ -716,7 +712,7 @@ export default function Home() {
     return [
       "All",
       ...allCrmTags
-        .filter((tag) => ["category", "categories", "workflow", "priority", "status"].includes(String(tag.tag_type ?? "").toLowerCase().trim()))
+        .filter((tag) => tag.tag_type === "category")
         .sort((a, b) => (a.sort_order ?? 100) - (b.sort_order ?? 100))
         .map((tag) => tag.tag_name),
     ];
@@ -731,15 +727,15 @@ export default function Home() {
         .filter((tag): tag is CrmTag => Boolean(tag));
 
       const contactMarketNames = contactTags
-        .filter((tag) => ["market", "markets"].includes(String(tag.tag_type ?? "").toLowerCase().trim()))
+        .filter((tag) => tag.tag_type === "market")
         .map((tag) => tag.tag_name);
 
       const contactSectorNames = contactTags
-        .filter((tag) => ["sector", "sectors", "industry", "industries", "segment", "segments"].includes(String(tag.tag_type ?? "").toLowerCase().trim()))
+        .filter((tag) => tag.tag_type === "sector")
         .map((tag) => tag.tag_name);
 
       const contactCategoryNames = contactTags
-        .filter((tag) => ["category", "categories", "workflow", "priority", "status"].includes(String(tag.tag_type ?? "").toLowerCase().trim()))
+        .filter((tag) => tag.tag_type === "category")
         .map((tag) => tag.tag_name);
 
       const searchableText = [
@@ -817,15 +813,15 @@ export default function Home() {
         .filter((tag): tag is CrmTag => Boolean(tag));
 
       const companyMarketNames = companyTags
-        .filter((tag) => ["market", "markets"].includes(String(tag.tag_type ?? "").toLowerCase().trim()))
+        .filter((tag) => tag.tag_type === "market")
         .map((tag) => tag.tag_name);
 
       const companySectorNames = companyTags
-        .filter((tag) => ["sector", "sectors", "industry", "industries", "segment", "segments"].includes(String(tag.tag_type ?? "").toLowerCase().trim()))
+        .filter((tag) => tag.tag_type === "sector")
         .map((tag) => tag.tag_name);
 
       const companyCategoryNames = companyTags
-        .filter((tag) => ["category", "categories", "workflow", "priority", "status"].includes(String(tag.tag_type ?? "").toLowerCase().trim()))
+        .filter((tag) => tag.tag_type === "category")
         .map((tag) => tag.tag_name);
 
       const searchableText = [
@@ -1121,14 +1117,6 @@ export default function Home() {
           headers: csvData.headers,
           rows: csvData.rows,
           mapping: activeMapping,
-          selectedMarketTagIds: importMarketTagIds,
-          selectedSectorTagIds: importSectorTagIds,
-          selectedCategoryTagIds: importCategoryTagIds,
-          selectedImportTagIds: [
-            ...importMarketTagIds,
-            ...importSectorTagIds,
-            ...importCategoryTagIds,
-          ],
         }),
       });
 
@@ -1143,7 +1131,7 @@ export default function Home() {
       );
 
       await loadCrmSummary();
-      setActiveTab("import");
+      setActiveTab("companies");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Import failed.");
     } finally {
@@ -1451,15 +1439,7 @@ async function handleAnalyzeProspect() {
 
         {activeTab === "import" && (
           <section className="grid gap-6">
-            <ImportTagAssignmentPanel
-              resetKey={importTagPanelResetKey}
-              selectedMarketTagIds={importMarketTagIds}
-              setSelectedMarketTagIds={setImportMarketTagIds}
-              selectedSectorTagIds={importSectorTagIds}
-              setSelectedSectorTagIds={setImportSectorTagIds}
-              selectedCategoryTagIds={importCategoryTagIds}
-              setSelectedCategoryTagIds={setImportCategoryTagIds}
-            />
+            <ImportTagAssignmentPanel />
             <div className="rounded-2xl bg-white p-6 shadow-sm">
               <div className="flex flex-col gap-4">
                 <div>
@@ -1702,88 +1682,6 @@ function readSelectedImportTagIds() {
     return [];
   }
 }
-function ImportResultsVisibilityPanel({
-  importMessage,
-  errorMessage,
-  results,
-}: {
-  importMessage: string;
-  errorMessage: string;
-  results: any | null;
-}) {
-  if (!importMessage && !errorMessage && !results) return null;
-
-  const report = results?.report;
-
-  return (
-    <section className="mt-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div>
-        <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
-          Latest Import Status
-        </p>
-
-        {importMessage && (
-          <div className="mt-3 rounded-xl border border-green-200 bg-green-50 p-4 text-sm font-semibold text-green-800">
-            {importMessage}
-          </div>
-        )}
-
-        {errorMessage && (
-          <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-800">
-            {errorMessage}
-          </div>
-        )}
-      </div>
-
-      {results && (
-        <div className="mt-5 grid gap-3 md:grid-cols-3">
-          <div className="rounded-xl border border-green-200 bg-green-50 p-4">
-            <p className="text-sm font-semibold text-green-900">Companies Created</p>
-            <p className="mt-2 text-3xl font-bold text-green-950">
-              {results.companiesCreated ?? report?.companiesCreated?.length ?? 0}
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
-            <p className="text-sm font-semibold text-blue-900">Companies Reused</p>
-            <p className="mt-2 text-3xl font-bold text-blue-950">
-              {results.duplicateCompanies ?? report?.companiesReused?.length ?? 0}
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-purple-200 bg-purple-50 p-4">
-            <p className="text-sm font-semibold text-purple-900">Companies Enriched</p>
-            <p className="mt-2 text-3xl font-bold text-purple-950">
-              {results.companiesEnriched ?? report?.companiesEnriched?.length ?? 0}
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-green-200 bg-green-50 p-4">
-            <p className="text-sm font-semibold text-green-900">Contacts Created</p>
-            <p className="mt-2 text-3xl font-bold text-green-950">
-              {results.contactsCreated ?? report?.contactsCreated?.length ?? 0}
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
-            <p className="text-sm font-semibold text-blue-900">Contacts Reused</p>
-            <p className="mt-2 text-3xl font-bold text-blue-950">
-              {results.duplicateContacts ?? report?.contactsReused?.length ?? 0}
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-red-200 bg-red-50 p-4">
-            <p className="text-sm font-semibold text-red-900">Errors</p>
-            <p className="mt-2 text-3xl font-bold text-red-950">
-              {results.errors?.length ?? report?.rowErrors?.length ?? 0}
-            </p>
-          </div>
-        </div>
-      )}
-    </section>
-  );
-}
-
 function ImportResultsReportPanel({
   results,
 }: {
@@ -1878,25 +1776,12 @@ function ImportResultsReportPanel({
   );
 }
 
-function ImportTagAssignmentPanel({
-  resetKey = 0,
-  selectedMarketTagIds,
-  setSelectedMarketTagIds,
-  selectedSectorTagIds,
-  setSelectedSectorTagIds,
-  selectedCategoryTagIds,
-  setSelectedCategoryTagIds,
-}: {
-  resetKey?: number;
-  selectedMarketTagIds: string[];
-  setSelectedMarketTagIds: (value: string[]) => void;
-  selectedSectorTagIds: string[];
-  setSelectedSectorTagIds: (value: string[]) => void;
-  selectedCategoryTagIds: string[];
-  setSelectedCategoryTagIds: (value: string[]) => void;
-}) {
+function ImportTagAssignmentPanel() {
   const [tags, setTags] = useState<CrmTag[]>([]);
-const [isLoadingTags, setIsLoadingTags] = useState(false);
+  const [selectedMarketTagIds, setSelectedMarketTagIds] = useState<string[]>([]);
+  const [selectedSectorTagIds, setSelectedSectorTagIds] = useState<string[]>([]);
+  const [selectedCategoryTagIds, setSelectedCategoryTagIds] = useState<string[]>([]);
+  const [isLoadingTags, setIsLoadingTags] = useState(false);
   const [tagError, setTagError] = useState("");
 
   async function loadImportTags() {
@@ -1925,19 +1810,19 @@ const [isLoadingTags, setIsLoadingTags] = useState(false);
 
   const marketTags = useMemo(() => {
     return tags
-      .filter((tag) => ["market", "markets"].includes(String(tag.tag_type ?? "").toLowerCase().trim()))
+      .filter((tag) => tag.tag_type === "market")
       .sort((a, b) => (a.sort_order ?? 100) - (b.sort_order ?? 100));
   }, [tags]);
 
   const sectorTags = useMemo(() => {
     return tags
-      .filter((tag) => ["sector", "sectors", "industry", "industries", "segment", "segments"].includes(String(tag.tag_type ?? "").toLowerCase().trim()))
+      .filter((tag) => tag.tag_type === "sector")
       .sort((a, b) => (a.sort_order ?? 100) - (b.sort_order ?? 100));
   }, [tags]);
 
   const categoryTags = useMemo(() => {
     return tags
-      .filter((tag) => ["category", "categories", "workflow", "priority", "status"].includes(String(tag.tag_type ?? "").toLowerCase().trim()))
+      .filter((tag) => tag.tag_type === "category")
       .sort((a, b) => (a.sort_order ?? 100) - (b.sort_order ?? 100));
   }, [tags]);
 
@@ -1978,7 +1863,7 @@ const [isLoadingTags, setIsLoadingTags] = useState(false);
         </div>
       )}
 
-      <div className="mt-5 grid gap-4">
+      <div className="mt-5 grid gap-4 lg:grid-cols-3">
         <ImportTagPicker
           title="Markets"
           helperText="Broad Graymills commercial arena."
@@ -4161,7 +4046,7 @@ function FunnelDashboardSection({
                     : "border-slate-200 bg-white hover:border-blue-200"
                 }`}
               >
-                <p className="text-sm font-semibold text-slate-900 break-words">{summary.stage.stage_name}</p>
+                <p className="text-sm font-semibold text-slate-900">{summary.stage.stage_name}</p>
                 <p className="mt-2 text-2xl font-bold">{summary.count}</p>
                 <div className="mt-3 grid gap-1 text-xs text-slate-600">
                   <p>Value: {formatCurrency(summary.value)}</p>
@@ -4476,7 +4361,7 @@ function ReleaseNotesSection() {
         <div className="mt-4 grid gap-3">
           {roadmap.map((item, index) => (
             <div key={item} className="rounded-xl border border-slate-200 p-4">
-              <p className="text-sm font-semibold text-slate-900 break-words">
+              <p className="text-sm font-semibold text-slate-900">
                 {index + 1}. {item}
               </p>
             </div>
@@ -7582,7 +7467,7 @@ if (!tagsResponse.ok) {
         </div>
       )}
 
-      <div className="mt-5 grid gap-4">
+      <div className="mt-5 grid gap-4 lg:grid-cols-3">
         <TagAssignmentColumn
           title="Markets"
           emptyText="No markets assigned."
@@ -8133,14 +8018,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
-
-
-
-
-
-
 
 
 

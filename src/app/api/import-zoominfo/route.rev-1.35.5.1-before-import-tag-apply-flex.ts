@@ -673,28 +673,9 @@ async function findOrCreateContact(supabase: ReturnType<typeof getSupabaseAdmin>
   return insertedContact;
 }
 
-function collectSelectedImportTagIds(payload: any) {
-  const ids = [
-    ...(Array.isArray(payload.selectedImportTagIds) ? payload.selectedImportTagIds : []),
-    ...(Array.isArray(payload.selectedMarketTagIds) ? payload.selectedMarketTagIds : []),
-    ...(Array.isArray(payload.selectedSectorTagIds) ? payload.selectedSectorTagIds : []),
-    ...(Array.isArray(payload.selectedCategoryTagIds) ? payload.selectedCategoryTagIds : []),
-  ];
-
-  return Array.from(
-    new Set(
-      ids
-        .filter((id) => typeof id === "string")
-        .map((id) => id.trim())
-        .filter((id) => id.length > 0)
-    )
-  );
-}
-
 export async function POST(request: Request) {
   try {
     const payload = (await request.json()) as ImportPayload;
-    const selectedImportTagIds = collectSelectedImportTagIds(payload);
 
     if (!payload.fileName || !Array.isArray(payload.rows) || payload.rows.length === 0) {
       return NextResponse.json(
@@ -855,10 +836,7 @@ const companyWasDuplicate = company.created_at !== company.updated_at;
 
         const contact = await findOrCreateContact(supabase, contactBeforeInsert);
 
-        
-        await applyImportTagsToCompany(supabase, company.id, selectedImportTagIds);
-        await applyImportTagsToContact(supabase, contact?.id, selectedImportTagIds);
-const industryFitScore = scoreIndustryFit(industry, naics);
+        const industryFitScore = scoreIndustryFit(industry, naics);
         const cleaningPainScore = scoreCleaningPain(industry);
         const buyerRelevanceScore = scoreBuyerRelevance(title, managementLevel);
         const companySizeScore = scoreCompanySize(employeeCount);
@@ -1134,9 +1112,6 @@ const industryFitScore = scoreIndustryFit(industry, naics);
     );
   }
 }
-
-
-
 
 
 

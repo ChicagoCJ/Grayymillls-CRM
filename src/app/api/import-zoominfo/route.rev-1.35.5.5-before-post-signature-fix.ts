@@ -691,7 +691,7 @@ function collectSelectedImportTagIds(payload: any) {
   );
 }
 
-export async function POST(request: Request) {
+async async export async function POST(request: Request) {
   try {
     const payload = (await request.json()) as ImportPayload;
     const selectedImportTagIds = collectSelectedImportTagIds(payload);
@@ -1134,7 +1134,6 @@ const industryFitScore = scoreIndustryFit(industry, naics);
     );
   }
 }
-
 
 
 

@@ -151,9 +151,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.35.5.3 - Import Tag Duplicate State Cleanup";
+const APP_VERSION = "Rev 1.35.4.1 - Import Tag Layout Fix";
 const REVISION_NOTE =
-  "Duplicate local import tag selection state was removed so lifted import tag selections compile cleanly.";
+  "Import tag groups now stack vertically so Markets, Sectors, and Categories remain visible after upload/import cycles.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -560,9 +560,6 @@ export default function Home() {
   const [importMessage, setImportMessage] = useState("");
   const [lastImportResults, setLastImportResults] = useState<ImportResultsSummary | null>(null);
   const [importTagPanelResetKey, setImportTagPanelResetKey] = useState(0);
-  const [importMarketTagIds, setImportMarketTagIds] = useState<string[]>([]);
-  const [importSectorTagIds, setImportSectorTagIds] = useState<string[]>([]);
-  const [importCategoryTagIds, setImportCategoryTagIds] = useState<string[]>([]);
   const [isImporting, setIsImporting] = useState(false);
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
   const [isLoadingCompanyDetail, setIsLoadingCompanyDetail] = useState(false);
@@ -1121,14 +1118,6 @@ export default function Home() {
           headers: csvData.headers,
           rows: csvData.rows,
           mapping: activeMapping,
-          selectedMarketTagIds: importMarketTagIds,
-          selectedSectorTagIds: importSectorTagIds,
-          selectedCategoryTagIds: importCategoryTagIds,
-          selectedImportTagIds: [
-            ...importMarketTagIds,
-            ...importSectorTagIds,
-            ...importCategoryTagIds,
-          ],
         }),
       });
 
@@ -1451,15 +1440,7 @@ async function handleAnalyzeProspect() {
 
         {activeTab === "import" && (
           <section className="grid gap-6">
-            <ImportTagAssignmentPanel
-              resetKey={importTagPanelResetKey}
-              selectedMarketTagIds={importMarketTagIds}
-              setSelectedMarketTagIds={setImportMarketTagIds}
-              selectedSectorTagIds={importSectorTagIds}
-              setSelectedSectorTagIds={setImportSectorTagIds}
-              selectedCategoryTagIds={importCategoryTagIds}
-              setSelectedCategoryTagIds={setImportCategoryTagIds}
-            />
+            <ImportTagAssignmentPanel resetKey={importTagPanelResetKey} />
             <div className="rounded-2xl bg-white p-6 shadow-sm">
               <div className="flex flex-col gap-4">
                 <div>
@@ -1878,25 +1859,12 @@ function ImportResultsReportPanel({
   );
 }
 
-function ImportTagAssignmentPanel({
-  resetKey = 0,
-  selectedMarketTagIds,
-  setSelectedMarketTagIds,
-  selectedSectorTagIds,
-  setSelectedSectorTagIds,
-  selectedCategoryTagIds,
-  setSelectedCategoryTagIds,
-}: {
-  resetKey?: number;
-  selectedMarketTagIds: string[];
-  setSelectedMarketTagIds: (value: string[]) => void;
-  selectedSectorTagIds: string[];
-  setSelectedSectorTagIds: (value: string[]) => void;
-  selectedCategoryTagIds: string[];
-  setSelectedCategoryTagIds: (value: string[]) => void;
-}) {
+function ImportTagAssignmentPanel({ resetKey = 0 }: { resetKey?: number }) {
   const [tags, setTags] = useState<CrmTag[]>([]);
-const [isLoadingTags, setIsLoadingTags] = useState(false);
+  const [selectedMarketTagIds, setSelectedMarketTagIds] = useState<string[]>([]);
+  const [selectedSectorTagIds, setSelectedSectorTagIds] = useState<string[]>([]);
+  const [selectedCategoryTagIds, setSelectedCategoryTagIds] = useState<string[]>([]);
+  const [isLoadingTags, setIsLoadingTags] = useState(false);
   const [tagError, setTagError] = useState("");
 
   async function loadImportTags() {
@@ -8133,10 +8101,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
-
-
 
 
 
