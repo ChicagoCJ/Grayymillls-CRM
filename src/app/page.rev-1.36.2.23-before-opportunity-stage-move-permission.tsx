@@ -151,9 +151,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.36.2.23 - Opportunity Stage Move Permission Guard";
+const APP_VERSION = "Rev 1.36.2.22 - Funnel Stage Permission Guard";
 const REVISION_NOTE =
-  "Opportunity stage movement now respects role permissions while Sales Reps remain allowed to move assigned opportunities between existing stages.";
+  "Funnel stage management is now guarded by role permissions while opportunity stage movement remains available.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1542,7 +1542,6 @@ async function handleAnalyzeProspect() {
             onAnalyzeProspect={handleAnalyzeProspect}
             onBack={() => setActiveTab("companies")}
             salesCoverageCanEdit={currentPermissions.canAssignSalesCoverage}
-            canMoveOpportunityStages={currentPermissions.canMoveOpportunityStages}
 />  
         )}        {activeTab === "admin" && (
           <section className="grid gap-6">
@@ -5553,7 +5552,6 @@ function CompanyDetailSection({
   onAnalyzeProspect,
   onBack,
   salesCoverageCanEdit = true,
-  canMoveOpportunityStages = true,
 }: {
   detail: CompanyDetail | null;
   activityForm: ActivityForm;
@@ -5566,7 +5564,6 @@ function CompanyDetailSection({
   onAnalyzeProspect: () => void;
   onBack: () => void;
   salesCoverageCanEdit?: boolean;
-  canMoveOpportunityStages?: boolean;
 }) {
   if (!detail) {
     return (
@@ -5713,7 +5710,6 @@ function CompanyDetailSection({
       <CompanyTagManager companyId={String(detail.company.id)} />
 
       <CompanyOpportunityPanel
-        canMoveOpportunityStages={canMoveOpportunityStages}
         companyId={String(detail.company.id)}
         companyName={displayValue(detail.company.company_name)}
         contacts={detail.contacts}
@@ -7040,14 +7036,12 @@ function CompanyOpportunityPanel({
   contacts,
   prospects,
   primaryProspect,
-  canMoveOpportunityStages = true,
 }: {
   companyId: string;
   companyName: string;
   contacts: Record<string, string | boolean | null>[];
   prospects: Record<string, string | number | null>[];
   primaryProspect: Record<string, string | number | null> | null;
-  canMoveOpportunityStages?: boolean;
 }) {
   const [stages, setStages] = useState<SalesFunnelStage[]>([]);
   const [opportunities, setOpportunities] = useState<SalesOpportunity[]>([]);
@@ -7851,12 +7845,6 @@ function CompanyOpportunityPanel({
                     />
 
 
-                    {!canMoveOpportunityStages && (
-                      <p className="mb-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs font-semibold text-amber-800">
-                        Your current role cannot move this opportunity between stages.
-                      </p>
-                    )}
-
                     <label className="text-xs font-semibold text-slate-600">Update Stage</label>
                     <select
                       value={opportunity.stage_id || ""}
@@ -7866,7 +7854,6 @@ function CompanyOpportunityPanel({
                         })
                       }
                       disabled={isSaving}
-                      disabled={!canMoveOpportunityStages}
                       className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
                     >
                       <option value="">No stage</option>
@@ -8644,7 +8631,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 
