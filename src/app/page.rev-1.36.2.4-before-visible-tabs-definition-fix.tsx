@@ -151,9 +151,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.36.2.10 - canShowTab Hard Cleanup";
+const APP_VERSION = "Rev 1.36.2.3 - Inline Visible Tabs Fix";
 const REVISION_NOTE =
-  "Removed partial role-based navigation filtering references to keep the app stable.";
+  "Role Testing Mode now filters navigation tabs inline so restricted tabs hide without missing state errors.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -408,7 +408,13 @@ function suggestMappings(headers: string[]): MappingSuggestion[] {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   }
-function handleRoleChange(role: AppUserRole) {
+  const visibleTabs = tabs.filter((tab) => {
+    if (tab.key === "admin") return currentPermissions.canManageAdminSettings;
+    if (tab.key === "import") return currentPermissions.canImportCsv;
+    return true;
+  });
+
+  function handleRoleChange(role: AppUserRole) {
     setCurrentUserRole(role);
 
     const nextPermissions = getRolePermissions(role);
@@ -421,7 +427,7 @@ function handleRoleChange(role: AppUserRole) {
       setActiveTab("dashboard");
     }
   }
-return (
+  return (
           header.normalized.includes(normalizedAlias) ||
           normalizedAlias.includes(header.normalized)
         );
@@ -938,7 +944,8 @@ export default function Home() {
       const matchesCategoryTag =
         companyCategoryTagFilter === "All" ||
         companyCategoryNames.includes(companyCategoryTagFilter);
-return (
+
+      return (
         matchesSearch &&
         matchesTier &&
         matchesStatus &&
@@ -1374,7 +1381,13 @@ async function handleAnalyzeProspect() {
         )}
 
         <nav className="flex flex-wrap gap-2">
-          {tabs.map((tab) => (
+          {tabs
+              .filter((tab) => {
+                if (tab.key === "admin") return currentPermissions.canManageAdminSettings;
+                if (tab.key === "import") return currentPermissions.canImportCsv;
+                return true;
+              })
+              .map((tab) => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
@@ -8624,13 +8637,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
-
-
-
-
-
 
 
 

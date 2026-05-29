@@ -151,9 +151,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.36.2.10 - canShowTab Hard Cleanup";
+const APP_VERSION = "Rev 1.36.2.8 - Role-Based Navigation Hiding";
 const REVISION_NOTE =
-  "Removed partial role-based navigation filtering references to keep the app stable.";
+  "Navigation now hides Admin and Import tabs based on the selected role-testing permissions.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -938,7 +938,13 @@ export default function Home() {
       const matchesCategoryTag =
         companyCategoryTagFilter === "All" ||
         companyCategoryNames.includes(companyCategoryTagFilter);
-return (
+
+      function canShowTab(tabKey: TabKey) {
+    if (tabKey === "admin") return currentPermissions.canManageAdminSettings;
+    if (tabKey === "import") return currentPermissions.canImportCsv;
+    return true;
+  }
+  return (
         matchesSearch &&
         matchesTier &&
         matchesStatus &&
@@ -1374,7 +1380,7 @@ async function handleAnalyzeProspect() {
         )}
 
         <nav className="flex flex-wrap gap-2">
-          {tabs.map((tab) => (
+          {tabs.filter((tab) => canShowTab(tab.key)).map((tab) => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
@@ -8624,8 +8630,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
 
 
 

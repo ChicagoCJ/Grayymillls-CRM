@@ -151,9 +151,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.36.2.10 - canShowTab Hard Cleanup";
+const APP_VERSION = "Rev 1.36.2.9 - Role Nav Stabilized";
 const REVISION_NOTE =
-  "Removed partial role-based navigation filtering references to keep the app stable.";
+  "Role Testing Mode remains active while navigation rendering is restored to a stable baseline.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -8624,7 +8624,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 

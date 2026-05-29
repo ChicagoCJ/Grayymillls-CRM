@@ -151,9 +151,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.36.2.10 - canShowTab Hard Cleanup";
+const APP_VERSION = "Rev 1.36.1 - User Roles and Coverage Types";
 const REVISION_NOTE =
-  "Removed partial role-based navigation filtering references to keep the app stable.";
+  "CRM users now support Admin, Sales Manager, and Sales Rep roles plus Internal or Outside Rep coverage type.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -408,20 +408,7 @@ function suggestMappings(headers: string[]): MappingSuggestion[] {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   }
-function handleRoleChange(role: AppUserRole) {
-    setCurrentUserRole(role);
-
-    const nextPermissions = getRolePermissions(role);
-
-    if (activeTab === "admin" && !nextPermissions.canManageAdminSettings) {
-      setActiveTab("dashboard");
-    }
-
-    if (activeTab === "import" && !nextPermissions.canImportCsv) {
-      setActiveTab("dashboard");
-    }
-  }
-return (
+  return (
           header.normalized.includes(normalizedAlias) ||
           normalizedAlias.includes(header.normalized)
         );
@@ -530,51 +517,6 @@ function formatCoverageType(type: string | null | undefined) {
   if (type === "internal") return "Internal";
   return "Internal";
 }
-type AppUserRole = "admin" | "sales_manager" | "sales_rep";
-
-type AppPermissions = {
-  canManageAdminSettings: boolean;
-  canImportCsv: boolean;
-  canManageFunnelStages: boolean;
-  canMoveOpportunityStages: boolean;
-  canAssignSalesCoverage: boolean;
-};
-
-function getRolePermissions(role: AppUserRole): AppPermissions {
-  if (role === "admin") {
-    return {
-      canManageAdminSettings: true,
-      canImportCsv: true,
-      canManageFunnelStages: true,
-      canMoveOpportunityStages: true,
-      canAssignSalesCoverage: true,
-    };
-  }
-
-  if (role === "sales_manager") {
-    return {
-      canManageAdminSettings: false,
-      canImportCsv: true,
-      canManageFunnelStages: false,
-      canMoveOpportunityStages: true,
-      canAssignSalesCoverage: true,
-    };
-  }
-
-  return {
-    canManageAdminSettings: false,
-    canImportCsv: false,
-    canManageFunnelStages: false,
-    canMoveOpportunityStages: true,
-    canAssignSalesCoverage: false,
-  };
-}
-
-function formatAppUserRole(role: AppUserRole) {
-  if (role === "admin") return "Admin";
-  if (role === "sales_manager") return "Sales Manager";
-  return "Sales Rep";
-}
 function displayValue(value: unknown) {
   if (value === null || value === undefined || value === "") return "Not provided";
   if (typeof value === "string" || typeof value === "number") return String(value);
@@ -624,11 +566,6 @@ function hasMeaningfulAnalysis(intelligence: Record<string, unknown> | null) {
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<TabKey>("dashboard");
-  const [currentUserRole, setCurrentUserRole] = useState<AppUserRole>("admin");
-  const currentPermissions = useMemo(
-    () => getRolePermissions(currentUserRole),
-    [currentUserRole]
-  );
   const [csvData, setCsvData] = useState<ParsedCsv | null>(null);
   const [manualMapping, setManualMapping] = useState<Record<string, string>>({});
   const [errorMessage, setErrorMessage] = useState("");
@@ -938,7 +875,8 @@ export default function Home() {
       const matchesCategoryTag =
         companyCategoryTagFilter === "All" ||
         companyCategoryNames.includes(companyCategoryTagFilter);
-return (
+
+      return (
         matchesSearch &&
         matchesTier &&
         matchesStatus &&
@@ -1333,25 +1271,7 @@ async function handleAnalyzeProspect() {
               </p>
             </div>
 
-            <RoleTestingPanel
-          currentUserRole={currentUserRole}
-          setCurrentUserRole={(role) => {
-            const nextPermissions = getRolePermissions(role);
-
-            setCurrentUserRole(role);
-
-            if (activeTab === "admin" && !nextPermissions.canManageAdminSettings) {
-              setActiveTab("dashboard");
-            }
-
-            if (activeTab === "import" && !nextPermissions.canImportCsv) {
-              setActiveTab("dashboard");
-            }
-          }}
-          permissions={currentPermissions}
-        />
-
-        <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm">
+            <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm">
               <p className="font-semibold text-blue-900">{APP_VERSION}</p>
               <p className="mt-1 text-blue-700">{REVISION_NOTE}</p>
             </div>
@@ -2638,65 +2558,6 @@ function AdminFunnelStagesSection() {
             ))}
           </div>
         )}
-      </div>
-    </section>
-  );
-}
-
-function RoleTestingPanel({
-  currentUserRole,
-  setCurrentUserRole,
-  permissions,
-}: {
-  currentUserRole: AppUserRole;
-  setCurrentUserRole: (role: AppUserRole) => void;
-  permissions: AppPermissions;
-}) {
-  return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
-            Role Testing Mode
-          </p>
-          <h3 className="mt-1 text-lg font-bold">
-            Current Role: {formatAppUserRole(currentUserRole)}
-          </h3>
-          <p className="mt-1 text-sm leading-6 text-slate-600">
-            UI-only permission testing. API-level enforcement will come in a later revision.
-          </p>
-        </div>
-
-        <div className="w-full max-w-xs">
-          <label className="text-sm font-semibold text-slate-700">Test as Role</label>
-          <select
-            value={currentUserRole}
-            onChange={(event) => setCurrentUserRole(event.target.value as AppUserRole)}
-            className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-          >
-            <option value="admin">Admin</option>
-            <option value="sales_manager">Sales Manager</option>
-            <option value="sales_rep">Sales Rep</option>
-          </select>
-        </div>
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
-        <span className={`rounded-full px-2.5 py-1 ${permissions.canManageAdminSettings ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-500"}`}>
-          Admin Settings
-        </span>
-        <span className={`rounded-full px-2.5 py-1 ${permissions.canImportCsv ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-500"}`}>
-          CSV Import
-        </span>
-        <span className={`rounded-full px-2.5 py-1 ${permissions.canManageFunnelStages ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-500"}`}>
-          Manage Funnel Stages
-        </span>
-        <span className={`rounded-full px-2.5 py-1 ${permissions.canMoveOpportunityStages ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-500"}`}>
-          Move Stages
-        </span>
-        <span className={`rounded-full px-2.5 py-1 ${permissions.canAssignSalesCoverage ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-500"}`}>
-          Assign Sales Coverage
-        </span>
       </div>
     </section>
   );
@@ -8624,17 +8485,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
 
 
 

@@ -151,9 +151,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.36.2.10 - canShowTab Hard Cleanup";
+const APP_VERSION = "Rev 1.36.2.5 - Navigation Stabilization Fix";
 const REVISION_NOTE =
-  "Removed partial role-based navigation filtering references to keep the app stable.";
+  "Role Testing Mode remains available while navigation tab filtering is temporarily stabilized.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -938,7 +938,8 @@ export default function Home() {
       const matchesCategoryTag =
         companyCategoryTagFilter === "All" ||
         companyCategoryNames.includes(companyCategoryTagFilter);
-return (
+
+      return (
         matchesSearch &&
         matchesTier &&
         matchesStatus &&
@@ -8624,11 +8625,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
-
-
-
 
 
 
