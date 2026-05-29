@@ -1,4 +1,4 @@
-﻿import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -27,8 +27,6 @@ export async function GET() {
         `
         id,
         company_name,
-        assigned_salesperson_id,
-        assigned_sales_manager_id,
         website,
         domain,
         industry,

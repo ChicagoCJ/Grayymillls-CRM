@@ -47,8 +47,6 @@ type ImportResult = {
 };
 
 type CompanySummary = {
-  assigned_salesperson_id?: string | null;
-  assigned_sales_manager_id?: string | null;
   id: string;
   company_name: string;
   website: string | null;
@@ -153,9 +151,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.36.2.31 - Company Display Role Filter";
+const APP_VERSION = "Rev 1.36.2.27 - Record Visibility Rules Draft";
 const REVISION_NOTE =
-  "Role visibility is now applied directly to the Companies display list when the visibility toggle is active.";
+  "Role Testing Mode now documents draft record-level visibility rules for Admins, Sales Managers, and Sales Reps.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -520,22 +518,6 @@ function isMapped(value: string | undefined) {
   return Boolean(value && value !== "Not detected" && value !== "__skip__");
 }
 
-async function readJsonResponse(response: Response, label: string) {
-  const contentType = response.headers.get("content-type") || "";
-  const bodyText = await response.text();
-
-  if (!contentType.includes("application/json")) {
-    throw new Error(
-      `${label} returned ${response.status} ${response.statusText} as ${contentType || "unknown content type"}. Preview: ${bodyText.slice(0, 160)}`
-    );
-  }
-
-  try {
-    return JSON.parse(bodyText);
-  } catch {
-    throw new Error(`${label} returned invalid JSON. Preview: ${bodyText.slice(0, 160)}`);
-  }
-}
 function formatUserRole(role: string | null | undefined) {
   if (role === "admin") return "Admin";
   if (role === "sales_manager") return "Sales Manager";
@@ -646,7 +628,6 @@ export default function Home() {
   const [currentUserId, setCurrentUserId] = useState("");
   const [currentUserDisplayName, setCurrentUserDisplayName] = useState("Manual Role Test");
   const [currentCoverageType, setCurrentCoverageType] = useState("internal");
-  const [applyRoleVisibility, setApplyRoleVisibility] = useState(false);
   const [roleTestUsers, setRoleTestUsers] = useState<CrmUser[]>([]);
   const [isLoadingRoleUsers, setIsLoadingRoleUsers] = useState(false);
   const [roleUserError, setRoleUserError] = useState("");
@@ -905,24 +886,6 @@ export default function Home() {
       ).sort((a, b) => a.localeCompare(b)),
     ];
   }, [crmSummary.companies]);
-  const roleVisibilityNeedsUser =
-    applyRoleVisibility && currentUserRole !== "admin" && !currentUserId;
-
-  function companyMatchesRoleVisibility(company: CompanySummary) {
-    if (!applyRoleVisibility) return true;
-    if (currentUserRole === "admin") return true;
-    if (!currentUserId) return true;
-
-    if (currentUserRole === "sales_manager") {
-      return company.assigned_sales_manager_id === currentUserId;
-    }
-
-    if (currentUserRole === "sales_rep") {
-      return company.assigned_salesperson_id === currentUserId;
-    }
-
-    return true;
-  }
   const filteredCompanies = useMemo(() => {
     const search = normalizeForSearch(companySearchTerm);
 
@@ -1094,7 +1057,7 @@ return (
 
     try {
       const response = await fetch(`/api/company-detail?id=${companyId}`);
-      const data = await readJsonResponse(response, "/api/crm-users");
+      const data = await response.json();
 
       if (!response.ok) {
         throw new Error(data.error || "Could not load company detail.");
@@ -1423,25 +1386,6 @@ async function handleAnalyzeProspect() {
       setCurrentUserRole(selectedUser.user_role);
     }
   }
-  function getRoleVisibleCompanies(companies: CompanySummary[]) {
-    if (!applyRoleVisibility) return companies;
-    if (currentUserRole === "admin") return companies;
-    if (!currentUserId) return companies;
-
-    return companies.filter((company) => {
-      if (currentUserRole === "sales_manager") {
-        return String(company.assigned_sales_manager_id || "") === currentUserId;
-      }
-
-      if (currentUserRole === "sales_rep") {
-        return String(company.assigned_salesperson_id || "") === currentUserId;
-      }
-
-      return true;
-    });
-  }
-
-  const displayedCompanies = getRoleVisibleCompanies(filteredCompanies);
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">
       <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-6">
@@ -1463,9 +1407,6 @@ async function handleAnalyzeProspect() {
           currentUserId={currentUserId}
           currentUserDisplayName={currentUserDisplayName}
           currentCoverageType={currentCoverageType}
-          applyRoleVisibility={applyRoleVisibility}
-          setApplyRoleVisibility={setApplyRoleVisibility}
-          roleVisibilityNeedsUser={roleVisibilityNeedsUser}
           roleTestUsers={roleTestUsers}
           isLoadingRoleUsers={isLoadingRoleUsers}
           roleUserError={roleUserError}
@@ -1545,7 +1486,7 @@ async function handleAnalyzeProspect() {
               <MetricCard
                 label="Companies in CRM"
                 value={crmSummary.companies.length.toString()}
-                note={`${displayedCompanies.length} shown after filters`}
+                note={`${filteredCompanies.length} shown after filters`}
               />
               <MetricCard
                 label="Open follow-ups"
@@ -1600,7 +1541,7 @@ async function handleAnalyzeProspect() {
 
         {activeTab === "companies" && (
           <CompaniesSection
-            companies={displayedCompanies}
+            companies={filteredCompanies}
             totalCompanyCount={crmSummary.companies.length}
             companySearchTerm={companySearchTerm}
             setCompanySearchTerm={setCompanySearchTerm}
@@ -2813,9 +2754,6 @@ function RoleTestingPanel({
   currentUserId,
   currentUserDisplayName,
   currentCoverageType,
-  applyRoleVisibility,
-  setApplyRoleVisibility,
-  roleVisibilityNeedsUser,
   roleTestUsers,
   isLoadingRoleUsers,
   roleUserError,
@@ -2827,9 +2765,6 @@ function RoleTestingPanel({
   currentUserId: string;
   currentUserDisplayName: string;
   currentCoverageType: string;
-  applyRoleVisibility: boolean;
-  setApplyRoleVisibility: (value: boolean) => void;
-  roleVisibilityNeedsUser: boolean;
   roleTestUsers: CrmUser[];
   isLoadingRoleUsers: boolean;
   roleUserError: string;
@@ -2919,39 +2854,8 @@ function RoleTestingPanel({
           </div>
         </div>
 
-        <div className="mt-4 rounded-xl border border-blue-200 bg-white p-3">
-          <label className="flex items-start gap-3 text-sm font-semibold text-slate-800">
-            <input
-              type="checkbox"
-              checked={applyRoleVisibility}
-              onChange={(event) => setApplyRoleVisibility(event.target.checked)}
-              className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-700 focus:ring-blue-500"
-            />
-            <span>
-              Apply Role Visibility
-              <span className="mt-1 block text-xs font-normal leading-5 text-slate-600">
-                When enabled, the Companies list is filtered by the selected CRM user assignment.
-                Admin sees all companies. Sales Managers see companies where they are assigned
-                Sales Manager. Sales Reps see companies where they are assigned Salesperson / Rep.
-              </span>
-            </span>
-          </label>
-
-          {roleVisibilityNeedsUser && (
-            <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs font-semibold text-amber-800">
-              Select a CRM user to apply Sales Manager or Sales Rep visibility. No company records are hidden until a user is selected.
-            </p>
-          )}
-
-          {applyRoleVisibility && !roleVisibilityNeedsUser && (
-            <p className="mt-3 rounded-lg border border-green-200 bg-green-50 p-2 text-xs font-semibold text-green-800">
-              Role visibility is active for the Companies list.
-            </p>
-          )}
-        </div>
-
         <p className="mt-3 text-xs font-semibold text-amber-700">
-          Draft mode: this toggle filters Companies only. Funnel opportunity visibility will be added separately.
+          Draft only: these visibility rules are documented here but are not filtering records yet.
         </p>
       </div>
 
@@ -8882,12 +8786,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
-
-
-
-
 
 
 

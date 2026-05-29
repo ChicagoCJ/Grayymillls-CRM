@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.36.2.31 - Company Display Role Filter";
+const APP_VERSION = "Rev 1.36.2.29 - Role Visibility Assignment Fields";
 const REVISION_NOTE =
-  "Role visibility is now applied directly to the Companies display list when the visibility toggle is active.";
+  "Company role visibility can now use salesperson and sales manager assignment fields from the CRM summary.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1423,25 +1423,6 @@ async function handleAnalyzeProspect() {
       setCurrentUserRole(selectedUser.user_role);
     }
   }
-  function getRoleVisibleCompanies(companies: CompanySummary[]) {
-    if (!applyRoleVisibility) return companies;
-    if (currentUserRole === "admin") return companies;
-    if (!currentUserId) return companies;
-
-    return companies.filter((company) => {
-      if (currentUserRole === "sales_manager") {
-        return String(company.assigned_sales_manager_id || "") === currentUserId;
-      }
-
-      if (currentUserRole === "sales_rep") {
-        return String(company.assigned_salesperson_id || "") === currentUserId;
-      }
-
-      return true;
-    });
-  }
-
-  const displayedCompanies = getRoleVisibleCompanies(filteredCompanies);
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">
       <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-6">
@@ -1545,7 +1526,7 @@ async function handleAnalyzeProspect() {
               <MetricCard
                 label="Companies in CRM"
                 value={crmSummary.companies.length.toString()}
-                note={`${displayedCompanies.length} shown after filters`}
+                note={`${filteredCompanies.length} shown after filters`}
               />
               <MetricCard
                 label="Open follow-ups"
@@ -1600,7 +1581,7 @@ async function handleAnalyzeProspect() {
 
         {activeTab === "companies" && (
           <CompaniesSection
-            companies={displayedCompanies}
+            companies={filteredCompanies}
             totalCompanyCount={crmSummary.companies.length}
             companySearchTerm={companySearchTerm}
             setCompanySearchTerm={setCompanySearchTerm}
@@ -8882,8 +8863,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
 
 
 
