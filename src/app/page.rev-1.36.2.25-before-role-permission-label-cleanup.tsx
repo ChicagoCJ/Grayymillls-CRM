@@ -151,9 +151,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.36.2.25 - Role Permission Labels Cleanup";
+const APP_VERSION = "Rev 1.36.2.24 - Opportunity Stage Disabled Prop Fix";
 const REVISION_NOTE =
-  "Role permission language now clarifies that Sales Reps can create, update, and close opportunities while stage-definition management remains admin-only.";
+  "Opportunity stage movement dropdown now combines saving and role-permission disabled states correctly.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -2724,10 +2724,10 @@ function RoleTestingPanel({
           CSV Import
         </span>
         <span className={`rounded-full px-2.5 py-1 ${permissions.canManageFunnelStages ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-500"}`}>
-          Manage Stage Definitions
+          Manage Funnel Stages
         </span>
         <span className={`rounded-full px-2.5 py-1 ${permissions.canMoveOpportunityStages ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-500"}`}>
-          Move Opportunity Stages
+          Move Stages
         </span>
         <span className={`rounded-full px-2.5 py-1 ${permissions.canAssignSalesCoverage ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-500"}`}>
           Assign Sales Coverage
@@ -2742,17 +2742,17 @@ function UserRolePermissionsReference() {
     {
       title: "Admin",
       permissions:
-        "Full administrative control: users, tags, funnel stage definitions, imports, sales assignments, company/contact records, opportunities, documents, and activities.",
+        "Full administrative control: users, tags, funnel stages, imports, sales assignments, company/contact records, opportunities, documents, and activities.",
     },
     {
       title: "Sales Manager",
       permissions:
-        "Can import CSV files, oversee assigned sales reps and outside reps, assign sales coverage within allowed scope, create and edit opportunities, move opportunities between existing stages, and mark opportunities won or lost. Cannot manage global admin settings unless also an Admin.",
+        "Can import CSV files, oversee assigned sales reps and outside reps, reassign reps within allowed scope, edit opportunities, and move opportunities between existing stages.",
     },
     {
       title: "Sales Rep",
       permissions:
-        "Can work assigned records, create opportunities, update opportunities, add activities, notes, and documents, move assigned opportunities between existing funnel stages, and mark opportunities won or lost. Cannot create, edit, archive, or reactivate users, tags, or funnel stage definitions.",
+        "Can work assigned records, add activities, notes, documents, and opportunity updates, and move assigned prospects or opportunities between existing funnel stages. Cannot create, edit, or archive users, tags, or funnel stages.",
     },
   ];
 
@@ -8643,7 +8643,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 
