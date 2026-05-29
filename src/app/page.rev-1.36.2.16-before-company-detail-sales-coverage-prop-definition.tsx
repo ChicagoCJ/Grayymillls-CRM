@@ -151,9 +151,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.36.2.20 - Sales Coverage Prop Rename";
+const APP_VERSION = "Rev 1.36.2.15 - Company Detail Permission Prop Fix";
 const REVISION_NOTE =
-  "Company detail sales coverage permissions now use a distinct local prop name to avoid scope conflicts.";
+  "Company detail now receives sales coverage edit permission from the top-level role state.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1541,7 +1541,6 @@ async function handleAnalyzeProspect() {
             onCompleteActivity={handleCompleteActivity}
             onAnalyzeProspect={handleAnalyzeProspect}
             onBack={() => setActiveTab("companies")}
-            salesCoverageCanEdit={currentPermissions.canAssignSalesCoverage}
 />  
         )}        {activeTab === "admin" && (
           <section className="grid gap-6">
@@ -5531,7 +5530,6 @@ function CompanyDetailSection({
   onCompleteActivity,
   onAnalyzeProspect,
   onBack,
-  salesCoverageCanEdit = true,
 }: {
   detail: CompanyDetail | null;
   activityForm: ActivityForm;
@@ -5543,7 +5541,6 @@ function CompanyDetailSection({
   onCompleteActivity: (activityId: string, companyId?: string | null) => void;
   onAnalyzeProspect: () => void;
   onBack: () => void;
-  salesCoverageCanEdit?: boolean;
 }) {
   if (!detail) {
     return (
@@ -5679,7 +5676,7 @@ function CompanyDetailSection({
 
       <CompanySalesAssignmentPanel
         companyId={String(detail.company.id)}
-        canEditSalesCoverage={salesCoverageCanEdit}
+        canEditSalesCoverage={canEditSalesCoverage}
       />
 
       <CompanyOwnerPanel
@@ -8611,11 +8608,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
-
-
-
 
 
 

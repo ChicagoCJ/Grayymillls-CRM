@@ -151,9 +151,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.36.2.20 - Sales Coverage Prop Rename";
+const APP_VERSION = "Rev 1.37.1 - Header Logo Insert Fix";
 const REVISION_NOTE =
-  "Company detail sales coverage permissions now use a distinct local prop name to avoid scope conflicts.";
+  "Graymills logo placement under the top application label has been corrected.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1541,7 +1541,6 @@ async function handleAnalyzeProspect() {
             onCompleteActivity={handleCompleteActivity}
             onAnalyzeProspect={handleAnalyzeProspect}
             onBack={() => setActiveTab("companies")}
-            salesCoverageCanEdit={currentPermissions.canAssignSalesCoverage}
 />  
         )}        {activeTab === "admin" && (
           <section className="grid gap-6">
@@ -5531,7 +5530,6 @@ function CompanyDetailSection({
   onCompleteActivity,
   onAnalyzeProspect,
   onBack,
-  salesCoverageCanEdit = true,
 }: {
   detail: CompanyDetail | null;
   activityForm: ActivityForm;
@@ -5543,7 +5541,6 @@ function CompanyDetailSection({
   onCompleteActivity: (activityId: string, companyId?: string | null) => void;
   onAnalyzeProspect: () => void;
   onBack: () => void;
-  salesCoverageCanEdit?: boolean;
 }) {
   if (!detail) {
     return (
@@ -5677,10 +5674,7 @@ function CompanyDetailSection({
         </DetailCard>
       </div>      <CompanyIndustryEnrichmentPanel company={detail.company} />
 
-      <CompanySalesAssignmentPanel
-        companyId={String(detail.company.id)}
-        canEditSalesCoverage={salesCoverageCanEdit}
-      />
+      <CompanySalesAssignmentPanel companyId={String(detail.company.id)} />
 
       <CompanyOwnerPanel
         companyId={String(detail.company.id)}
@@ -6087,13 +6081,7 @@ function CompanyIndustryEnrichmentPanel({
   );
 }
 
-function CompanySalesAssignmentPanel({
-  companyId,
-  canEditSalesCoverage = true,
-}: {
-  companyId: string;
-  canEditSalesCoverage?: boolean;
-}) {
+function CompanySalesAssignmentPanel({ companyId }: { companyId: string }) {
   const [users, setUsers] = useState<any[]>([]);
   const [assignedSalespersonId, setAssignedSalespersonId] = useState("Unassigned");
   const [assignedSalesManagerId, setAssignedSalesManagerId] = useState("Unassigned");
@@ -6223,8 +6211,7 @@ function CompanySalesAssignmentPanel({
           <select
             value={assignedSalespersonId}
             onChange={(event) => setAssignedSalespersonId(event.target.value)}
-            disabled={!canEditSalesCoverage}
-            className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
+            className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
           >
             <option value="Unassigned">Unassigned</option>
             {users.map((user) => (
@@ -6243,8 +6230,7 @@ function CompanySalesAssignmentPanel({
           <select
             value={assignedSalesManagerId}
             onChange={(event) => setAssignedSalesManagerId(event.target.value)}
-            disabled={!canEditSalesCoverage}
-            className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
+            className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
           >
             <option value="Unassigned">Unassigned</option>
             {users.map((user) => (
@@ -6259,22 +6245,12 @@ function CompanySalesAssignmentPanel({
         </div>
       </div>
 
-      {!canEditSalesCoverage && (
-        <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">
-          Your current role can view sales coverage but cannot edit assignments.
-        </p>
-      )}
-
       <button
         onClick={saveCompanySalesAssignments}
-        disabled={isSavingAssignments || !canEditSalesCoverage}
+        disabled={isSavingAssignments}
         className="mt-5 rounded-xl bg-green-700 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-green-800 disabled:cursor-not-allowed disabled:bg-slate-300"
       >
-        {isSavingAssignments
-          ? "Saving..."
-          : canEditSalesCoverage
-            ? "Save Sales Assignments"
-            : "View Only"}
+        {isSavingAssignments ? "Saving..." : "Save Sales Assignments"}
       </button>
     </section>
   );
@@ -8611,13 +8587,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
-
-
-
-
-
 
 
 
