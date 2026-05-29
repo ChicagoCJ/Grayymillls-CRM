@@ -151,9 +151,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.37.1 - Header Logo Insert Fix";
+const APP_VERSION = "Rev 1.36.2.13 - Opportunity Activities Form Cleanup";
 const REVISION_NOTE =
-  "Graymills logo placement under the top application label has been corrected.";
+  "Removed misplaced user role form controls from the opportunity activity dashboard.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1331,11 +1331,6 @@ async function handleAnalyzeProspect() {
               <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
                 Graymills Prospecting Tool
               </p>
-              <img
-                src="/graymills-logo.jpg"
-                alt="Graymills"
-                className="mt-4 max-h-14 w-auto max-w-[190px] object-contain"
-              />
             </div>
 
             <RoleTestingPanel
@@ -8587,8 +8582,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
 
 
 

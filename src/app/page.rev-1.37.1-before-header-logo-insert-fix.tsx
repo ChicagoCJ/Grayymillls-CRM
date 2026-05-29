@@ -151,9 +151,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.37.1 - Header Logo Insert Fix";
+const APP_VERSION = "Rev 1.37 - Header Branding";
 const REVISION_NOTE =
-  "Graymills logo placement under the top application label has been corrected.";
+  "Added Graymills logo branding to the top application header.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1331,11 +1331,6 @@ async function handleAnalyzeProspect() {
               <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
                 Graymills Prospecting Tool
               </p>
-              <img
-                src="/graymills-logo.jpg"
-                alt="Graymills"
-                className="mt-4 max-h-14 w-auto max-w-[190px] object-contain"
-              />
             </div>
 
             <RoleTestingPanel
@@ -8587,7 +8582,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 
