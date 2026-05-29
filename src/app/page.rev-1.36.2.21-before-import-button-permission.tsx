@@ -151,9 +151,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.36.2.21 - Import Button Permission Guard";
+const APP_VERSION = "Rev 1.36.2.20 - Sales Coverage Prop Rename";
 const REVISION_NOTE =
-  "CSV import action is now disabled for Sales Rep role as a secondary UI permission guard.";
+  "Company detail sales coverage permissions now use a distinct local prop name to avoid scope conflicts.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -8611,7 +8611,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 
