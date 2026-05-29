@@ -151,9 +151,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.36.2.22 - Funnel Stage Permission Guard";
+const APP_VERSION = "Rev 1.36.2.21 - Import Button Permission Guard";
 const REVISION_NOTE =
-  "Funnel stage management is now guarded by role permissions while opportunity stage movement remains available.";
+  "CSV import action is now disabled for Sales Rep role as a secondary UI permission guard.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1547,7 +1547,7 @@ async function handleAnalyzeProspect() {
           <section className="grid gap-6">
             <UserRolePermissionsReference />
             <AdminUsersSection />
-            <AdminFunnelStagesSection canManageFunnelStages={currentPermissions.canManageFunnelStages} />
+            <AdminFunnelStagesSection />
             <AdminTagsSection />
           </section>
         )}
@@ -2198,11 +2198,7 @@ function ImportTagPicker({
   );
 }
 
-function AdminFunnelStagesSection({
-  canManageFunnelStages = true,
-}: {
-  canManageFunnelStages?: boolean;
-}) {
+function AdminFunnelStagesSection() {
   const [stages, setStages] = useState<SalesFunnelStage[]>([]);
   const [isLoadingStages, setIsLoadingStages] = useState(false);
   const [isSavingStage, setIsSavingStage] = useState(false);
@@ -2276,11 +2272,6 @@ function AdminFunnelStagesSection({
   }
 
   async function saveStage() {
-    if (!canManageFunnelStages) {
-      setStageError("Your current role cannot create or edit funnel stages.");
-      return;
-    }
-
     setIsSavingStage(true);
     setStageMessage("");
     setStageError("");
@@ -2326,11 +2317,6 @@ function AdminFunnelStagesSection({
   }
 
   async function updateStageStatus(stage: SalesFunnelStage, status: "active" | "archived") {
-    if (!canManageFunnelStages) {
-      setStageError("Your current role cannot archive or reactivate funnel stages.");
-      return;
-    }
-
     setIsSavingStage(true);
     setStageMessage("");
     setStageError("");
@@ -2405,12 +2391,6 @@ function AdminFunnelStagesSection({
             <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-600">
               Maintain the stages used for opportunity tracking. Archive stages instead of deleting them when opportunities may already reference the stage.
             </p>
-
-            {!canManageFunnelStages && (
-              <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">
-                Your current role can view funnel stages but cannot create, edit, archive, or reactivate them.
-              </p>
-            )}
           </div>
 
           <button
@@ -2558,7 +2538,7 @@ function AdminFunnelStagesSection({
         <div className="mt-5 flex flex-wrap gap-2">
           <button
             onClick={saveStage}
-            disabled={isSavingStage || !canManageFunnelStages}
+            disabled={isSavingStage}
             className="rounded-xl bg-green-700 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-green-800 disabled:cursor-not-allowed disabled:bg-slate-300"
           >
             {isSavingStage ? "Saving..." : editingStageId ? "Save Stage" : "Create Stage"}
@@ -2643,7 +2623,7 @@ function AdminFunnelStagesSection({
                   <div className="flex flex-wrap gap-2">
                     <button
                       onClick={() => startEditingStage(stage)}
-                      disabled={isSavingStage || !canManageFunnelStages}
+                      disabled={isSavingStage}
                       className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
                     >
                       Edit
@@ -2652,7 +2632,7 @@ function AdminFunnelStagesSection({
                     {stage.status === "archived" ? (
                       <button
                         onClick={() => updateStageStatus(stage, "active")}
-                        disabled={isSavingStage || !canManageFunnelStages}
+                        disabled={isSavingStage}
                         className="rounded-lg bg-blue-700 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                       >
                         Reactivate
@@ -2660,7 +2640,7 @@ function AdminFunnelStagesSection({
                     ) : (
                       <button
                         onClick={() => updateStageStatus(stage, "archived")}
-                        disabled={isSavingStage || !canManageFunnelStages}
+                        disabled={isSavingStage}
                         className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                       >
                         Archive
@@ -8631,7 +8611,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 
