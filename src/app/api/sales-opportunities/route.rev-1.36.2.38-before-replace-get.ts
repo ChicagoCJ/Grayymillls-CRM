@@ -162,9 +162,7 @@ export async function GET(request: Request) {
 
     const { data, error } = await query;
 
-    if (error) throw error;
-
-    const opportunities = data ?? [];
+    if (error) throw error;    const opportunities = data ?? [];
 
     const companyIds = Array.from(
       new Set(
@@ -215,6 +213,7 @@ export async function GET(request: Request) {
     );
   }
 }
+
 export async function POST(request: Request) {
   try {
     const supabase = getSupabaseAdmin();
@@ -390,6 +389,5 @@ export async function PATCH(request: Request) {
     );
   }
 }
-
 
 

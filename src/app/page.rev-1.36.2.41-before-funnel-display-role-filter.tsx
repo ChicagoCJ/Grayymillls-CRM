@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.36.2.45 - Funnel Role Return Fix";
+const APP_VERSION = "Rev 1.36.2.40.2 - Hard Contacts Filter Cleanup";
 const REVISION_NOTE =
-  "Funnel filtering now includes the role visibility match in the opportunity filter return logic.";
+  "Contacts filtering has been cleaned of misplaced opportunity visibility logic and rebuilt from a clean cache.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -4467,12 +4467,7 @@ function FunnelDashboardSection({
         )
       ).sort((a, b) => a.localeCompare(b)),
     ];
-  }, [
-    statusFilter,
-    stageFilter,
-    typeFilter,
-    searchTerm,
-  ]);
+  }, [opportunities]);
 
   function opportunityMatchesRoleVisibility(opportunity: SalesOpportunity) {
     if (!funnelApplyRoleVisibility) return true;
@@ -4486,7 +4481,7 @@ function FunnelDashboardSection({
 
     return true;
   }
-const filteredOpportunities = useMemo(() => {
+  const filteredOpportunities = useMemo(() => {
     const search = normalizeForSearch(searchTerm);
 
     return opportunities.filter((opportunity) => {
@@ -4510,22 +4505,9 @@ const filteredOpportunities = useMemo(() => {
       const matchesStage = stageFilter === "All" || opportunity.stage_id === stageFilter;
       const matchesType = typeFilter === "All" || opportunity.opportunity_type === typeFilter;
 
-      return (
-        matchesSearch &&
-        matchesStage &&
-        matchesType &&
-        matchesOpportunityRoleVisibility
-      );
+      return matchesSearch && matchesStage && matchesType;
     });
-  }, [
-    opportunities,
-    searchTerm,
-    stageFilter,
-    typeFilter,
-    funnelApplyRoleVisibility,
-    funnelCurrentUserId,
-    funnelCurrentUserRole,
-  ]);
+  }, [opportunities, searchTerm, stageFilter, typeFilter]);
 
   const statusCounts = useMemo(() => {
     return {
@@ -4535,37 +4517,13 @@ const filteredOpportunities = useMemo(() => {
       archived: opportunities.filter((opportunity) => opportunity.status === "archived").length,
       total: opportunities.length,
     };
-  }, [
-    statusFilter,
-    stageFilter,
-    typeFilter,
-    searchTerm,
-  ]);
+  }, [opportunities]);
 
-  const displayedFunnelOpportunities = useMemo(() => {
-    if (!funnelApplyRoleVisibility) return filteredOpportunities;
-    if (funnelCurrentUserRole === "admin") return filteredOpportunities;
-    if (funnelCurrentUserRole === "sales_manager") return filteredOpportunities;
-    if (!funnelCurrentUserId) return filteredOpportunities;
-
-    if (funnelCurrentUserRole === "sales_rep") {
-      return filteredOpportunities.filter((opportunity) => {
-        return String(opportunity.companies?.assigned_salesperson_id || "") === funnelCurrentUserId;
-      });
-    }
-
-    return filteredOpportunities;
-  }, [
-    filteredOpportunities,
-    funnelApplyRoleVisibility,
-    funnelCurrentUserId,
-    funnelCurrentUserRole,
-  ]);
-  const totalPipelineValue = displayedFunnelOpportunities.reduce((total, opportunity) => {
+  const totalPipelineValue = filteredOpportunities.reduce((total, opportunity) => {
     return total + Number(opportunity.estimated_value ?? 0);
   }, 0);
 
-  const weightedPipelineValue = displayedFunnelOpportunities.reduce((total, opportunity) => {
+  const weightedPipelineValue = filteredOpportunities.reduce((total, opportunity) => {
     const value = Number(opportunity.estimated_value ?? 0);
     const probability = Number(opportunity.probability ?? 0) / 100;
 
@@ -4573,17 +4531,17 @@ const filteredOpportunities = useMemo(() => {
   }, 0);
 
   const averageProbability =
-    displayedFunnelOpportunities.length === 0
+    filteredOpportunities.length === 0
       ? 0
       : Math.round(
-          displayedFunnelOpportunities.reduce((total, opportunity) => {
+          filteredOpportunities.reduce((total, opportunity) => {
             return total + Number(opportunity.probability ?? 0);
-          }, 0) / displayedFunnelOpportunities.length
+          }, 0) / filteredOpportunities.length
         );
 
   const stageSummaries = useMemo(() => {
     return stages.map((stage) => {
-      const stageOpportunities = displayedFunnelOpportunities.filter(
+      const stageOpportunities = filteredOpportunities.filter(
         (opportunity) => opportunity.stage_id === stage.id
       );
 
@@ -4605,7 +4563,7 @@ const filteredOpportunities = useMemo(() => {
         weightedValue: stageWeightedValue,
       };
     });
-  }, [stages, displayedFunnelOpportunities]);
+  }, [stages, filteredOpportunities]);
 
   function formatCurrency(value: number) {
     return value.toLocaleString(undefined, {
@@ -4655,7 +4613,7 @@ const filteredOpportunities = useMemo(() => {
       <div className="grid gap-4 md:grid-cols-4">
         <MetricCard
           label="Filtered opportunities"
-          value={displayedFunnelOpportunities.length.toString()}
+          value={filteredOpportunities.length.toString()}
           note={`Open ${statusCounts.open} · Won ${statusCounts.won} · Lost ${statusCounts.lost}`}
         />
         <MetricCard
@@ -4797,12 +4755,12 @@ const filteredOpportunities = useMemo(() => {
           <div>
             <h3 className="text-xl font-bold">Opportunities</h3>
             <p className="mt-2 text-sm text-slate-600">
-              Showing {displayedFunnelOpportunities.length} opportunities after filters.
+              Showing {filteredOpportunities.length} opportunities after filters.
             </p>
           </div>
         </div>
 
-        {displayedFunnelOpportunities.length === 0 ? (
+        {filteredOpportunities.length === 0 ? (
           <p className="mt-3 text-sm text-slate-600">
             No opportunities match the current filter.
           </p>
@@ -4824,7 +4782,7 @@ const filteredOpportunities = useMemo(() => {
                 </tr>
               </thead>
               <tbody>
-                {displayedFunnelOpportunities.map((opportunity) => {
+                {filteredOpportunities.map((opportunity) => {
                   const value = Number(opportunity.estimated_value ?? 0);
                   const probability = Number(opportunity.probability ?? 0) / 100;
                   const weighted = value * probability;
@@ -8993,10 +8951,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
-
-
 
 
 

@@ -122,9 +122,7 @@ export async function GET(request: Request) {
         *,
         companies (
           id,
-          company_name,
-          assigned_salesperson_id,
-          assigned_sales_manager_id
+          company_name
         ),
         contacts (
           id,
@@ -164,47 +162,8 @@ export async function GET(request: Request) {
 
     if (error) throw error;
 
-    const opportunities = data ?? [];
-
-    const companyIds = Array.from(
-      new Set(
-        opportunities
-          .map((opportunity: any) => opportunity.company_id)
-          .filter((companyId: unknown): companyId is string => {
-            return typeof companyId === "string" && companyId.length > 0;
-          })
-      )
-    );
-
-    const companyAssignmentsById = new Map<string, any>();
-
-    if (companyIds.length > 0) {
-      const { data: companiesData, error: companiesError } = await supabase
-        .from("companies")
-        .select("id, company_name, assigned_salesperson_id, assigned_sales_manager_id")
-        .in("id", companyIds);
-
-      if (companiesError) throw companiesError;
-
-      for (const company of companiesData ?? []) {
-        companyAssignmentsById.set(company.id, company);
-      }
-    }
-
-    const opportunitiesWithCompanyAssignments = opportunities.map((opportunity: any) => {
-      const companyAssignment = companyAssignmentsById.get(opportunity.company_id);
-
-      return {
-        ...opportunity,
-        companies: {
-          ...(opportunity.companies ?? {}),
-          ...(companyAssignment ?? {}),
-        },
-      };
-    });
-
     return NextResponse.json({
-      opportunities: opportunitiesWithCompanyAssignments,
+      opportunities: data ?? [],
     });
   } catch (error) {
     return NextResponse.json(
@@ -215,6 +174,7 @@ export async function GET(request: Request) {
     );
   }
 }
+
 export async function POST(request: Request) {
   try {
     const supabase = getSupabaseAdmin();
@@ -390,6 +350,3 @@ export async function PATCH(request: Request) {
     );
   }
 }
-
-
-

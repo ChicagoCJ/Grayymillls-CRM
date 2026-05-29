@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.36.2.45 - Funnel Role Return Fix";
+const APP_VERSION = "Rev 1.36.2.41 - Funnel Display Role Filter";
 const REVISION_NOTE =
-  "Funnel filtering now includes the role visibility match in the opportunity filter return logic.";
+  "Role visibility is now applied directly to the Funnel opportunity display list for Sales Rep testing.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -4467,12 +4467,7 @@ function FunnelDashboardSection({
         )
       ).sort((a, b) => a.localeCompare(b)),
     ];
-  }, [
-    statusFilter,
-    stageFilter,
-    typeFilter,
-    searchTerm,
-  ]);
+  }, [opportunities]);
 
   function opportunityMatchesRoleVisibility(opportunity: SalesOpportunity) {
     if (!funnelApplyRoleVisibility) return true;
@@ -4486,7 +4481,7 @@ function FunnelDashboardSection({
 
     return true;
   }
-const filteredOpportunities = useMemo(() => {
+  const filteredOpportunities = useMemo(() => {
     const search = normalizeForSearch(searchTerm);
 
     return opportunities.filter((opportunity) => {
@@ -4510,22 +4505,9 @@ const filteredOpportunities = useMemo(() => {
       const matchesStage = stageFilter === "All" || opportunity.stage_id === stageFilter;
       const matchesType = typeFilter === "All" || opportunity.opportunity_type === typeFilter;
 
-      return (
-        matchesSearch &&
-        matchesStage &&
-        matchesType &&
-        matchesOpportunityRoleVisibility
-      );
+      return matchesSearch && matchesStage && matchesType;
     });
-  }, [
-    opportunities,
-    searchTerm,
-    stageFilter,
-    typeFilter,
-    funnelApplyRoleVisibility,
-    funnelCurrentUserId,
-    funnelCurrentUserRole,
-  ]);
+  }, [opportunities, searchTerm, stageFilter, typeFilter]);
 
   const statusCounts = useMemo(() => {
     return {
@@ -4535,12 +4517,7 @@ const filteredOpportunities = useMemo(() => {
       archived: opportunities.filter((opportunity) => opportunity.status === "archived").length,
       total: opportunities.length,
     };
-  }, [
-    statusFilter,
-    stageFilter,
-    typeFilter,
-    searchTerm,
-  ]);
+  }, [opportunities]);
 
   const displayedFunnelOpportunities = useMemo(() => {
     if (!funnelApplyRoleVisibility) return filteredOpportunities;
@@ -4605,7 +4582,7 @@ const filteredOpportunities = useMemo(() => {
         weightedValue: stageWeightedValue,
       };
     });
-  }, [stages, displayedFunnelOpportunities]);
+  }, [stages, filteredOpportunities]);
 
   function formatCurrency(value: number) {
     return value.toLocaleString(undefined, {
@@ -8993,9 +8970,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
-
 
 
 

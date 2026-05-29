@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.36.2.45 - Funnel Role Return Fix";
+const APP_VERSION = "Rev 1.36.2.37 - Opportunity Assignment Merge";
 const REVISION_NOTE =
-  "Funnel filtering now includes the role visibility match in the opportunity filter return logic.";
+  "Sales opportunities now merge related company sales assignment fields for role visibility testing.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -862,7 +862,6 @@ export default function Home() {
         .join(" ");
 
       const matchesSearch = !search || searchableText.includes(search);
-
       const matchesMarketTag =
         contactMarketTagFilter === "All" || contactMarketNames.includes(contactMarketTagFilter);
       const matchesSectorTag =
@@ -968,7 +967,6 @@ export default function Home() {
         .join(" ");
 
       const matchesSearch = !search || searchableText.includes(search);
-
       const matchesTier =
         companyTierFilter === "All" || prospect?.priority_tier === companyTierFilter;
       const matchesStatus =
@@ -4402,16 +4400,8 @@ function OpportunityActivitiesDashboard({
 
 function FunnelDashboardSection({
   onOpenCompany,
-  funnelApplyRoleVisibility = false,
-  funnelCurrentUserId = "",
-  funnelCurrentUserRole = "admin",
-  funnelCurrentUserDisplayName = "Manual Role Test",
 }: {
   onOpenCompany: (companyId: string) => void;
-  funnelApplyRoleVisibility?: boolean;
-  funnelCurrentUserId?: string;
-  funnelCurrentUserRole?: AppUserRole;
-  funnelCurrentUserDisplayName?: string;
 }) {
   const [stages, setStages] = useState<SalesFunnelStage[]>([]);
   const [opportunities, setOpportunities] = useState<SalesOpportunity[]>([]);
@@ -4467,26 +4457,9 @@ function FunnelDashboardSection({
         )
       ).sort((a, b) => a.localeCompare(b)),
     ];
-  }, [
-    statusFilter,
-    stageFilter,
-    typeFilter,
-    searchTerm,
-  ]);
+  }, [opportunities]);
 
-  function opportunityMatchesRoleVisibility(opportunity: SalesOpportunity) {
-    if (!funnelApplyRoleVisibility) return true;
-    if (funnelCurrentUserRole === "admin") return true;
-    if (funnelCurrentUserRole === "sales_manager") return true;
-    if (!funnelCurrentUserId) return true;
-
-    if (funnelCurrentUserRole === "sales_rep") {
-      return String(opportunity.companies?.assigned_salesperson_id || "") === funnelCurrentUserId;
-    }
-
-    return true;
-  }
-const filteredOpportunities = useMemo(() => {
+  const filteredOpportunities = useMemo(() => {
     const search = normalizeForSearch(searchTerm);
 
     return opportunities.filter((opportunity) => {
@@ -4506,26 +4479,12 @@ const filteredOpportunities = useMemo(() => {
         .join(" ");
 
       const matchesSearch = !search || searchableText.includes(search);
-      const matchesOpportunityRoleVisibility = opportunityMatchesRoleVisibility(opportunity);
       const matchesStage = stageFilter === "All" || opportunity.stage_id === stageFilter;
       const matchesType = typeFilter === "All" || opportunity.opportunity_type === typeFilter;
 
-      return (
-        matchesSearch &&
-        matchesStage &&
-        matchesType &&
-        matchesOpportunityRoleVisibility
-      );
+      return matchesSearch && matchesStage && matchesType;
     });
-  }, [
-    opportunities,
-    searchTerm,
-    stageFilter,
-    typeFilter,
-    funnelApplyRoleVisibility,
-    funnelCurrentUserId,
-    funnelCurrentUserRole,
-  ]);
+  }, [opportunities, searchTerm, stageFilter, typeFilter]);
 
   const statusCounts = useMemo(() => {
     return {
@@ -4535,37 +4494,13 @@ const filteredOpportunities = useMemo(() => {
       archived: opportunities.filter((opportunity) => opportunity.status === "archived").length,
       total: opportunities.length,
     };
-  }, [
-    statusFilter,
-    stageFilter,
-    typeFilter,
-    searchTerm,
-  ]);
+  }, [opportunities]);
 
-  const displayedFunnelOpportunities = useMemo(() => {
-    if (!funnelApplyRoleVisibility) return filteredOpportunities;
-    if (funnelCurrentUserRole === "admin") return filteredOpportunities;
-    if (funnelCurrentUserRole === "sales_manager") return filteredOpportunities;
-    if (!funnelCurrentUserId) return filteredOpportunities;
-
-    if (funnelCurrentUserRole === "sales_rep") {
-      return filteredOpportunities.filter((opportunity) => {
-        return String(opportunity.companies?.assigned_salesperson_id || "") === funnelCurrentUserId;
-      });
-    }
-
-    return filteredOpportunities;
-  }, [
-    filteredOpportunities,
-    funnelApplyRoleVisibility,
-    funnelCurrentUserId,
-    funnelCurrentUserRole,
-  ]);
-  const totalPipelineValue = displayedFunnelOpportunities.reduce((total, opportunity) => {
+  const totalPipelineValue = filteredOpportunities.reduce((total, opportunity) => {
     return total + Number(opportunity.estimated_value ?? 0);
   }, 0);
 
-  const weightedPipelineValue = displayedFunnelOpportunities.reduce((total, opportunity) => {
+  const weightedPipelineValue = filteredOpportunities.reduce((total, opportunity) => {
     const value = Number(opportunity.estimated_value ?? 0);
     const probability = Number(opportunity.probability ?? 0) / 100;
 
@@ -4573,17 +4508,17 @@ const filteredOpportunities = useMemo(() => {
   }, 0);
 
   const averageProbability =
-    displayedFunnelOpportunities.length === 0
+    filteredOpportunities.length === 0
       ? 0
       : Math.round(
-          displayedFunnelOpportunities.reduce((total, opportunity) => {
+          filteredOpportunities.reduce((total, opportunity) => {
             return total + Number(opportunity.probability ?? 0);
-          }, 0) / displayedFunnelOpportunities.length
+          }, 0) / filteredOpportunities.length
         );
 
   const stageSummaries = useMemo(() => {
     return stages.map((stage) => {
-      const stageOpportunities = displayedFunnelOpportunities.filter(
+      const stageOpportunities = filteredOpportunities.filter(
         (opportunity) => opportunity.stage_id === stage.id
       );
 
@@ -4605,7 +4540,7 @@ const filteredOpportunities = useMemo(() => {
         weightedValue: stageWeightedValue,
       };
     });
-  }, [stages, displayedFunnelOpportunities]);
+  }, [stages, filteredOpportunities]);
 
   function formatCurrency(value: number) {
     return value.toLocaleString(undefined, {
@@ -4655,7 +4590,7 @@ const filteredOpportunities = useMemo(() => {
       <div className="grid gap-4 md:grid-cols-4">
         <MetricCard
           label="Filtered opportunities"
-          value={displayedFunnelOpportunities.length.toString()}
+          value={filteredOpportunities.length.toString()}
           note={`Open ${statusCounts.open} · Won ${statusCounts.won} · Lost ${statusCounts.lost}`}
         />
         <MetricCard
@@ -4674,19 +4609,6 @@ const filteredOpportunities = useMemo(() => {
           note="Average across filtered opportunities"
         />
       </div>
-
-      {funnelApplyRoleVisibility && (
-        <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
-          <p className="font-bold">Funnel opportunities are filtered by current role visibility.</p>
-          <p className="mt-1">
-            Current user: <span className="font-semibold">{funnelCurrentUserDisplayName}</span> · Role:{" "}
-            <span className="font-semibold">{formatAppUserRole(funnelCurrentUserRole)}</span>
-          </p>
-          <p className="mt-1 text-xs leading-5">
-            Admin and Sales Managers see all funnel opportunities. Sales Reps see opportunities where the related company is assigned to them as Salesperson / Rep.
-          </p>
-        </div>
-      )}
 
       <div className="rounded-2xl bg-white p-6 shadow-sm">
         <h3 className="text-xl font-bold">Funnel Filters</h3>
@@ -4797,12 +4719,12 @@ const filteredOpportunities = useMemo(() => {
           <div>
             <h3 className="text-xl font-bold">Opportunities</h3>
             <p className="mt-2 text-sm text-slate-600">
-              Showing {displayedFunnelOpportunities.length} opportunities after filters.
+              Showing {filteredOpportunities.length} opportunities after filters.
             </p>
           </div>
         </div>
 
-        {displayedFunnelOpportunities.length === 0 ? (
+        {filteredOpportunities.length === 0 ? (
           <p className="mt-3 text-sm text-slate-600">
             No opportunities match the current filter.
           </p>
@@ -4824,7 +4746,7 @@ const filteredOpportunities = useMemo(() => {
                 </tr>
               </thead>
               <tbody>
-                {displayedFunnelOpportunities.map((opportunity) => {
+                {filteredOpportunities.map((opportunity) => {
                   const value = Number(opportunity.estimated_value ?? 0);
                   const probability = Number(opportunity.probability ?? 0) / 100;
                   const weighted = value * probability;
@@ -8993,17 +8915,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
 
 
 
