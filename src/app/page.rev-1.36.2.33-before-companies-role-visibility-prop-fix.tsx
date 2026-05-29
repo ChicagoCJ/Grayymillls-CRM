@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.36.2.34 - Sales Manager Full Company Visibility";
+const APP_VERSION = "Rev 1.36.2.32 - Role Visibility Polish";
 const REVISION_NOTE =
-  "Sales Managers now see all companies when role visibility is active; Sales Reps remain limited to assigned accounts.";
+  "Role visibility now shows clearer company counts, selected-user context, and warnings when visibility filtering is active.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -914,7 +914,7 @@ export default function Home() {
     if (!currentUserId) return true;
 
     if (currentUserRole === "sales_manager") {
-      return true;
+      return company.assigned_sales_manager_id === currentUserId;
     }
 
     if (currentUserRole === "sales_rep") {
@@ -1430,7 +1430,7 @@ async function handleAnalyzeProspect() {
 
     return companies.filter((company) => {
       if (currentUserRole === "sales_manager") {
-        return true;
+        return String(company.assigned_sales_manager_id || "") === currentUserId;
       }
 
       if (currentUserRole === "sales_rep") {
@@ -5352,12 +5352,6 @@ function CompanyTagFilterPanel({
 function CompaniesSection({
   companies,
   totalCompanyCount,
-  unfilteredCompanyCount = totalCompanyCount,
-  roleVisibilityActive = false,
-  roleVisibilityNeedsUser = false,
-  currentUserDisplayName = "Manual Role Test",
-  currentUserRole = "admin",
-  currentCoverageType = "internal",
   companySearchTerm,
   setCompanySearchTerm,
   companyTierFilter,
@@ -5385,12 +5379,6 @@ function CompaniesSection({
 }: {
   companies: CompanySummary[];
   totalCompanyCount: number;
-  unfilteredCompanyCount?: number;
-  roleVisibilityActive?: boolean;
-  roleVisibilityNeedsUser?: boolean;
-  currentUserDisplayName?: string;
-  currentUserRole?: AppUserRole;
-  currentCoverageType?: string;
   companySearchTerm: string;
   setCompanySearchTerm: (value: string) => void;
   companyTierFilter: string;
@@ -5447,7 +5435,7 @@ function CompaniesSection({
             <span className="font-semibold">{formatCoverageType(currentCoverageType)}</span>
           </p>
           <p className="mt-1 text-xs leading-5">
-            Admin and Sales Managers see all companies.
+            Admin sees all companies. Sales Managers see companies where they are assigned as Sales Manager.
             Sales Reps see companies where they are assigned as Salesperson / Rep.
           </p>
         </div>
@@ -8915,8 +8903,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
 
 
 

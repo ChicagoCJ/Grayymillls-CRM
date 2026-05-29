@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.36.2.34 - Sales Manager Full Company Visibility";
+const APP_VERSION = "Rev 1.36.2.31 - Company Display Role Filter";
 const REVISION_NOTE =
-  "Sales Managers now see all companies when role visibility is active; Sales Reps remain limited to assigned accounts.";
+  "Role visibility is now applied directly to the Companies display list when the visibility toggle is active.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -914,7 +914,7 @@ export default function Home() {
     if (!currentUserId) return true;
 
     if (currentUserRole === "sales_manager") {
-      return true;
+      return company.assigned_sales_manager_id === currentUserId;
     }
 
     if (currentUserRole === "sales_rep") {
@@ -1430,7 +1430,7 @@ async function handleAnalyzeProspect() {
 
     return companies.filter((company) => {
       if (currentUserRole === "sales_manager") {
-        return true;
+        return String(company.assigned_sales_manager_id || "") === currentUserId;
       }
 
       if (currentUserRole === "sales_rep") {
@@ -5352,12 +5352,6 @@ function CompanyTagFilterPanel({
 function CompaniesSection({
   companies,
   totalCompanyCount,
-  unfilteredCompanyCount = totalCompanyCount,
-  roleVisibilityActive = false,
-  roleVisibilityNeedsUser = false,
-  currentUserDisplayName = "Manual Role Test",
-  currentUserRole = "admin",
-  currentCoverageType = "internal",
   companySearchTerm,
   setCompanySearchTerm,
   companyTierFilter,
@@ -5385,12 +5379,6 @@ function CompaniesSection({
 }: {
   companies: CompanySummary[];
   totalCompanyCount: number;
-  unfilteredCompanyCount?: number;
-  roleVisibilityActive?: boolean;
-  roleVisibilityNeedsUser?: boolean;
-  currentUserDisplayName?: string;
-  currentUserRole?: AppUserRole;
-  currentCoverageType?: string;
   companySearchTerm: string;
   setCompanySearchTerm: (value: string) => void;
   companyTierFilter: string;
@@ -5437,27 +5425,6 @@ function CompaniesSection({
           <span className="font-bold">{totalCompanyCount}</span>
         </div>
       </div>
-
-      {roleVisibilityActive && (
-        <div className="mt-6 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
-          <p className="font-bold">Companies are filtered by current role visibility.</p>
-          <p className="mt-1">
-            Current user: <span className="font-semibold">{currentUserDisplayName}</span> · Role:{" "}
-            <span className="font-semibold">{formatAppUserRole(currentUserRole)}</span> · Coverage:{" "}
-            <span className="font-semibold">{formatCoverageType(currentCoverageType)}</span>
-          </p>
-          <p className="mt-1 text-xs leading-5">
-            Admin and Sales Managers see all companies.
-            Sales Reps see companies where they are assigned as Salesperson / Rep.
-          </p>
-        </div>
-      )}
-
-      {roleVisibilityNeedsUser && (
-        <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">
-          Apply Role Visibility is on, but no CRM user is selected. Select a CRM user to test Sales Manager or Sales Rep visibility.
-        </div>
-      )}
 
       <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
         <div className="grid gap-4 lg:grid-cols-4">
@@ -8915,9 +8882,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
-
 
 
 
