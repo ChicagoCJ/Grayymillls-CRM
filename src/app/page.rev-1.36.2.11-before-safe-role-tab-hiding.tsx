@@ -151,9 +151,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.36.2.13 - Opportunity Activities Form Cleanup";
+const APP_VERSION = "Rev 1.36.2.10 - canShowTab Hard Cleanup";
 const REVISION_NOTE =
-  "Removed misplaced user role form controls from the opportunity activity dashboard.";
+  "Removed partial role-based navigation filtering references to keep the app stable.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1374,15 +1374,7 @@ async function handleAnalyzeProspect() {
         )}
 
         <nav className="flex flex-wrap gap-2">
-          {tabs
-              .filter((tab) => {
-                if (tab.key === "admin") return currentUserRole === "admin";
-                if (tab.key === "import") {
-                  return currentUserRole === "admin" || currentUserRole === "sales_manager";
-                }
-                return true;
-              })
-              .map((tab) => (
+          {tabs.map((tab) => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
@@ -3964,7 +3956,32 @@ function OpportunityActivitiesDashboard({
 
       <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
         <div className="grid gap-4 lg:grid-cols-5">
-<div>
+          <div>
+            <label className="text-sm font-semibold text-slate-700">User Role</label>
+            <select
+              value={form.userRole}
+              onChange={(event) => setForm({ ...form, userRole: event.target.value })}
+              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
+            >
+              <option value="admin">Admin</option>
+              <option value="sales_manager">Sales Manager</option>
+              <option value="sales_rep">Sales Rep</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="text-sm font-semibold text-slate-700">Coverage Type</label>
+            <select
+              value={form.coverageType}
+              onChange={(event) => setForm({ ...form, coverageType: event.target.value })}
+              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
+            >
+              <option value="internal">Internal</option>
+              <option value="outside_rep">Outside Rep</option>
+            </select>
+          </div>
+
+          <div>
             <label className="text-sm font-semibold text-slate-700">Status</label>
             <select
               value={statusFilter}
@@ -4348,7 +4365,32 @@ function FunnelDashboardSection({
         <h3 className="text-xl font-bold">Funnel Filters</h3>
 
         <div className="mt-5 grid gap-4 lg:grid-cols-5">
-<div>
+          <div>
+            <label className="text-sm font-semibold text-slate-700">User Role</label>
+            <select
+              value={form.userRole}
+              onChange={(event) => setForm({ ...form, userRole: event.target.value })}
+              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
+            >
+              <option value="admin">Admin</option>
+              <option value="sales_manager">Sales Manager</option>
+              <option value="sales_rep">Sales Rep</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="text-sm font-semibold text-slate-700">Coverage Type</label>
+            <select
+              value={form.coverageType}
+              onChange={(event) => setForm({ ...form, coverageType: event.target.value })}
+              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
+            >
+              <option value="internal">Internal</option>
+              <option value="outside_rep">Outside Rep</option>
+            </select>
+          </div>
+
+          <div>
             <label className="text-sm font-semibold text-slate-700">Status</label>
             <select
               value={statusFilter}
@@ -8582,9 +8624,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
-
 
 
 
