@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.36.2.47 - Visibility Notice Placement";
+const APP_VERSION = "Rev 1.36.2.45 - Funnel Role Return Fix";
 const REVISION_NOTE =
-  "Companies and Funnel now show clearer role visibility notices, and Sales Manager visibility wording has been updated.";
+  "Funnel filtering now includes the role visibility match in the opportunity filter return logic.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -558,17 +558,6 @@ type AppPermissions = {
   canAssignSalesCoverage: boolean;
 };
 
-function getRoleVisibilityReason(role: AppUserRole, userDisplayName: string) {
-  if (role === "admin") {
-    return "Visible because Admin users can see all CRM records.";
-  }
-
-  if (role === "sales_manager") {
-    return "Visible because Sales Managers can see all companies and funnel opportunities for oversight.";
-  }
-
-  return `Visible only when ${userDisplayName} is assigned as Salesperson / Rep.`;
-}
 function getRolePermissions(role: AppUserRole): AppPermissions {
   if (role === "admin") {
     return {
@@ -2964,7 +2953,7 @@ function RoleTestingPanel({
         </div>
 
         <p className="mt-3 text-xs font-semibold text-amber-700">
-          Role visibility filters Companies and Funnel opportunities for Sales Reps. Admin and Sales Managers see all records.
+          Draft mode: this toggle filters Companies only. Funnel opportunity visibility will be added separately.
         </p>
       </div>
 
@@ -4696,9 +4685,6 @@ const filteredOpportunities = useMemo(() => {
           <p className="mt-1 text-xs leading-5">
             Admin and Sales Managers see all funnel opportunities. Sales Reps see opportunities where the related company is assigned to them as Salesperson / Rep.
           </p>
-          <p className="mt-2 rounded-lg bg-white p-2 text-xs font-semibold text-blue-900 ring-1 ring-blue-100">
-            Funnel visibility reason: {getRoleVisibilityReason(funnelCurrentUserRole, funnelCurrentUserDisplayName)}
-          </p>
         </div>
       )}
 
@@ -5541,9 +5527,6 @@ function CompaniesSection({
           <p className="mt-1 text-xs leading-5">
             Admin and Sales Managers see all companies.
             Sales Reps see companies where they are assigned as Salesperson / Rep.
-          </p>
-          <p className="mt-2 rounded-lg bg-white p-2 text-xs font-semibold text-blue-900 ring-1 ring-blue-100">
-            Company visibility reason: {getRoleVisibilityReason(currentUserRole, currentUserDisplayName)}
           </p>
         </div>
       )}
@@ -9010,8 +8993,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
 
 
 

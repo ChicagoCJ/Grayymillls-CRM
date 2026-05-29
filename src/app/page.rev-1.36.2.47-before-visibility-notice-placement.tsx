@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.36.2.47 - Visibility Notice Placement";
+const APP_VERSION = "Rev 1.36.2.46 - Visibility Reason Indicator";
 const REVISION_NOTE =
-  "Companies and Funnel now show clearer role visibility notices, and Sales Manager visibility wording has been updated.";
+  "Role visibility now explains why Companies and Funnel records are visible for the selected user and role.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -2964,7 +2964,7 @@ function RoleTestingPanel({
         </div>
 
         <p className="mt-3 text-xs font-semibold text-amber-700">
-          Role visibility filters Companies and Funnel opportunities for Sales Reps. Admin and Sales Managers see all records.
+          Draft mode: this toggle filters Companies only. Funnel opportunity visibility will be added separately.
         </p>
       </div>
 
@@ -9010,7 +9010,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 
