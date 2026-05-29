@@ -39,21 +39,6 @@ function cleanSortOrder(value: unknown) {
   return Number.isFinite(numberValue) ? Math.round(numberValue) : 100;
 }
 
-function cleanUserRole(value: unknown) {
-  if (value === "admin" || value === "sales_manager" || value === "sales_rep") {
-    return value;
-  }
-
-  return "sales_rep";
-}
-
-function cleanCoverageType(value: unknown) {
-  if (value === "internal" || value === "outside_rep") {
-    return value;
-  }
-
-  return "internal";
-}
 export async function GET(request: Request) {
   try {
     const supabase = getSupabaseAdmin();
@@ -107,8 +92,6 @@ export async function POST(request: Request) {
         phone: cleanText(payload.phone),
         notes: cleanText(payload.notes),
         sort_order: cleanSortOrder(payload.sortOrder),
-        user_role: cleanUserRole(payload.userRole),
-        coverage_type: cleanCoverageType(payload.coverageType),
         status: payload.status || "active",
       })
       .select("*")
@@ -162,14 +145,6 @@ export async function PATCH(request: Request) {
     if (payload.notes !== undefined) update.notes = cleanText(payload.notes);
     if (payload.sortOrder !== undefined) update.sort_order = cleanSortOrder(payload.sortOrder);
 
-    if (payload.userRole !== undefined) {
-      update.user_role = cleanUserRole(payload.userRole);
-    }
-
-    if (payload.coverageType !== undefined) {
-      update.coverage_type = cleanCoverageType(payload.coverageType);
-    }
-
     if (payload.status !== undefined) {
       update.status = payload.status;
       update.archived_at = payload.status === "archived" ? new Date().toISOString() : null;
@@ -197,4 +172,3 @@ export async function PATCH(request: Request) {
     );
   }
 }
-

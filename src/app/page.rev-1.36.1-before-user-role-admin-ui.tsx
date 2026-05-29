@@ -151,9 +151,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.36.1 - User Roles and Coverage Types";
+const APP_VERSION = "Rev 1.36 - Salesperson and Sales Manager Assignment";
 const REVISION_NOTE =
-  "CRM users now support Admin, Sales Manager, and Sales Rep roles plus Internal or Outside Rep coverage type.";
+  "Company records now support separate Salesperson / Rep and Sales Manager assignments.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -505,18 +505,6 @@ function isMapped(value: string | undefined) {
   return Boolean(value && value !== "Not detected" && value !== "__skip__");
 }
 
-function formatUserRole(role: string | null | undefined) {
-  if (role === "admin") return "Admin";
-  if (role === "sales_manager") return "Sales Manager";
-  if (role === "sales_rep") return "Sales Rep";
-  return "Sales Rep";
-}
-
-function formatCoverageType(type: string | null | undefined) {
-  if (type === "outside_rep") return "Outside Rep";
-  if (type === "internal") return "Internal";
-  return "Internal";
-}
 function displayValue(value: unknown) {
   if (value === null || value === undefined || value === "") return "Not provided";
   if (typeof value === "string" || typeof value === "number") return String(value);
@@ -1451,7 +1439,6 @@ async function handleAnalyzeProspect() {
 />  
         )}        {activeTab === "admin" && (
           <section className="grid gap-6">
-            <UserRolePermissionsReference />
             <AdminUsersSection />
             <AdminFunnelStagesSection />
             <AdminTagsSection />
@@ -2391,31 +2378,6 @@ function AdminFunnelStagesSection() {
           </div>
 
           <div>
-            <label className="text-sm font-semibold text-slate-700">User Role</label>
-            <select
-              value={form.userRole}
-              onChange={(event) => setForm({ ...form, userRole: event.target.value })}
-              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
-            >
-              <option value="admin">Admin</option>
-              <option value="sales_manager">Sales Manager</option>
-              <option value="sales_rep">Sales Rep</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="text-sm font-semibold text-slate-700">Coverage Type</label>
-            <select
-              value={form.coverageType}
-              onChange={(event) => setForm({ ...form, coverageType: event.target.value })}
-              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
-            >
-              <option value="internal">Internal</option>
-              <option value="outside_rep">Outside Rep</option>
-            </select>
-          </div>
-
-          <div>
             <label className="text-sm font-semibold text-slate-700">Status</label>
             <select
               value={form.status}
@@ -2558,43 +2520,6 @@ function AdminFunnelStagesSection() {
             ))}
           </div>
         )}
-      </div>
-    </section>
-  );
-}
-
-function UserRolePermissionsReference() {
-  const roles = [
-    {
-      title: "Admin",
-      permissions:
-        "Full administrative control: users, tags, funnel stages, imports, sales assignments, company/contact records, opportunities, documents, and activities.",
-    },
-    {
-      title: "Sales Manager",
-      permissions:
-        "Can import CSV files, oversee assigned sales reps and outside reps, reassign reps within allowed scope, edit opportunities, and move opportunities between existing stages.",
-    },
-    {
-      title: "Sales Rep",
-      permissions:
-        "Can work assigned records, add activities, notes, documents, and opportunity updates, and move assigned prospects or opportunities between existing funnel stages. Cannot create, edit, or archive users, tags, or funnel stages.",
-    },
-  ];
-
-  return (
-    <section className="rounded-2xl bg-white p-6 shadow-sm">
-      <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
-        Permission Reference
-      </p>
-      <h3 className="mt-2 text-xl font-bold">Admin, Sales Manager, and Sales Rep Roles</h3>
-      <div className="mt-5 grid gap-4 lg:grid-cols-3">
-        {roles.map((role) => (
-          <div key={role.title} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <h4 className="font-semibold text-slate-900">{role.title}</h4>
-            <p className="mt-2 text-sm leading-6 text-slate-600">{role.permissions}</p>
-          </div>
-        ))}
       </div>
     </section>
   );
@@ -2891,31 +2816,6 @@ function AdminUsersSection() {
               onChange={(event) => setForm({ ...form, sortOrder: event.target.value })}
               className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm disabled:cursor-not-allowed disabled:bg-slate-100"
             />
-          </div>
-
-          <div>
-            <label className="text-sm font-semibold text-slate-700">User Role</label>
-            <select
-              value={form.userRole}
-              onChange={(event) => setForm({ ...form, userRole: event.target.value })}
-              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
-            >
-              <option value="admin">Admin</option>
-              <option value="sales_manager">Sales Manager</option>
-              <option value="sales_rep">Sales Rep</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="text-sm font-semibold text-slate-700">Coverage Type</label>
-            <select
-              value={form.coverageType}
-              onChange={(event) => setForm({ ...form, coverageType: event.target.value })}
-              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
-            >
-              <option value="internal">Internal</option>
-              <option value="outside_rep">Outside Rep</option>
-            </select>
           </div>
 
           <div>
@@ -3419,31 +3319,6 @@ function AdminTagsSection() {
           </div>
 
           <div>
-            <label className="text-sm font-semibold text-slate-700">User Role</label>
-            <select
-              value={form.userRole}
-              onChange={(event) => setForm({ ...form, userRole: event.target.value })}
-              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
-            >
-              <option value="admin">Admin</option>
-              <option value="sales_manager">Sales Manager</option>
-              <option value="sales_rep">Sales Rep</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="text-sm font-semibold text-slate-700">Coverage Type</label>
-            <select
-              value={form.coverageType}
-              onChange={(event) => setForm({ ...form, coverageType: event.target.value })}
-              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
-            >
-              <option value="internal">Internal</option>
-              <option value="outside_rep">Outside Rep</option>
-            </select>
-          </div>
-
-          <div>
             <label className="text-sm font-semibold text-slate-700">Status</label>
             <select
               value={form.status}
@@ -3817,31 +3692,6 @@ function OpportunityActivitiesDashboard({
 
       <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
         <div className="grid gap-4 lg:grid-cols-5">
-          <div>
-            <label className="text-sm font-semibold text-slate-700">User Role</label>
-            <select
-              value={form.userRole}
-              onChange={(event) => setForm({ ...form, userRole: event.target.value })}
-              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
-            >
-              <option value="admin">Admin</option>
-              <option value="sales_manager">Sales Manager</option>
-              <option value="sales_rep">Sales Rep</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="text-sm font-semibold text-slate-700">Coverage Type</label>
-            <select
-              value={form.coverageType}
-              onChange={(event) => setForm({ ...form, coverageType: event.target.value })}
-              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
-            >
-              <option value="internal">Internal</option>
-              <option value="outside_rep">Outside Rep</option>
-            </select>
-          </div>
-
           <div>
             <label className="text-sm font-semibold text-slate-700">Status</label>
             <select
@@ -4226,31 +4076,6 @@ function FunnelDashboardSection({
         <h3 className="text-xl font-bold">Funnel Filters</h3>
 
         <div className="mt-5 grid gap-4 lg:grid-cols-5">
-          <div>
-            <label className="text-sm font-semibold text-slate-700">User Role</label>
-            <select
-              value={form.userRole}
-              onChange={(event) => setForm({ ...form, userRole: event.target.value })}
-              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
-            >
-              <option value="admin">Admin</option>
-              <option value="sales_manager">Sales Manager</option>
-              <option value="sales_rep">Sales Rep</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="text-sm font-semibold text-slate-700">Coverage Type</label>
-            <select
-              value={form.coverageType}
-              onChange={(event) => setForm({ ...form, coverageType: event.target.value })}
-              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
-            >
-              <option value="internal">Internal</option>
-              <option value="outside_rep">Outside Rep</option>
-            </select>
-          </div>
-
           <div>
             <label className="text-sm font-semibold text-slate-700">Status</label>
             <select
@@ -8485,7 +8310,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 
