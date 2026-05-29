@@ -151,9 +151,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.36.2.24 - Opportunity Stage Disabled Prop Fix";
+const APP_VERSION = "Rev 1.36.2.23 - Opportunity Stage Move Permission Guard";
 const REVISION_NOTE =
-  "Opportunity stage movement dropdown now combines saving and role-permission disabled states correctly.";
+  "Opportunity stage movement now respects role permissions while Sales Reps remain allowed to move assigned opportunities between existing stages.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -7865,7 +7865,8 @@ function CompanyOpportunityPanel({
                           stageId: event.target.value || null,
                         })
                       }
-                      disabled={isSaving || !canMoveOpportunityStages}
+                      disabled={isSaving}
+                      disabled={!canMoveOpportunityStages}
                       className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
                     >
                       <option value="">No stage</option>
@@ -8643,7 +8644,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 
