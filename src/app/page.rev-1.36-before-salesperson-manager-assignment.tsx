@@ -151,9 +151,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.36 - Salesperson and Sales Manager Assignment";
+const APP_VERSION = "Rev 1.35.5.3 - Import Tag Duplicate State Cleanup";
 const REVISION_NOTE =
-  "Company records now support separate Salesperson / Rep and Sales Manager assignments.";
+  "Duplicate local import tag selection state was removed so lifted import tag selections compile cleanly.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -5397,8 +5397,6 @@ function CompanyDetailSection({
         </DetailCard>
       </div>      <CompanyIndustryEnrichmentPanel company={detail.company} />
 
-      <CompanySalesAssignmentPanel companyId={String(detail.company.id)} />
-
       <CompanyOwnerPanel
         companyId={String(detail.company.id)}
         currentOwnerId={detail.company.assigned_user_id ? String(detail.company.assigned_user_id) : ""}
@@ -5800,181 +5798,6 @@ function CompanyIndustryEnrichmentPanel({
           ))}
         </div>
       )}
-    </section>
-  );
-}
-
-function CompanySalesAssignmentPanel({ companyId }: { companyId: string }) {
-  const [users, setUsers] = useState<any[]>([]);
-  const [assignedSalespersonId, setAssignedSalespersonId] = useState("Unassigned");
-  const [assignedSalesManagerId, setAssignedSalesManagerId] = useState("Unassigned");
-  const [isLoadingAssignments, setIsLoadingAssignments] = useState(false);
-  const [isSavingAssignments, setIsSavingAssignments] = useState(false);
-  const [assignmentMessage, setAssignmentMessage] = useState("");
-  const [assignmentError, setAssignmentError] = useState("");
-
-  async function loadCompanySalesAssignments() {
-    setIsLoadingAssignments(true);
-    setAssignmentError("");
-
-    try {
-      const response = await fetch(`/api/company-sales-assignments?companyId=${companyId}`);
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Could not load sales assignments.");
-      }
-
-      setUsers(data.users ?? []);
-      setAssignedSalespersonId(
-        data.companyAssignment?.assigned_salesperson_id ?? "Unassigned"
-      );
-      setAssignedSalesManagerId(
-        data.companyAssignment?.assigned_sales_manager_id ?? "Unassigned"
-      );
-    } catch (error) {
-      setAssignmentError(
-        error instanceof Error ? error.message : "Could not load sales assignments."
-      );
-    } finally {
-      setIsLoadingAssignments(false);
-    }
-  }
-
-  useEffect(() => {
-    loadCompanySalesAssignments();
-  }, [companyId]);
-
-  async function saveCompanySalesAssignments() {
-    setIsSavingAssignments(true);
-    setAssignmentMessage("");
-    setAssignmentError("");
-
-    try {
-      const response = await fetch("/api/company-sales-assignments", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          companyId,
-          assignedSalespersonId,
-          assignedSalesManagerId,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Could not save sales assignments.");
-      }
-
-      setAssignmentMessage("Sales assignments saved.");
-      await loadCompanySalesAssignments();
-    } catch (error) {
-      setAssignmentError(
-        error instanceof Error ? error.message : "Could not save sales assignments."
-      );
-    } finally {
-      setIsSavingAssignments(false);
-    }
-  }
-
-  function userLabel(user: any) {
-    return user.display_name || user.name || user.email || user.id;
-  }
-
-  function selectedName(userId: string) {
-    if (!userId || userId === "Unassigned") return "Unassigned";
-    const user = users.find((candidate) => candidate.id === userId);
-    return user ? userLabel(user) : "Unknown user";
-  }
-
-  return (
-    <section className="rounded-2xl bg-white p-6 shadow-sm">
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
-            Sales Coverage
-          </p>
-          <h3 className="mt-2 text-xl font-bold">Salesperson / Rep and Sales Manager</h3>
-          <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
-            Assign the outside or direct salesperson responsible for the account and the internal
-            sales manager overseeing follow-up, prioritization, and opportunity progress.
-          </p>
-        </div>
-
-        <button
-          onClick={loadCompanySalesAssignments}
-          disabled={isLoadingAssignments}
-          className="w-fit rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
-        >
-          {isLoadingAssignments ? "Refreshing..." : "Refresh Assignments"}
-        </button>
-      </div>
-
-      {(assignmentMessage || assignmentError) && (
-        <div className="mt-4 grid gap-2">
-          {assignmentMessage && (
-            <div className="rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-800">
-              {assignmentMessage}
-            </div>
-          )}
-          {assignmentError && (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-              {assignmentError}
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="mt-5 grid gap-4 md:grid-cols-2">
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-          <label className="text-sm font-semibold text-slate-700">Salesperson / Rep</label>
-          <select
-            value={assignedSalespersonId}
-            onChange={(event) => setAssignedSalespersonId(event.target.value)}
-            className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-          >
-            <option value="Unassigned">Unassigned</option>
-            {users.map((user) => (
-              <option key={`salesperson-${user.id}`} value={user.id}>
-                {userLabel(user)}
-              </option>
-            ))}
-          </select>
-          <p className="mt-2 text-xs text-slate-500">
-            Current selection: {selectedName(assignedSalespersonId)}
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-          <label className="text-sm font-semibold text-slate-700">Sales Manager / Internal Owner</label>
-          <select
-            value={assignedSalesManagerId}
-            onChange={(event) => setAssignedSalesManagerId(event.target.value)}
-            className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-          >
-            <option value="Unassigned">Unassigned</option>
-            {users.map((user) => (
-              <option key={`sales-manager-${user.id}`} value={user.id}>
-                {userLabel(user)}
-              </option>
-            ))}
-          </select>
-          <p className="mt-2 text-xs text-slate-500">
-            Current selection: {selectedName(assignedSalesManagerId)}
-          </p>
-        </div>
-      </div>
-
-      <button
-        onClick={saveCompanySalesAssignments}
-        disabled={isSavingAssignments}
-        className="mt-5 rounded-xl bg-green-700 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-green-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-      >
-        {isSavingAssignments ? "Saving..." : "Save Sales Assignments"}
-      </button>
     </section>
   );
 }
@@ -8310,7 +8133,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 
