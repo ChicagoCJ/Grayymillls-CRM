@@ -151,9 +151,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.36.2.26 - Current User Selector";
+const APP_VERSION = "Rev 1.36.2.25 - Role Permission Labels Cleanup";
 const REVISION_NOTE =
-  "Role Testing Mode now supports selecting an actual CRM user and applying that user role for permission testing.";
+  "Role permission language now clarifies that Sales Reps can create, update, and close opportunities while stage-definition management remains admin-only.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -625,12 +625,6 @@ function hasMeaningfulAnalysis(intelligence: Record<string, unknown> | null) {
 export default function Home() {
   const [activeTab, setActiveTab] = useState<TabKey>("dashboard");
   const [currentUserRole, setCurrentUserRole] = useState<AppUserRole>("admin");
-  const [currentUserId, setCurrentUserId] = useState("");
-  const [currentUserDisplayName, setCurrentUserDisplayName] = useState("Manual Role Test");
-  const [currentCoverageType, setCurrentCoverageType] = useState("internal");
-  const [roleTestUsers, setRoleTestUsers] = useState<CrmUser[]>([]);
-  const [isLoadingRoleUsers, setIsLoadingRoleUsers] = useState(false);
-  const [roleUserError, setRoleUserError] = useState("");
   const currentPermissions = useMemo(
     () => getRolePermissions(currentUserRole),
     [currentUserRole]
@@ -1328,64 +1322,6 @@ async function handleAnalyzeProspect() {
     { key: "releaseNotes", label: "Release Notes" },
   ];
 
-  async function loadRoleTestUsers() {
-    setIsLoadingRoleUsers(true);
-    setRoleUserError("");
-
-    try {
-      const response = await fetch("/api/crm-users");
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Could not load CRM users.");
-      }
-
-      const activeUsers = (data.users ?? []).filter((user: CrmUser) => {
-        return !user.status || user.status === "active";
-      });
-
-      setRoleTestUsers(activeUsers);
-    } catch (error) {
-      setRoleUserError(error instanceof Error ? error.message : "Could not load CRM users.");
-    } finally {
-      setIsLoadingRoleUsers(false);
-    }
-  }
-
-  useEffect(() => {
-    loadRoleTestUsers();
-  }, []);
-
-  function applyRoleTestUser(userId: string) {
-    setCurrentUserId(userId);
-
-    if (!userId) {
-      setCurrentUserDisplayName("Manual Role Test");
-      setCurrentCoverageType("internal");
-      return;
-    }
-
-    const selectedUser = roleTestUsers.find((user) => user.id === userId);
-
-    if (!selectedUser) {
-      setCurrentUserDisplayName("Unknown User");
-      setCurrentCoverageType("internal");
-      return;
-    }
-
-    setCurrentUserDisplayName(
-      selectedUser.display_name || selectedUser.email || "Unnamed User"
-    );
-    setCurrentCoverageType(selectedUser.coverage_type || "internal");
-
-    if (
-      selectedUser.user_role === "admin" ||
-      selectedUser.user_role === "sales_manager" ||
-      selectedUser.user_role === "sales_rep"
-    ) {
-      setCurrentUserRole(selectedUser.user_role);
-    }
-  }
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">
       <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-6">
@@ -1404,13 +1340,6 @@ async function handleAnalyzeProspect() {
 
             <RoleTestingPanel
           currentUserRole={currentUserRole}
-          currentUserId={currentUserId}
-          currentUserDisplayName={currentUserDisplayName}
-          currentCoverageType={currentCoverageType}
-          roleTestUsers={roleTestUsers}
-          isLoadingRoleUsers={isLoadingRoleUsers}
-          roleUserError={roleUserError}
-          onSelectUser={applyRoleTestUser}
           setCurrentUserRole={(role) => {
             const nextPermissions = getRolePermissions(role);
 
@@ -2751,24 +2680,10 @@ function AdminFunnelStagesSection({
 
 function RoleTestingPanel({
   currentUserRole,
-  currentUserId,
-  currentUserDisplayName,
-  currentCoverageType,
-  roleTestUsers,
-  isLoadingRoleUsers,
-  roleUserError,
-  onSelectUser,
   setCurrentUserRole,
   permissions,
 }: {
   currentUserRole: AppUserRole;
-  currentUserId: string;
-  currentUserDisplayName: string;
-  currentCoverageType: string;
-  roleTestUsers: CrmUser[];
-  isLoadingRoleUsers: boolean;
-  roleUserError: string;
-  onSelectUser: (userId: string) => void;
   setCurrentUserRole: (role: AppUserRole) => void;
   permissions: AppPermissions;
 }) {
@@ -2785,30 +2700,6 @@ function RoleTestingPanel({
           <p className="mt-1 text-sm leading-6 text-slate-600">
             UI-only permission testing. API-level enforcement will come in a later revision.
           </p>
-        </div>
-
-        <div className="w-full max-w-xs">
-          <label className="text-sm font-semibold text-slate-700">Test as CRM User</label>
-          <select
-            value={currentUserId}
-            onChange={(event) => onSelectUser(event.target.value)}
-            className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-          >
-            <option value="">Manual Role Test</option>
-            {roleTestUsers.map((user) => (
-              <option key={user.id} value={user.id}>
-                {user.display_name || user.email || user.id}
-              </option>
-            ))}
-          </select>
-          <p className="mt-2 text-xs text-slate-500">
-            {isLoadingRoleUsers
-              ? "Loading users..."
-              : `Current user: ${currentUserDisplayName} · ${formatCoverageType(currentCoverageType)}`}
-          </p>
-          {roleUserError && (
-            <p className="mt-2 text-xs font-semibold text-red-700">{roleUserError}</p>
-          )}
         </div>
 
         <div className="w-full max-w-xs">
@@ -8752,7 +8643,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 
