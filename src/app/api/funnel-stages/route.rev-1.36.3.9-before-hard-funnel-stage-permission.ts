@@ -92,29 +92,6 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const permissionContext = getPermissionContext(request);
-    const funnelStageCreateAllowed = canManageFunnelStageDefinitions(permissionContext.userRole);
-
-    logSoftPermissionCheck(
-      "manage_funnel_stage_definition",
-      permissionContext,
-      funnelStageCreateAllowed
-    );
-
-    if (!funnelStageCreateAllowed) {
-      return NextResponse.json(
-        {
-          error: "Your current role cannot create or edit funnel stage definitions.",
-          permission: {
-            action: "manage_funnel_stage_definition",
-            userRole: permissionContext.userRole,
-            softMode: false,
-          },
-        },
-        { status: 403 }
-      );
-    }
-
     const supabase = getSupabaseAdmin();
     const payload = (await request.json()) as FunnelStagePayload;
 
@@ -164,29 +141,6 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const permissionContext = getPermissionContext(request);
-    const funnelStageUpdateAllowed = canManageFunnelStageDefinitions(permissionContext.userRole);
-
-    logSoftPermissionCheck(
-      "manage_funnel_stage_definition",
-      permissionContext,
-      funnelStageUpdateAllowed
-    );
-
-    if (!funnelStageUpdateAllowed) {
-      return NextResponse.json(
-        {
-          error: "Your current role cannot create, edit, archive, or reactivate funnel stage definitions.",
-          permission: {
-            action: "manage_funnel_stage_definition",
-            userRole: permissionContext.userRole,
-            softMode: false,
-          },
-        },
-        { status: 403 }
-      );
-    }
-
     const supabase = getSupabaseAdmin();
     const payload = (await request.json()) as FunnelStagePayload;
 
@@ -255,7 +209,6 @@ export async function PATCH(request: Request) {
     );
   }
 }
-
 
 
 
