@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.41.11c - Import Assignment Message Fix";
+const APP_VERSION = "Rev 1.41.10 - Import Workflow Width Containment";
 const REVISION_NOTE =
-  "Import success messages now report sales coverage assignments returned by the import API.";
+  "Import Segmentation and Import Sales Coverage Assignment now stay within the import workflow width after CSV upload.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1273,16 +1273,8 @@ return (
         throw new Error(data.error || "Import failed.");
       }
 
-      const assignedSalespersonName = importAssignmentUserName(data.assignedSalespersonId);
-      const assignedSalesManagerName = importAssignmentUserName(data.assignedSalesManagerId);
-
-      const assignmentSummary =
-        data.companiesAssigned && data.companiesAssigned > 0
-          ? ` Sales coverage assigned to ${data.companiesAssigned} companies. Salesperson / Rep: ${assignedSalespersonName}. Sales Manager: ${assignedSalesManagerName}.`
-          : "";
-
       setImportMessage(
-        `Import ${data.status}: ${data.processedCount} processed, ${data.duplicateCount} possible duplicates/reused companies, ${data.errorCount} row errors.${assignmentSummary}`
+        `Import ${data.status}: ${data.processedCount} processed, ${data.duplicateCount} possible duplicates/reused companies, ${data.errorCount} row errors.`
       );
 
       await loadCrmSummary();
@@ -1397,11 +1389,6 @@ async function handleAnalyzeProspect() {
       "x-crm-user-role": String(currentUserRole || "admin"),
       "x-crm-user-name": String(currentUserDisplayName || "Manual Role Test"),
     };
-  }
-  function importAssignmentUserName(userId?: string | null) {
-    if (!userId) return "Not selected";
-    const user = roleTestUsers.find((candidate) => candidate.id === userId);
-    return user?.display_name || user?.email || userId;
   }
   async function loadRoleTestUsers() {
     setIsLoadingRoleUsers(true);
@@ -9098,9 +9085,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
-
 
 
 

@@ -760,7 +760,6 @@ export async function POST(request: Request) {
     let processedCount = 0;
     let duplicateCount = 0;
     let errorCount = 0;
-    const assignedCompanyIds = new Set<string>();
     let companiesAssigned = 0;
 
     for (let index = 0; index < payload.rows.length; index += 1) {
@@ -855,18 +854,7 @@ export async function POST(request: Request) {
         };
 
         const company = await findOrCreateCompany(supabase, companyBeforeInsert);
-
-        if (payload.assignedSalespersonId || payload.assignedSalesManagerId) {
-          await applyImportSalesAssignmentsToCompany(
-            supabase,
-            company.id,
-            payload.assignedSalespersonId,
-            payload.assignedSalesManagerId
-          );
-
-          assignedCompanyIds.add(company.id);
-        }
-
+        
         const companyWasEnriched = await updateCompanyIndustryEnrichment(supabase, company.id, {
           naics,
           sic,
@@ -1173,9 +1161,6 @@ const industryFitScore = scoreIndustryFit(industry, naics);
       processedCount,
       duplicateCount,
       errorCount,
-      companiesAssigned: assignedCompanyIds.size,
-      assignedSalespersonId: payload.assignedSalespersonId || null,
-      assignedSalesManagerId: payload.assignedSalesManagerId || null,
       status: finalStatus,
     });
   } catch (error) {
@@ -1187,7 +1172,6 @@ const industryFitScore = scoreIndustryFit(industry, naics);
     );
   }
 }
-
 
 
 

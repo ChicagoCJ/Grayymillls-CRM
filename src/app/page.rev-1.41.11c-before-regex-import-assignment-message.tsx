@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.41.11c - Import Assignment Message Fix";
+const APP_VERSION = "Rev 1.41.11b - Import Assignment Apply Summary";
 const REVISION_NOTE =
-  "Import success messages now report sales coverage assignments returned by the import API.";
+  "ZoomInfo import now applies selected sales coverage to imported/reused companies and reports assignment results.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1273,16 +1273,8 @@ return (
         throw new Error(data.error || "Import failed.");
       }
 
-      const assignedSalespersonName = importAssignmentUserName(data.assignedSalespersonId);
-      const assignedSalesManagerName = importAssignmentUserName(data.assignedSalesManagerId);
-
-      const assignmentSummary =
-        data.companiesAssigned && data.companiesAssigned > 0
-          ? ` Sales coverage assigned to ${data.companiesAssigned} companies. Salesperson / Rep: ${assignedSalespersonName}. Sales Manager: ${assignedSalesManagerName}.`
-          : "";
-
       setImportMessage(
-        `Import ${data.status}: ${data.processedCount} processed, ${data.duplicateCount} possible duplicates/reused companies, ${data.errorCount} row errors.${assignmentSummary}`
+        `Import ${data.status}: ${data.processedCount} processed, ${data.duplicateCount} possible duplicates/reused companies, ${data.errorCount} row errors.`
       );
 
       await loadCrmSummary();
@@ -9098,7 +9090,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 
