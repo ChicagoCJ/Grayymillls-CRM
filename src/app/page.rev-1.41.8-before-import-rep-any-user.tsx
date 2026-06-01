@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.41.8 - Import Rep Can Be Any User";
+const APP_VERSION = "Rev 1.41.7 - Import Assignment Placement Repair";
 const REVISION_NOTE =
-  "Import Salesperson / Rep assignment can now use any active CRM user, including managers and admins.";
+  "Import assignment controls are placed directly above the Choose CSV File button in the ZoomInfo import workflow.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1752,7 +1752,7 @@ async function handleAnalyzeProspect() {
                       >
                         <option value="">Do not change / leave unassigned</option>
                         {roleTestUsers
-                          .filter((user) => user.status === "active")
+                          .filter((user) => user.status === "active" && user.user_role === "sales_rep")
                           .map((user) => (
                             <option key={user.id} value={user.id}>
                               {user.display_name || user.email || user.id}
@@ -9085,7 +9085,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 

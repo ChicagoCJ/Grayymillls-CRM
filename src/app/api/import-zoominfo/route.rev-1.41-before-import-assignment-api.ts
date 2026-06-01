@@ -66,35 +66,6 @@ function normalizeImportTagIds(value: unknown) {
   );
 }
 
-async function applyImportSalesAssignmentsToCompany(
-  supabase: ReturnType<typeof getSupabaseAdmin>,
-  companyId: string,
-  assignedSalespersonId?: string,
-  assignedSalesManagerId?: string
-) {
-  const update: Record<string, string | null> = {};
-
-  if (typeof assignedSalespersonId === "string" && assignedSalespersonId.trim().length > 0) {
-    update.assigned_salesperson_id = assignedSalespersonId.trim();
-  }
-
-  if (typeof assignedSalesManagerId === "string" && assignedSalesManagerId.trim().length > 0) {
-    update.assigned_sales_manager_id = assignedSalesManagerId.trim();
-  }
-
-  if (Object.keys(update).length === 0) {
-    return;
-  }
-
-  update.updated_at = new Date().toISOString();
-
-  const { error } = await supabase
-    .from("companies")
-    .update(update)
-    .eq("id", companyId);
-
-  if (error) throw error;
-}
 async function applyImportTagsToCompany(
   supabase: ReturnType<typeof getSupabaseAdmin>,
   companyId: string,
@@ -1171,7 +1142,6 @@ const industryFitScore = scoreIndustryFit(industry, naics);
     );
   }
 }
-
 
 
 

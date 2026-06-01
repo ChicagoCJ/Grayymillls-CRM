@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.41.8 - Import Rep Can Be Any User";
+const APP_VERSION = "Rev 1.36.3.12 - Hard CRM User Permission Enforcement";
 const REVISION_NOTE =
-  "Import Salesperson / Rep assignment can now use any active CRM user, including managers and admins.";
+  "CRM user create, edit, archive, and reactivate actions are now blocked at the API level for non-admin users.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -658,8 +658,6 @@ export default function Home() {
   const [currentUserDisplayName, setCurrentUserDisplayName] = useState("Manual Role Test");
   const [currentCoverageType, setCurrentCoverageType] = useState("internal");
   const [applyRoleVisibility, setApplyRoleVisibility] = useState(false);
-  const [importAssignedSalespersonId, setImportAssignedSalespersonId] = useState("");
-  const [importAssignedSalesManagerId, setImportAssignedSalesManagerId] = useState("");
   const [roleTestUsers, setRoleTestUsers] = useState<CrmUser[]>([]);
   const [isLoadingRoleUsers, setIsLoadingRoleUsers] = useState(false);
   const [roleUserError, setRoleUserError] = useState("");
@@ -1262,8 +1260,6 @@ return (
             ...importSectorTagIds,
             ...importCategoryTagIds,
           ],
-          assignedSalespersonId: importAssignedSalespersonId,
-          assignedSalesManagerId: importAssignedSalesManagerId,
         }),
       });
 
@@ -1736,57 +1732,6 @@ async function handleAnalyzeProspect() {
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5">
-                  <h3 className="text-lg font-bold text-blue-950">Import Sales Coverage Assignment</h3>
-                  <p className="mt-2 text-sm leading-6 text-blue-900">
-                    Optional: assign every company created or reused from this import to a Salesperson / Rep and Sales Manager.
-                  </p>
-
-                  <div className="mt-5 grid gap-4 md:grid-cols-2">
-                    <div>
-                      <label className="text-sm font-semibold text-slate-700">Salesperson / Rep</label>
-                      <select
-                        value={importAssignedSalespersonId}
-                        onChange={(event) => setImportAssignedSalespersonId(event.target.value)}
-                        className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                      >
-                        <option value="">Do not change / leave unassigned</option>
-                        {roleTestUsers
-                          .filter((user) => user.status === "active")
-                          .map((user) => (
-                            <option key={user.id} value={user.id}>
-                              {user.display_name || user.email || user.id}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="text-sm font-semibold text-slate-700">Sales Manager</label>
-                      <select
-                        value={importAssignedSalesManagerId}
-                        onChange={(event) => setImportAssignedSalesManagerId(event.target.value)}
-                        className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                      >
-                        <option value="">Do not change / leave unassigned</option>
-                        {roleTestUsers
-                          .filter((user) => user.status === "active" && (user.user_role === "sales_manager" || user.user_role === "admin"))
-                          .map((user) => (
-                            <option key={user.id} value={user.id}>
-                              {user.display_name || user.email || user.id}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  {(importAssignedSalespersonId || importAssignedSalesManagerId) && (
-                    <p className="mt-4 rounded-xl border border-blue-300 bg-white p-3 text-sm font-semibold text-blue-900">
-                      Import assignment is active. Imported/reused companies will be updated with the selected sales coverage.
-                    </p>
-                  )}
-                </div>
-
                 <div className="flex flex-wrap justify-start gap-3">
                   <label className="inline-flex cursor-pointer items-center justify-center rounded-xl bg-blue-700 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-blue-800">
                     Choose CSV File
@@ -1890,7 +1835,8 @@ async function handleAnalyzeProspect() {
                     </div>
                   )}
                 </div>
-<div className="rounded-2xl bg-white p-6 shadow-sm">
+
+                <div className="rounded-2xl bg-white p-6 shadow-sm">
                   <h3 className="text-lg font-bold">Manual CRM Field Mapping</h3>
                   <p className="mt-2 text-sm text-slate-600">
                     Review each CRM field and choose the correct ZoomInfo CSV column. Use
@@ -9085,11 +9031,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
-
-
-
 
 
 

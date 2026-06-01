@@ -153,9 +153,13 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.41.8 - Import Rep Can Be Any User";
+const APP_VERSION = "Rev 1.41.6 - Import Assignment Direct Placement";
 const REVISION_NOTE =
-  "Import Salesperson / Rep assignment can now use any active CRM user, including managers and admins.";
+                <div className="rounded-2xl border-4 border-red-500 bg-yellow-100 p-6 text-lg font-black text-red-900">
+                  IMPORT ASSIGNMENT TEST BANNER — if you can see this, the insertion point is correct.
+                </div>
+
+  "Import assignment controls are inserted directly above the Choose CSV File button.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1734,57 +1738,6 @@ async function handleAnalyzeProspect() {
                     Upload a ZoomInfo CSV, review and adjust field mapping, then save the
                     data into the Graymills CRM.
                   </p>
-                </div>
-
-                <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5">
-                  <h3 className="text-lg font-bold text-blue-950">Import Sales Coverage Assignment</h3>
-                  <p className="mt-2 text-sm leading-6 text-blue-900">
-                    Optional: assign every company created or reused from this import to a Salesperson / Rep and Sales Manager.
-                  </p>
-
-                  <div className="mt-5 grid gap-4 md:grid-cols-2">
-                    <div>
-                      <label className="text-sm font-semibold text-slate-700">Salesperson / Rep</label>
-                      <select
-                        value={importAssignedSalespersonId}
-                        onChange={(event) => setImportAssignedSalespersonId(event.target.value)}
-                        className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                      >
-                        <option value="">Do not change / leave unassigned</option>
-                        {roleTestUsers
-                          .filter((user) => user.status === "active")
-                          .map((user) => (
-                            <option key={user.id} value={user.id}>
-                              {user.display_name || user.email || user.id}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="text-sm font-semibold text-slate-700">Sales Manager</label>
-                      <select
-                        value={importAssignedSalesManagerId}
-                        onChange={(event) => setImportAssignedSalesManagerId(event.target.value)}
-                        className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                      >
-                        <option value="">Do not change / leave unassigned</option>
-                        {roleTestUsers
-                          .filter((user) => user.status === "active" && (user.user_role === "sales_manager" || user.user_role === "admin"))
-                          .map((user) => (
-                            <option key={user.id} value={user.id}>
-                              {user.display_name || user.email || user.id}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  {(importAssignedSalespersonId || importAssignedSalesManagerId) && (
-                    <p className="mt-4 rounded-xl border border-blue-300 bg-white p-3 text-sm font-semibold text-blue-900">
-                      Import assignment is active. Imported/reused companies will be updated with the selected sales coverage.
-                    </p>
-                  )}
                 </div>
 
                 <div className="flex flex-wrap justify-start gap-3">
@@ -9085,7 +9038,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 
