@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.36.3.6 - Import Permission Header Context";
+const APP_VERSION = "Rev 1.36.3.1 - Import JSON Header Fix";
 const REVISION_NOTE =
-  "Import requests now send the selected CRM user and role context to the API permission soft-check.";
+  "API permission context headers now preserve JSON content headers so import results display correctly.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1245,7 +1245,6 @@ return (
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...getApiPermissionHeaders(),
         },
         body: JSON.stringify({
           fileName: csvData.fileName,
@@ -1381,9 +1380,9 @@ async function handleAnalyzeProspect() {
 
   function getApiPermissionHeaders() {
     return {
-      "x-crm-user-id": String(currentUserId || ""),
-      "x-crm-user-role": String(currentUserRole || "admin"),
-      "x-crm-user-name": String(currentUserDisplayName || "Manual Role Test"),
+      "x-crm-user-id": currentUserId,
+      "x-crm-user-role": currentUserRole,
+      "x-crm-user-name": currentUserDisplayName,
     };
   }
   async function loadRoleTestUsers() {
@@ -9022,7 +9021,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 
