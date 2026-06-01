@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.36.3.11 - Hard Tag Permission Enforcement";
+const APP_VERSION = "Rev 1.36.3.10 - Funnel Stage Permission Headers";
 const REVISION_NOTE =
-  "Tag create, edit, archive, and reactivate actions are now blocked at the API level for non-admin users.";
+  "Funnel stage API calls now send the selected CRM user and role context for server-side permission checks.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -9031,7 +9031,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 
