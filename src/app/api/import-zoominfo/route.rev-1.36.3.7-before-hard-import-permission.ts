@@ -1157,4 +1157,3 @@ const industryFitScore = scoreIndustryFit(industry, naics);
 
 
 
-

@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.36.3.7 - Hard Import Permission Enforcement";
+const APP_VERSION = "Rev 1.36.3.6 - Import Permission Header Context";
 const REVISION_NOTE =
-  "CSV import is now blocked at the API level for Sales Rep users while remaining available to Admins and Sales Managers.";
+  "Import requests now send the selected CRM user and role context to the API permission soft-check.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -9022,7 +9022,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 
