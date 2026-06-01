@@ -76,27 +76,11 @@ export async function GET(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const permissionContext = getPermissionContext(request);
-    const assignmentAllowed = canAssignSalesCoverage(permissionContext.userRole);
-
     logSoftPermissionCheck(
       "assign_sales_coverage",
       permissionContext,
-      assignmentAllowed
+      canAssignSalesCoverage(permissionContext.userRole)
     );
-
-    if (!assignmentAllowed) {
-      return NextResponse.json(
-        {
-          error: "Your current role cannot edit sales coverage assignments.",
-          permission: {
-            action: "assign_sales_coverage",
-            userRole: permissionContext.userRole,
-            softMode: false,
-          },
-        },
-        { status: 403 }
-      );
-    }
 
     const supabase = getSupabaseAdmin();
     const payload = await request.json();
@@ -137,7 +121,6 @@ export async function PATCH(request: Request) {
     );
   }
 }
-
 
 
 

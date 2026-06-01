@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.36.3.8 - Hard Sales Coverage Permission Enforcement";
+const APP_VERSION = "Rev 1.36.3.7 - Hard Import Permission Enforcement";
 const REVISION_NOTE =
-  "Sales coverage assignment changes are now blocked at the API level for Sales Rep users.";
+  "CSV import is now blocked at the API level for Sales Rep users while remaining available to Admins and Sales Managers.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -9022,7 +9022,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 
