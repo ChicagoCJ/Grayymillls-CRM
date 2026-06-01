@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.36.3.12 - Hard CRM User Permission Enforcement";
+const APP_VERSION = "Rev 1.36.3.11 - Hard Tag Permission Enforcement";
 const REVISION_NOTE =
-  "CRM user create, edit, archive, and reactivate actions are now blocked at the API level for non-admin users.";
+  "Tag create, edit, archive, and reactivate actions are now blocked at the API level for non-admin users.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -9031,7 +9031,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 
