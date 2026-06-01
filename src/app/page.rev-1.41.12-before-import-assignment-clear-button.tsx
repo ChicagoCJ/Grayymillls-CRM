@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.41.12b - Clear Import Assignment Button";
+const APP_VERSION = "Rev 1.41.11c - Import Assignment Message Fix";
 const REVISION_NOTE =
-  "Import Sales Coverage Assignment now includes a visible Clear import assignment button.";
+  "Import success messages now report sales coverage assignments returned by the import API.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1398,10 +1398,6 @@ async function handleAnalyzeProspect() {
       "x-crm-user-name": String(currentUserDisplayName || "Manual Role Test"),
     };
   }
-  function clearImportAssignments() {
-    setImportAssignedSalespersonId("");
-    setImportAssignedSalesManagerId("");
-  }
   function importAssignmentUserName(userId?: string | null) {
     if (!userId) return "Not selected";
     const user = roleTestUsers.find((candidate) => candidate.id === userId);
@@ -1798,26 +1794,10 @@ async function handleAnalyzeProspect() {
                   </div>
 
                   {(importAssignedSalespersonId || importAssignedSalesManagerId) && (
-                    <div className="mt-4 rounded-xl border border-blue-300 bg-white p-3 text-sm text-blue-900">
-                      <p className="font-semibold">
-                        Import assignment is active. Imported/reused companies will be updated with the selected sales coverage.
-                      </p>
-                      <p className="mt-1 text-xs text-blue-800">
-                        Selections stay in place after import so you can process another file for the same coverage team.
-                      </p>
-                    </div>
+                    <p className="mt-4 rounded-xl border border-blue-300 bg-white p-3 text-sm font-semibold text-blue-900">
+                      Import assignment is active. Imported/reused companies will be updated with the selected sales coverage.
+                    </p>
                   )}
-
-                  <div className="mt-4 flex flex-wrap gap-3">
-                    <button
-                      type="button"
-                      onClick={clearImportAssignments}
-                      disabled={!importAssignedSalespersonId && !importAssignedSalesManagerId}
-                      className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
-                    >
-                      Clear import assignment
-                    </button>
-                  </div>
                 </div>
 
                 <div className="flex flex-wrap justify-start gap-3">
@@ -9118,8 +9098,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
 
 
 
