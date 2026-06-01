@@ -75,13 +75,6 @@ export async function GET(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const permissionContext = getPermissionContext(request);
-    logSoftPermissionCheck(
-      "assign_sales_coverage",
-      permissionContext,
-      canAssignSalesCoverage(permissionContext.userRole)
-    );
-
     const supabase = getSupabaseAdmin();
     const payload = await request.json();
 
@@ -121,6 +114,4 @@ export async function PATCH(request: Request) {
     );
   }
 }
-
-
 

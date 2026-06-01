@@ -694,13 +694,6 @@ function collectSelectedImportTagIds(payload: any) {
 
 export async function POST(request: Request) {
   try {
-    const permissionContext = getPermissionContext(request);
-    logSoftPermissionCheck(
-      "import_zoominfo",
-      permissionContext,
-      canImportCsv(permissionContext.userRole)
-    );
-
     const payload = (await request.json()) as ImportPayload;
     const selectedImportTagIds = collectSelectedImportTagIds(payload);
 

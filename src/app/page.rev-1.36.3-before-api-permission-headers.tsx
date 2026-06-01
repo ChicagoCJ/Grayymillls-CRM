@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.36.3.1 - Import JSON Header Fix";
+const APP_VERSION = "Rev 1.36.2.47 - Visibility Notice Placement";
 const REVISION_NOTE =
-  "API permission context headers now preserve JSON content headers so import results display correctly.";
+  "Companies and Funnel now show clearer role visibility notices, and Sales Manager visibility wording has been updated.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1378,13 +1378,6 @@ async function handleAnalyzeProspect() {
     { key: "releaseNotes", label: "Release Notes" },
   ];
 
-  function getApiPermissionHeaders() {
-    return {
-      "x-crm-user-id": currentUserId,
-      "x-crm-user-role": currentUserRole,
-      "x-crm-user-name": currentUserDisplayName,
-    };
-  }
   async function loadRoleTestUsers() {
     setIsLoadingRoleUsers(true);
     setRoleUserError("");
@@ -2489,10 +2482,6 @@ function AdminFunnelStagesSection({
     try {
       const response = await fetch("/api/funnel-stages", {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          ...getApiPermissionHeaders(),
-        },
         headers: {
           "Content-Type": "application/json",
         },
@@ -9021,8 +9010,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
 
 
 

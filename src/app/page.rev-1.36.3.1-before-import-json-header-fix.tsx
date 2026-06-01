@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.36.3.1 - Import JSON Header Fix";
+const APP_VERSION = "Rev 1.36.3 - API Permission Context Foundation";
 const REVISION_NOTE =
-  "API permission context headers now preserve JSON content headers so import results display correctly.";
+  "Frontend API calls can now send current CRM user and role context for future server-side permission enforcement.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -2490,7 +2490,6 @@ function AdminFunnelStagesSection({
       const response = await fetch("/api/funnel-stages", {
         method: "PATCH",
         headers: {
-          "Content-Type": "application/json",
           ...getApiPermissionHeaders(),
         },
         headers: {
@@ -9021,7 +9020,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 
