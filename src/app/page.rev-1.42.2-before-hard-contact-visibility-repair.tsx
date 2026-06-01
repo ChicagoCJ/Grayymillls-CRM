@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.42.2 - Contact Visibility Hard Repair";
+const APP_VERSION = "Rev 1.42.1 - Contact Visibility Cleanup";
 const REVISION_NOTE =
-  "Contact role visibility now cleanly inherits company assignment without affecting Companies, Activities, or Funnel filters.";
+  "Contact role visibility now applies only inside the Contacts filter and inherits assignment from the related company.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -841,7 +841,7 @@ export default function Home() {
     if (!currentUserId) return true;
 
     if (currentUserRole === "sales_rep") {
-      const relatedCompany = crmSummary.companies.find(
+      const relatedCompany = companies.find(
         (company) => String(company.id || company.company_id || "") === String(contact.company_id || "")
       );
 
@@ -1003,7 +1003,10 @@ export default function Home() {
         .map(normalizeForSearch)
         .join(" ");
 
-      const matchesSearch = !search || searchableText.includes(search);const matchesTier =
+      const matchesSearch = !search || searchableText.includes(search);
+      const matchesContactRoleVisibility = contactMatchesRoleVisibility(contact);
+
+      const matchesTier =
         companyTierFilter === "All" || prospect?.priority_tier === companyTierFilter;
       const matchesStatus =
         companyStatusFilter === "All" || (company.status || "new") === companyStatusFilter;
@@ -4271,7 +4274,9 @@ function OpportunityActivitiesDashboard({
         .map(normalizeForSearch)
         .join(" ");
 
-      const matchesSearch = !search || searchableText.includes(search);const matchesType = typeFilter === "All" || activity.activity_type === typeFilter;
+      const matchesSearch = !search || searchableText.includes(search);
+      const matchesContactRoleVisibility = contactMatchesRoleVisibility(contact);
+      const matchesType = typeFilter === "All" || activity.activity_type === typeFilter;
 
       return matchesSearch && matchesType;
     });
@@ -4644,7 +4649,9 @@ const filteredOpportunities = useMemo(() => {
         .map(normalizeForSearch)
         .join(" ");
 
-      const matchesSearch = !search || searchableText.includes(search);const matchesOpportunityRoleVisibility = opportunityMatchesRoleVisibility(opportunity);
+      const matchesSearch = !search || searchableText.includes(search);
+      const matchesContactRoleVisibility = contactMatchesRoleVisibility(contact);
+      const matchesOpportunityRoleVisibility = opportunityMatchesRoleVisibility(opportunity);
       const matchesStage = stageFilter === "All" || opportunity.stage_id === stageFilter;
       const matchesType = typeFilter === "All" || opportunity.opportunity_type === typeFilter;
 
@@ -9137,7 +9144,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 

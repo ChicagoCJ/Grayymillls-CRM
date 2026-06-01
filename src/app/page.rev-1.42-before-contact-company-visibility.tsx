@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.42.2 - Contact Visibility Hard Repair";
+const APP_VERSION = "Rev 1.41.12b - Clear Import Assignment Button";
 const REVISION_NOTE =
-  "Contact role visibility now cleanly inherits company assignment without affecting Companies, Activities, or Funnel filters.";
+  "Import Sales Coverage Assignment now includes a visible Clear import assignment button.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -834,22 +834,6 @@ export default function Home() {
         .map((tag) => tag.tag_name),
     ];
   }, [allCrmTags]);
-  function contactMatchesRoleVisibility(contact: ContactSummary) {
-    if (!applyRoleVisibility) return true;
-    if (currentUserRole === "admin") return true;
-    if (currentUserRole === "sales_manager") return true;
-    if (!currentUserId) return true;
-
-    if (currentUserRole === "sales_rep") {
-      const relatedCompany = crmSummary.companies.find(
-        (company) => String(company.id || company.company_id || "") === String(contact.company_id || "")
-      );
-
-      return String(relatedCompany?.assigned_salesperson_id || "") === currentUserId;
-    }
-
-    return true;
-  }
   const filteredContacts = useMemo(() => {
     const search = normalizeForSearch(contactSearchTerm);
 
@@ -891,7 +875,6 @@ export default function Home() {
         .join(" ");
 
       const matchesSearch = !search || searchableText.includes(search);
-      const matchesContactRoleVisibility = contactMatchesRoleVisibility(contact);
 
       const matchesMarketTag =
         contactMarketTagFilter === "All" || contactMarketNames.includes(contactMarketTagFilter);
@@ -901,13 +884,7 @@ export default function Home() {
         contactCategoryTagFilter === "All" ||
         contactCategoryNames.includes(contactCategoryTagFilter);
 
-      return (
-        matchesSearch &&
-        matchesMarketTag &&
-        matchesSectorTag &&
-        matchesCategoryTag &&
-        matchesContactRoleVisibility
-      );
+      return matchesSearch && matchesMarketTag && matchesSectorTag && matchesCategoryTag;
     });
   }, [
     crmSummary.contacts,
@@ -1003,7 +980,9 @@ export default function Home() {
         .map(normalizeForSearch)
         .join(" ");
 
-      const matchesSearch = !search || searchableText.includes(search);const matchesTier =
+      const matchesSearch = !search || searchableText.includes(search);
+
+      const matchesTier =
         companyTierFilter === "All" || prospect?.priority_tier === companyTierFilter;
       const matchesStatus =
         companyStatusFilter === "All" || (company.status || "new") === companyStatusFilter;
@@ -4271,7 +4250,8 @@ function OpportunityActivitiesDashboard({
         .map(normalizeForSearch)
         .join(" ");
 
-      const matchesSearch = !search || searchableText.includes(search);const matchesType = typeFilter === "All" || activity.activity_type === typeFilter;
+      const matchesSearch = !search || searchableText.includes(search);
+      const matchesType = typeFilter === "All" || activity.activity_type === typeFilter;
 
       return matchesSearch && matchesType;
     });
@@ -4644,7 +4624,8 @@ const filteredOpportunities = useMemo(() => {
         .map(normalizeForSearch)
         .join(" ");
 
-      const matchesSearch = !search || searchableText.includes(search);const matchesOpportunityRoleVisibility = opportunityMatchesRoleVisibility(opportunity);
+      const matchesSearch = !search || searchableText.includes(search);
+      const matchesOpportunityRoleVisibility = opportunityMatchesRoleVisibility(opportunity);
       const matchesStage = stageFilter === "All" || opportunity.stage_id === stageFilter;
       const matchesType = typeFilter === "All" || opportunity.opportunity_type === typeFilter;
 
@@ -9137,9 +9118,6 @@ function ReadableListItem({
     </div>
   );
 }
-
-
-
 
 
 
