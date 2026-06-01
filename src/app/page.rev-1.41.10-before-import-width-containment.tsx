@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.41.10 - Import Workflow Width Containment";
+const APP_VERSION = "Rev 1.41.9 - Import Assignment Width Fix";
 const REVISION_NOTE =
-  "Import Segmentation and Import Sales Coverage Assignment now stay within the import workflow width after CSV upload.";
+  "Import sales coverage assignment controls now stay within the ZoomInfo import card width after a CSV is selected.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1470,7 +1470,7 @@ async function handleAnalyzeProspect() {
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">
       <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-6">
-        <header className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+        <header className="rounded-2xl bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
               <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
@@ -1565,7 +1565,7 @@ async function handleAnalyzeProspect() {
         </nav>
 
         {activeTab === "dashboard" && (
-          <section className="grid max-w-full gap-6 overflow-hidden">
+          <section className="grid gap-6">
             <div className="grid gap-4 md:grid-cols-4">
               <MetricCard
                 label="Companies in CRM"
@@ -1648,7 +1648,7 @@ async function handleAnalyzeProspect() {
         )}
 
         {activeTab === "contacts" && (
-          <section className="grid max-w-full gap-6 overflow-hidden">
+          <section className="grid gap-6">
             <ContactTagFilterPanel
               contactSearchTerm={contactSearchTerm}
               setContactSearchTerm={setContactSearchTerm}
@@ -1700,7 +1700,7 @@ async function handleAnalyzeProspect() {
             canMoveOpportunityStages={currentPermissions.canMoveOpportunityStages}
 />  
         )}        {activeTab === "admin" && (
-          <section className="grid max-w-full gap-6 overflow-hidden">
+          <section className="grid gap-6">
             <UserRolePermissionsReference />
             <AdminUsersSection />
             <AdminFunnelStagesSection
@@ -1716,7 +1716,7 @@ async function handleAnalyzeProspect() {
         {activeTab === "releaseNotes" && <ReleaseNotesSection />}
 
         {activeTab === "import" && (
-          <section className="grid max-w-full gap-6 overflow-hidden">
+          <section className="grid gap-6">
             <ImportTagAssignmentPanel
               resetKey={importTagPanelResetKey}
               selectedMarketTagIds={importMarketTagIds}
@@ -1726,7 +1726,7 @@ async function handleAnalyzeProspect() {
               selectedCategoryTagIds={importCategoryTagIds}
               setSelectedCategoryTagIds={setImportCategoryTagIds}
             />
-            <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+            <div className="rounded-2xl bg-white p-6 shadow-sm">
               <div className="flex flex-col gap-4">
                 <div>
                   <h2 className="text-xl font-bold">Import ZoomInfo CSV</h2>
@@ -1856,9 +1856,9 @@ async function handleAnalyzeProspect() {
                   />
                 </div>
 
-                <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+                <div className="rounded-2xl bg-white p-6 shadow-sm">
                   <h3 className="text-lg font-bold">Import Review</h3>
-                  <div className="mt-4 grid max-w-full gap-4 md:grid-cols-3">
+                  <div className="mt-4 grid gap-4 md:grid-cols-3">
                     <ReviewCard
                       label="Required Mapping"
                       value={isReadyToImport ? "Pass" : "Needs attention"}
@@ -1890,7 +1890,7 @@ async function handleAnalyzeProspect() {
                     </div>
                   )}
                 </div>
-<div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+<div className="rounded-2xl bg-white p-6 shadow-sm">
                   <h3 className="text-lg font-bold">Manual CRM Field Mapping</h3>
                   <p className="mt-2 text-sm text-slate-600">
                     Review each CRM field and choose the correct ZoomInfo CSV column. Use
@@ -1960,13 +1960,13 @@ async function handleAnalyzeProspect() {
                   </div>
                 </div>
 
-                <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+                <div className="rounded-2xl bg-white p-6 shadow-sm">
                   <h3 className="text-lg font-bold">First 10 Rows Preview</h3>
                   <p className="mt-2 text-sm text-slate-600">
                     Confirm the CSV is being read correctly before saving records into Supabase.
                   </p>
 
-                  <div className="mt-4 max-w-full overflow-x-auto">
+                  <div className="mt-4 overflow-x-auto">
                     <table className="w-full min-w-[900px] border-collapse text-left text-xs">
                       <thead>
                         <tr className="border-b border-slate-200">
@@ -2261,7 +2261,7 @@ const [isLoadingTags, setIsLoadingTags] = useState(false);
     selectedMarketTagIds.length + selectedSectorTagIds.length + selectedCategoryTagIds.length;
 
   return (
-    <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+    <div className="rounded-2xl bg-white p-6 shadow-sm">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
@@ -2614,7 +2614,7 @@ function AdminFunnelStagesSection({
 
   return (
     <section className="grid gap-6">
-      <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
@@ -2657,7 +2657,7 @@ function AdminFunnelStagesSection({
         )}
       </div>
 
-      <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
         <h3 className="text-xl font-bold">{editingStageId ? "Edit Stage" : "Create Stage"}</h3>
 
         <div className="mt-5 grid gap-4 lg:grid-cols-6">
@@ -2794,7 +2794,7 @@ function AdminFunnelStagesSection({
         </div>
       </div>
 
-      <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
         <h3 className="text-xl font-bold">Funnel Stages</h3>
 
         {stages.length === 0 ? (
@@ -3084,7 +3084,7 @@ function UserRolePermissionsReference() {
   ];
 
   return (
-    <section className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+    <section className="rounded-2xl bg-white p-6 shadow-sm">
       <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
         Permission Reference
       </p>
@@ -3266,7 +3266,7 @@ function AdminUsersSection() {
 
   return (
     <section className="grid gap-6">
-      <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
@@ -3488,7 +3488,7 @@ function AdminUsersSection() {
         </div>
       </div>
 
-      <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
         <h3 className="text-xl font-bold">Owners</h3>
 
         {users.length === 0 ? (
@@ -3789,7 +3789,7 @@ function AdminTagsSection() {
 
   return (
     <section className="grid gap-6">
-      <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
@@ -3827,7 +3827,7 @@ function AdminTagsSection() {
         )}
       </div>
 
-      <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h3 className="text-xl font-bold">Bulk Tag Actions</h3>
@@ -3865,7 +3865,7 @@ function AdminTagsSection() {
         </div>
       </div>
 
-      <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
         <h3 className="text-xl font-bold">{editingTagId ? "Edit Tag" : "Create Tag"}</h3>
 
         <div className="mt-5 grid gap-4 lg:grid-cols-5">
@@ -4044,7 +4044,7 @@ function AdminTagGroup({
   onReactivate: (tag: CrmTag) => void;
 }) {
   return (
-    <section className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+    <section className="rounded-2xl bg-white p-6 shadow-sm">
       <h3 className="text-xl font-bold">{title}</h3>
 
       {tags.length === 0 ? (
@@ -4274,7 +4274,7 @@ function OpportunityActivitiesDashboard({
   }
 
   return (
-    <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+    <div className="rounded-2xl bg-white p-6 shadow-sm">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
@@ -4710,7 +4710,7 @@ const filteredOpportunities = useMemo(() => {
 
   return (
     <section className="grid gap-6">
-      <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
@@ -4777,7 +4777,7 @@ const filteredOpportunities = useMemo(() => {
         </div>
       )}
 
-      <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
         <h3 className="text-xl font-bold">Funnel Filters</h3>
 
         <div className="mt-5 grid gap-4 lg:grid-cols-5">
@@ -4849,7 +4849,7 @@ const filteredOpportunities = useMemo(() => {
         </div>
       </div>
 
-      <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
         <h3 className="text-xl font-bold">Stage Summary</h3>
 
         {stageSummaries.length === 0 ? (
@@ -4881,7 +4881,7 @@ const filteredOpportunities = useMemo(() => {
 
       <OpportunityActivitiesDashboard onOpenCompany={onOpenCompany} />
 
-      <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
           <div>
             <h3 className="text-xl font-bold">Opportunities</h3>
@@ -5166,7 +5166,7 @@ function ReleaseNotesSection() {
 
   return (
     <section className="grid gap-6">
-      <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
         <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
           Product History
         </p>
@@ -5176,7 +5176,7 @@ function ReleaseNotesSection() {
         </p>
       </div>
 
-      <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
         <h3 className="text-xl font-bold">Upcoming Roadmap</h3>
         <div className="mt-4 grid gap-3">
           {roadmap.map((item, index) => (
@@ -5191,7 +5191,7 @@ function ReleaseNotesSection() {
 
       <div className="grid gap-4">
         {releases.map((release) => (
-          <article key={release.version} className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+          <article key={release.version} className="rounded-2xl bg-white p-6 shadow-sm">
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div>
                 <p className="text-sm font-semibold text-blue-700">{release.version}</p>
@@ -5322,7 +5322,7 @@ function FollowUpDashboard({
         : "text-slate-900";
 
   return (
-    <section className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+    <section className="rounded-2xl bg-white p-6 shadow-sm">
       <h2 className={`text-xl font-bold ${titleClass}`}>{title}</h2>
 
       {activities.length === 0 ? (
@@ -5386,13 +5386,13 @@ function FollowUpDashboard({
 
 function RecentImports({ imports }: { imports: ImportSummary[] }) {
   return (
-    <section className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+    <section className="rounded-2xl bg-white p-6 shadow-sm">
       <h2 className="text-xl font-bold">Recent Imports</h2>
 
       {imports.length === 0 ? (
         <p className="mt-3 text-sm text-slate-600">No imports saved yet.</p>
       ) : (
-        <div className="mt-4 max-w-full overflow-x-auto">
+        <div className="mt-4 overflow-x-auto">
           <table className="w-full min-w-[760px] border-collapse text-left text-sm">
             <thead>
               <tr className="border-b border-slate-200">
@@ -5449,7 +5449,7 @@ function CompanyTagFilterPanel({
   clearCompanyFilters: () => void;
 }) {
   return (
-    <section className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+    <section className="rounded-2xl bg-white p-6 shadow-sm">
       <div>
         <h2 className="text-xl font-bold">Market / Sector / Category Filters</h2>
         <p className="mt-2 text-sm leading-6 text-slate-600">
@@ -5590,7 +5590,7 @@ function CompaniesSection({
   isLoadingCompanyDetail: boolean;
 }) {
   return (
-    <section className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+    <section className="rounded-2xl bg-white p-6 shadow-sm">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
           <h2 className="text-xl font-bold">Companies</h2>
@@ -5751,7 +5751,7 @@ function CompaniesSection({
           No companies match the current search or filters.
         </p>
       ) : (
-        <div className="mt-4 max-w-full overflow-x-auto">
+        <div className="mt-4 overflow-x-auto">
           <table className="w-full min-w-[980px] border-collapse text-left text-sm">
             <thead>
               <tr className="border-b border-slate-200">
@@ -5843,7 +5843,7 @@ function ContactTagFilterPanel({
   clearContactFilters: () => void;
 }) {
   return (
-    <section className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+    <section className="rounded-2xl bg-white p-6 shadow-sm">
       <div>
         <h2 className="text-xl font-bold">Contact Search and Tag Filters</h2>
         <p className="mt-2 text-sm leading-6 text-slate-600">
@@ -5929,7 +5929,7 @@ function ContactsSection({
   totalContactCount: number;
 }) {
   return (
-    <section className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+    <section className="rounded-2xl bg-white p-6 shadow-sm">
       <h2 className="text-xl font-bold">Contacts</h2>
       <p className="mt-2 text-sm text-slate-600">
         Contacts attached to imported company records.
@@ -5940,7 +5940,7 @@ function ContactsSection({
           No contacts imported yet.
         </p>
       ) : (
-        <div className="mt-4 max-w-full overflow-x-auto">
+        <div className="mt-4 overflow-x-auto">
           <table className="w-full min-w-[980px] border-collapse text-left text-sm">
             <thead>
               <tr className="border-b border-slate-200">
@@ -6012,7 +6012,7 @@ function CompanyDetailSection({
 }) {
   if (!detail) {
     return (
-      <section className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+      <section className="rounded-2xl bg-white p-6 shadow-sm">
         <button
           onClick={onBack}
           className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
@@ -6041,7 +6041,7 @@ function CompanyDetailSection({
 
   return (
     <section className="grid gap-6">
-      <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
         <div className="flex flex-wrap gap-3">
           <button
             onClick={onBack}
@@ -6165,7 +6165,7 @@ function CompanyDetailSection({
 
 
 
-      <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
         <h3 className="text-xl font-bold">Add Activity / Follow-Up</h3>
         <p className="mt-2 text-sm text-slate-600">
           Save notes, calls, emails, meetings, tasks, and quote follow-ups directly to this company record.
@@ -6243,7 +6243,7 @@ function CompanyDetailSection({
         </div>
       </div>
 
-      <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
         <h3 className="text-xl font-bold">Activity History</h3>
 
         {detail.activities.length === 0 ? (
@@ -6309,7 +6309,7 @@ function CompanyDetailSection({
         )}
       </div>
 
-      <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
         <h3 className="text-xl font-bold">Contacts</h3>
 
         {detail.contacts.length === 0 ? (
@@ -6386,7 +6386,7 @@ function CompanyDetailSection({
             </DetailCard>
           </div>
 
-          <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+          <div className="rounded-2xl bg-white p-6 shadow-sm">
             <h3 className="text-xl font-bold">Discovery Questions</h3>
             {discoveryQuestions.length === 0 ? (
               <p className="mt-3 text-sm text-slate-600">No discovery questions generated.</p>
@@ -6431,7 +6431,7 @@ function CompanyDetailSection({
             />
           </div>
 
-          <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+          <div className="rounded-2xl bg-white p-6 shadow-sm">
             <h3 className="text-xl font-bold">Copyable Sales Block</h3>
             <p className="mt-2 text-sm text-slate-600">
               Copy this into CRM notes, call prep, or sales handoff.
@@ -6512,7 +6512,7 @@ function CompanyIndustryEnrichmentPanel({
   });
 
   return (
-    <section className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+    <section className="rounded-2xl bg-white p-6 shadow-sm">
       <div>
         <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
           Industry Enrichment
@@ -6646,7 +6646,7 @@ function CompanySalesAssignmentPanel({
   }
 
   return (
-    <section className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+    <section className="rounded-2xl bg-white p-6 shadow-sm">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
@@ -6683,7 +6683,7 @@ function CompanySalesAssignmentPanel({
         </div>
       )}
 
-      <div className="mt-5 grid max-w-full gap-4 md:grid-cols-2">
+      <div className="mt-5 grid gap-4 md:grid-cols-2">
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
           <label className="text-sm font-semibold text-slate-700">Salesperson / Rep</label>
           <select
@@ -6822,7 +6822,7 @@ function CompanyOwnerPanel({
   const selectedOwner = owners.find((owner) => owner.id === selectedOwnerId);
 
   return (
-    <section className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+    <section className="rounded-2xl bg-white p-6 shadow-sm">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
@@ -7795,7 +7795,7 @@ function CompanyOpportunityPanel({
   }
 
   return (
-    <section className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+    <section className="rounded-2xl bg-white p-6 shadow-sm">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
@@ -8501,7 +8501,7 @@ if (!tagsResponse.ok) {
   }
 
   return (
-    <section className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+    <section className="rounded-2xl bg-white p-6 shadow-sm">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
           <h3 className="text-xl font-bold">Market / Sector / Category Tags</h3>
@@ -8986,7 +8986,7 @@ function DetailCard({
   children: ReactNode;
 }) {
   return (
-    <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+    <div className="rounded-2xl bg-white p-6 shadow-sm">
       <h3 className="text-lg font-bold">{title}</h3>
       <div className="mt-4">{children}</div>
     </div>
@@ -9014,7 +9014,7 @@ function ReadableListCard({
   secondaryKeys: string[];
 }) {
   return (
-    <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+    <div className="rounded-2xl bg-white p-6 shadow-sm">
       <h3 className="text-lg font-bold">{title}</h3>
 
       {items.length === 0 ? (
@@ -9085,7 +9085,6 @@ function ReadableListItem({
     </div>
   );
 }
-
 
 
 
