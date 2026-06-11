@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.45.1 - Visibility Count Variable Repair";
+const APP_VERSION = "Rev 1.45.2 - Funnel Visibility Counts";
 const REVISION_NOTE =
-  "Role visibility count variables are now defined before the banner renders.";
+  "The Funnel tab now shows visible and total opportunity counts under the active role visibility scope.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1700,9 +1700,9 @@ async function handleAnalyzeProspect() {
 
               <div className="rounded-xl bg-white p-3 ring-1 ring-blue-100">
                 <p className="text-xs font-bold uppercase tracking-wide text-blue-700">Funnel</p>
-                <p className="mt-1 text-sm font-bold text-blue-950">Scoped in Funnel tab</p>
+                <p className="mt-1 text-sm font-bold text-blue-950">Live counts in Funnel tab</p>
                 <p className="mt-1 text-xs text-blue-800">
-                  Funnel opportunities and opportunity activities inherit related company coverage.
+                  Funnel opportunities and opportunity activities inherit related company coverage. Open Funnel for live visible/total counts.
                 </p>
               </div>
             </div>
@@ -4864,6 +4864,9 @@ const filteredOpportunities = useMemo(() => {
     funnelCurrentUserId,
     funnelCurrentUserRole,
   ]);
+  const visibleFunnelOpportunityCount = displayedFunnelOpportunities.length;
+  const totalFunnelOpportunityCount = filteredOpportunities.length;
+
   const totalPipelineValue = displayedFunnelOpportunities.reduce((total, opportunity) => {
     return total + Number(opportunity.estimated_value ?? 0);
   }, 0);
@@ -5106,7 +5109,7 @@ const filteredOpportunities = useMemo(() => {
           <div>
             <h3 className="text-xl font-bold">Opportunities</h3>
             <p className="mt-2 text-sm text-slate-600">
-              Showing {displayedFunnelOpportunities.length} opportunities after filters.
+              Showing {visibleFunnelOpportunityCount} of {totalFunnelOpportunityCount} opportunities under the current filters and role visibility scope.
             </p>
           </div>
         </div>
@@ -9305,6 +9308,7 @@ function ReadableListItem({
     </div>
   );
 }
+
 
 
 
