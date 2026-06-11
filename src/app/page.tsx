@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.48 - Open Company From Diagnostics";
+const APP_VERSION = "Rev 1.49 - Diagnostics Guided Action Copy";
 const REVISION_NOTE =
-  "Sales coverage diagnostics drilldown company names now open the related company detail record.";
+  "Sales coverage diagnostics now include guided action copy for opening company detail and correcting sales coverage.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1845,6 +1845,7 @@ async function handleAnalyzeProspect() {
 
                 <div className="rounded-xl bg-white p-3 ring-1 ring-amber-100">
                   <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Current User Coverage</p>
+                  <p className="mt-1 text-[11px] font-semibold text-amber-800">Open Company Detail to review coverage</p>
                   <p className="mt-1 text-2xl font-bold">
                     {currentUserAssignedCompanyCount}
                   </p>
@@ -1864,9 +1865,18 @@ async function handleAnalyzeProspect() {
                 </div>
               </div>
 
+              <div className="mt-4 rounded-xl bg-white p-3 text-xs text-amber-900 ring-1 ring-amber-100">
+                <p className="font-bold text-amber-950">How to fix coverage issues</p>
+                <p className="mt-1">
+                  Click a company name to open Company Detail, then update Sales Coverage in the company record.
+                  This keeps assignment changes inside the existing permission-controlled workflow.
+                </p>
+              </div>
+
               <div data-testid="sales-coverage-diagnostics-drilldown" className="mt-4 grid gap-3 md:grid-cols-3">
                 <div className="rounded-xl bg-white p-3 ring-1 ring-amber-100">
                   <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Unassigned Companies</p>
+                  <p className="mt-1 text-[11px] font-semibold text-amber-800">Fix in Company Detail → Sales Coverage</p>
                   {unassignedSalespersonCompanySamples.length === 0 ? (
                     <p className="mt-2 text-xs text-amber-800">No unassigned companies detected.</p>
                   ) : (
@@ -1893,6 +1903,7 @@ async function handleAnalyzeProspect() {
 
                 <div className="rounded-xl bg-white p-3 ring-1 ring-amber-100">
                   <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Current User Coverage</p>
+                  <p className="mt-1 text-[11px] font-semibold text-amber-800">Open Company Detail to review coverage</p>
                   {currentUserCoverageCompanySamples.length === 0 ? (
                     <p className="mt-2 text-xs text-amber-800">No companies assigned to the selected user.</p>
                   ) : (
@@ -1919,6 +1930,7 @@ async function handleAnalyzeProspect() {
 
                 <div className="rounded-xl bg-white p-3 ring-1 ring-amber-100">
                   <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Inactive / Missing Coverage</p>
+                  <p className="mt-1 text-[11px] font-semibold text-amber-800">Fix stale assignments in Company Detail</p>
                   {inactiveCoverageCompanySamples.length === 0 ? (
                     <p className="mt-2 text-xs text-amber-800">No inactive or missing coverage detected.</p>
                   ) : (
@@ -9546,6 +9558,7 @@ function ReadableListItem({
     </div>
   );
 }
+
 
 
 
