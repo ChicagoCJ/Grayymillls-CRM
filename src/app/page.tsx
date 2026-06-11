@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.44.1 - Role Visibility Copy Polish";
+const APP_VERSION = "Rev 1.45.1 - Visibility Count Variable Repair";
 const REVISION_NOTE =
-  "Role visibility language now reflects that Companies, Contacts, Funnel, and Activities are scoped consistently.";
+  "Role visibility count variables are now defined before the banner renders.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1551,6 +1551,16 @@ async function handleAnalyzeProspect() {
   const roleVisibleDueTodayActivities = crmSummary.activities.dueToday.filter(activityRecordMatchesRoleVisibility);
   const roleVisibleOpenActivities = crmSummary.activities.open.filter(activityRecordMatchesRoleVisibility);
   const displayedCompanies = getRoleVisibleCompanies(filteredCompanies);
+  const visibleCompanyCount = displayedCompanies.length;
+  const totalCompanyCount = crmSummary.companies.length;
+  const visibleContactCount = filteredContacts.length;
+  const totalContactCount = crmSummary.contacts.length;
+  const visibleOpenFollowUpCount = roleVisibleOpenActivities.length;
+  const totalOpenFollowUpCount = crmSummary.activities.open.length;
+  const visibleDueTodayFollowUpCount = roleVisibleDueTodayActivities.length;
+  const totalDueTodayFollowUpCount = crmSummary.activities.dueToday.length;
+  const visibleOverdueFollowUpCount = roleVisibleOverdueActivities.length;
+  const totalOverdueFollowUpCount = crmSummary.activities.overdue.length;
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">
       <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-6">
@@ -1644,6 +1654,56 @@ async function handleAnalyzeProspect() {
                     funnel opportunities, and activities.
                   </p>
                 )}
+              </div>
+            </div>
+
+            <div data-testid="role-visibility-count-grid" className="mt-4 grid gap-3 md:grid-cols-3">
+              <div className="rounded-xl bg-white p-3 ring-1 ring-blue-100">
+                <p className="text-xs font-bold uppercase tracking-wide text-blue-700">Companies</p>
+                <p className="mt-1 text-2xl font-bold text-blue-950">
+                  {visibleCompanyCount} <span className="text-sm font-semibold text-blue-700">of {totalCompanyCount}</span>
+                </p>
+                <p className="mt-1 text-xs text-blue-800">Visible under current role scope</p>
+              </div>
+
+              <div className="rounded-xl bg-white p-3 ring-1 ring-blue-100">
+                <p className="text-xs font-bold uppercase tracking-wide text-blue-700">Contacts</p>
+                <p className="mt-1 text-2xl font-bold text-blue-950">
+                  {visibleContactCount} <span className="text-sm font-semibold text-blue-700">of {totalContactCount}</span>
+                </p>
+                <p className="mt-1 text-xs text-blue-800">Inherited from related company coverage</p>
+              </div>
+
+              <div className="rounded-xl bg-white p-3 ring-1 ring-blue-100">
+                <p className="text-xs font-bold uppercase tracking-wide text-blue-700">Open Follow-Ups</p>
+                <p className="mt-1 text-2xl font-bold text-blue-950">
+                  {visibleOpenFollowUpCount} <span className="text-sm font-semibold text-blue-700">of {totalOpenFollowUpCount}</span>
+                </p>
+                <p className="mt-1 text-xs text-blue-800">Activities tied to visible companies</p>
+              </div>
+
+              <div className="rounded-xl bg-white p-3 ring-1 ring-blue-100">
+                <p className="text-xs font-bold uppercase tracking-wide text-blue-700">Due Today</p>
+                <p className="mt-1 text-2xl font-bold text-blue-950">
+                  {visibleDueTodayFollowUpCount} <span className="text-sm font-semibold text-blue-700">of {totalDueTodayFollowUpCount}</span>
+                </p>
+                <p className="mt-1 text-xs text-blue-800">Today’s visible follow-ups</p>
+              </div>
+
+              <div className="rounded-xl bg-white p-3 ring-1 ring-blue-100">
+                <p className="text-xs font-bold uppercase tracking-wide text-blue-700">Overdue</p>
+                <p className="mt-1 text-2xl font-bold text-blue-950">
+                  {visibleOverdueFollowUpCount} <span className="text-sm font-semibold text-blue-700">of {totalOverdueFollowUpCount}</span>
+                </p>
+                <p className="mt-1 text-xs text-blue-800">Visible overdue follow-ups</p>
+              </div>
+
+              <div className="rounded-xl bg-white p-3 ring-1 ring-blue-100">
+                <p className="text-xs font-bold uppercase tracking-wide text-blue-700">Funnel</p>
+                <p className="mt-1 text-sm font-bold text-blue-950">Scoped in Funnel tab</p>
+                <p className="mt-1 text-xs text-blue-800">
+                  Funnel opportunities and opportunity activities inherit related company coverage.
+                </p>
               </div>
             </div>
           </section>
@@ -9245,6 +9305,9 @@ function ReadableListItem({
     </div>
   );
 }
+
+
+
 
 
 
