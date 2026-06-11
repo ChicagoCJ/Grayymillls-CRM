@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.49 - Diagnostics Guided Action Copy";
+const APP_VERSION = "Rev 1.50 - Diagnostics Duplicate Copy Cleanup";
 const REVISION_NOTE =
-  "Sales coverage diagnostics now include guided action copy for opening company detail and correcting sales coverage.";
+  "Sales coverage diagnostics copy has been tightened so action guidance appears in the drilldown area without duplicate messaging.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1845,7 +1845,6 @@ async function handleAnalyzeProspect() {
 
                 <div className="rounded-xl bg-white p-3 ring-1 ring-amber-100">
                   <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Current User Coverage</p>
-                  <p className="mt-1 text-[11px] font-semibold text-amber-800">Open Company Detail to review coverage</p>
                   <p className="mt-1 text-2xl font-bold">
                     {currentUserAssignedCompanyCount}
                   </p>
@@ -9558,6 +9557,7 @@ function ReadableListItem({
     </div>
   );
 }
+
 
 
 
