@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.46.2 - Sales Coverage Diagnostics Stability Repair";
+const APP_VERSION = "Rev 1.46.3 - Real Inactive User Diagnostics";
 const REVISION_NOTE =
-  "Sales coverage diagnostics now load safely while inactive-user assignment detection is held for a later data-source cleanup.";
+  "Sales coverage diagnostics now detect company assignments tied to inactive or missing CRM users.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1575,8 +1575,44 @@ async function handleAnalyzeProspect() {
         );
       }).length
     : 0;
-  const inactiveCoverageCompanyCount = 0;
-  const inactiveCoverageUserDisplayNames = "";
+  const activeCoverageUserIds = new Set(
+    roleTestUsers
+      .filter((user) => !user.status || user.status === "active")
+      .map((user) => String(user.id))
+  );
+
+  const assignedCoverageUserIds = Array.from(
+    new Set(
+      crmSummary.companies
+        .flatMap((company) => [
+          company.assigned_salesperson_id,
+          company.assigned_sales_manager_id,
+        ])
+        .filter((userId): userId is string => Boolean(userId))
+        .map((userId) => String(userId))
+    )
+  );
+
+  const inactiveCoverageUserIds = assignedCoverageUserIds.filter(
+    (userId) => !activeCoverageUserIds.has(userId)
+  );
+
+  const inactiveCoverageCompanyCount = crmSummary.companies.filter((company) => {
+    return (
+      Boolean(company.assigned_salesperson_id) &&
+        !activeCoverageUserIds.has(String(company.assigned_salesperson_id))
+    ) || (
+      Boolean(company.assigned_sales_manager_id) &&
+        !activeCoverageUserIds.has(String(company.assigned_sales_manager_id))
+    );
+  }).length;
+
+  const inactiveCoverageUserDisplayNames = inactiveCoverageUserIds
+    .map((userId) => {
+      const matchedUser = roleTestUsers.find((user) => String(user.id) === String(userId));
+      return matchedUser?.display_name || matchedUser?.email || userId;
+    })
+    .join(", ");
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">
       <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-6">
@@ -1764,14 +1800,14 @@ async function handleAnalyzeProspect() {
                 </div>
 
                 <div className="rounded-xl bg-white p-3 ring-1 ring-amber-100">
-                  <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Inactive User Assignments</p>
+                  <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Inactive / Missing User Assignments</p>
                   <p className="mt-1 text-2xl font-bold">
                     {inactiveCoverageCompanyCount}
                   </p>
                   <p className="mt-1 text-xs text-amber-800">
                     {inactiveCoverageCompanyCount > 0
-                      ? `Review inactive coverage: ${inactiveCoverageUserDisplayNames}`
-                      : "No inactive-user company assignments detected."}
+                      ? `Review inactive or missing coverage: ${inactiveCoverageUserDisplayNames}`
+                      : "No inactive or missing-user company assignments detected."}
                   </p>
                 </div>
               </div>
@@ -9378,6 +9414,7 @@ function ReadableListItem({
     </div>
   );
 }
+
 
 
 
