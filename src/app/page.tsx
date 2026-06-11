@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.43.2 - Funnel Activity Prop Repair";
+const APP_VERSION = "Rev 1.44 - Role Visibility Status Banner";
 const REVISION_NOTE =
-  "Opportunity activity visibility now receives role context correctly from the funnel dashboard.";
+  "A role visibility banner now explains the active user, role, and scoped record access when role visibility is enabled.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1602,6 +1602,52 @@ async function handleAnalyzeProspect() {
           </div>
         </header>
 
+        {applyRoleVisibility && (
+          <section className="rounded-2xl border border-blue-200 bg-blue-50 p-4 shadow-sm">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-blue-700">
+                  Role Visibility Scope Banner
+                </p>
+                <h2 className="mt-1 text-lg font-bold text-blue-950">
+                  Role Visibility is ON
+                </h2>
+                <p className="mt-1 text-sm text-blue-900">
+                  Current role:{" "}
+                  <span className="font-semibold">
+                    {currentUserRole === "sales_rep"
+                      ? "Sales Rep"
+                      : currentUserRole === "sales_manager"
+                        ? "Sales Manager"
+                        : "Admin"}
+                  </span>
+                  {currentUserId ? (
+                    <>
+                      {" "}· User ID: <span className="font-mono text-xs">{currentUserId}</span>
+                    </>
+                  ) : (
+                    <> · Manual role test mode</>
+                  )}
+                </p>
+              </div>
+
+              <div className="rounded-xl bg-white p-3 text-sm text-blue-950 ring-1 ring-blue-100 md:max-w-xl">
+                {currentUserRole === "sales_rep" ? (
+                  <p>
+                    Sales Rep visibility is scoped by company sales coverage. Companies, contacts,
+                    funnel opportunities, and activities are limited to records tied to companies
+                    assigned to this rep.
+                  </p>
+                ) : (
+                  <p>
+                    Admins and Sales Managers retain full visibility across companies, contacts,
+                    funnel opportunities, and activities.
+                  </p>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
         {(errorMessage || importMessage) && (
           <div className="grid gap-3">
             {errorMessage && (
@@ -9199,6 +9245,7 @@ function ReadableListItem({
     </div>
   );
 }
+
 
 
 
