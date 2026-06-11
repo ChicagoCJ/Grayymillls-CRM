@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.44 - Role Visibility Status Banner";
+const APP_VERSION = "Rev 1.44.1 - Role Visibility Copy Polish";
 const REVISION_NOTE =
-  "A role visibility banner now explains the active user, role, and scoped record access when role visibility is enabled.";
+  "Role visibility language now reflects that Companies, Contacts, Funnel, and Activities are scoped consistently.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -3179,13 +3179,13 @@ function RoleTestingPanel({
 
           {applyRoleVisibility && !roleVisibilityNeedsUser && (
             <p className="mt-3 rounded-lg border border-green-200 bg-green-50 p-2 text-xs font-semibold text-green-800">
-              Role visibility is active for the Companies list.
+              Role visibility is active for Companies, Contacts, Funnel, and Activities.
             </p>
           )}
         </div>
 
         <p className="mt-3 text-xs font-semibold text-amber-700">
-          Role visibility filters Companies and Funnel opportunities for Sales Reps. Admin and Sales Managers see all records.
+          Role visibility filters Companies, Contacts, Funnel opportunities, and Activities for Sales Reps. Admins and Sales Managers see all records.
         </p>
       </div>
 
@@ -9245,6 +9245,7 @@ function ReadableListItem({
     </div>
   );
 }
+
 
 
 
