@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.50 - Diagnostics Duplicate Copy Cleanup";
+const APP_VERSION = "Rev 1.51.1 - Diagnostics Compact Mode State Repair";
 const REVISION_NOTE =
-  "Sales coverage diagnostics copy has been tightened so action guidance appears in the drilldown area without duplicate messaging.";
+  "Diagnostics compact mode now defines its show/hide state before rendering the role visibility banner.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -661,6 +661,7 @@ export default function Home() {
   const [importAssignedSalespersonId, setImportAssignedSalespersonId] = useState("");
   const [importAssignedSalesManagerId, setImportAssignedSalesManagerId] = useState("");
   const [roleTestUsers, setRoleTestUsers] = useState<CrmUser[]>([]);
+  const [showSalesCoverageDiagnostics, setShowSalesCoverageDiagnostics] = useState(true);
   const [isLoadingRoleUsers, setIsLoadingRoleUsers] = useState(false);
   const [roleUserError, setRoleUserError] = useState("");
   const currentPermissions = useMemo(
@@ -1811,6 +1812,25 @@ async function handleAnalyzeProspect() {
               </div>
             </div>
 
+            <div className="mt-4 flex flex-col gap-2 rounded-xl bg-white p-3 text-sm text-blue-950 ring-1 ring-blue-100 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="font-bold">Sales Coverage Diagnostics</p>
+                <p className="mt-1 text-xs text-blue-800">
+                  Review company assignment health when role visibility is active.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSalesCoverageDiagnostics(!showSalesCoverageDiagnostics)}
+                className="w-fit rounded-lg bg-blue-700 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-800"
+                aria-expanded={showSalesCoverageDiagnostics}
+                aria-label="Toggle Sales Coverage Diagnostics"
+              >
+                {showSalesCoverageDiagnostics ? "Hide Diagnostics" : "Show Diagnostics"}
+              </button>
+            </div>
+
+            {showSalesCoverageDiagnostics && (
             <div data-testid="sales-coverage-diagnostics-grid" className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
               <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                 <div>
@@ -1955,6 +1975,7 @@ async function handleAnalyzeProspect() {
                 </div>
               </div>
             </div>
+            )}
           </section>
         )}
         {(errorMessage || importMessage) && (
@@ -9557,6 +9578,8 @@ function ReadableListItem({
     </div>
   );
 }
+
+
 
 
 
