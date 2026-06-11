@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.42.4 - Contact Visibility Dependencies";
+const APP_VERSION = "Rev 1.43.2 - Funnel Activity Prop Repair";
 const REVISION_NOTE =
-  "Contact visibility now recomputes immediately when role visibility, selected user, role, or company assignment data changes.";
+  "Opportunity activity visibility now receives role context correctly from the funnel dashboard.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1530,6 +1530,26 @@ async function handleAnalyzeProspect() {
     });
   }
 
+  function activityRecordMatchesRoleVisibility(activity: ActivityRecord) {
+    if (!applyRoleVisibility) return true;
+    if (currentUserRole === "admin") return true;
+    if (currentUserRole === "sales_manager") return true;
+    if (!currentUserId) return true;
+
+    if (currentUserRole === "sales_rep") {
+      const relatedCompany = crmSummary.companies.find(
+        (company) => String(company.id || company.company_id || "") === String(activity.company_id || "")
+      );
+
+      return String(relatedCompany?.assigned_salesperson_id || "") === currentUserId;
+    }
+
+    return true;
+  }
+
+  const roleVisibleOverdueActivities = crmSummary.activities.overdue.filter(activityRecordMatchesRoleVisibility);
+  const roleVisibleDueTodayActivities = crmSummary.activities.dueToday.filter(activityRecordMatchesRoleVisibility);
+  const roleVisibleOpenActivities = crmSummary.activities.open.filter(activityRecordMatchesRoleVisibility);
   const displayedCompanies = getRoleVisibleCompanies(filteredCompanies);
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">
@@ -1655,7 +1675,7 @@ async function handleAnalyzeProspect() {
 
             <FollowUpDashboard
               title="Overdue Follow-Ups"
-              activities={crmSummary.activities.overdue}
+              activities={roleVisibleOverdueActivities}
               emptyText="No overdue follow-ups."
               emphasis="overdue"
               onOpenCompany={loadCompanyDetail}
@@ -1665,7 +1685,7 @@ async function handleAnalyzeProspect() {
 
             <FollowUpDashboard
               title="Due Today"
-              activities={crmSummary.activities.dueToday}
+              activities={roleVisibleDueTodayActivities}
               emptyText="No follow-ups due today."
               emphasis="today"
               onOpenCompany={loadCompanyDetail}
@@ -1675,7 +1695,7 @@ async function handleAnalyzeProspect() {
 
             <FollowUpDashboard
               title="All Open Follow-Ups"
-              activities={crmSummary.activities.open}
+              activities={roleVisibleOpenActivities}
               emptyText="No open follow-ups."
               emphasis="open"
               onOpenCompany={loadCompanyDetail}
@@ -4217,8 +4237,14 @@ function AdminTagGroup({
 
 function OpportunityActivitiesDashboard({
   onOpenCompany,
+  opportunityActivityRoleVisibilityActive = false,
+  opportunityActivityCurrentUserId = null,
+  opportunityActivityCurrentUserRole = "admin",
 }: {
   onOpenCompany: (companyId: string) => void;
+  opportunityActivityRoleVisibilityActive?: boolean;
+  opportunityActivityCurrentUserId?: string | null;
+  opportunityActivityCurrentUserRole?: AppUserRole;
 }) {
   const [activities, setActivities] = useState<Record<string, any>[]>([]);
   const [statusFilter, setStatusFilter] = useState("open");
@@ -4301,7 +4327,14 @@ function OpportunityActivitiesDashboard({
 
       return matchesSearch && matchesType;
     });
-  }, [activities, searchTerm, typeFilter]);
+  }, [
+    activities,
+    searchTerm,
+    typeFilter,
+    opportunityActivityRoleVisibilityActive,
+    opportunityActivityCurrentUserId,
+    opportunityActivityCurrentUserRole,
+  ]);
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -4957,7 +4990,10 @@ const filteredOpportunities = useMemo(() => {
         )}
       </div>
 
-      <OpportunityActivitiesDashboard onOpenCompany={onOpenCompany} />
+      <OpportunityActivitiesDashboard onOpenCompany={onOpenCompany}
+          opportunityActivityRoleVisibilityActive={funnelApplyRoleVisibility}
+          opportunityActivityCurrentUserId={funnelCurrentUserId}
+          opportunityActivityCurrentUserRole={funnelCurrentUserRole} />
 
       <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
@@ -9163,6 +9199,8 @@ function ReadableListItem({
     </div>
   );
 }
+
+
 
 
 
