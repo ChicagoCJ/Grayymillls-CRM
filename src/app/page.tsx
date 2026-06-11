@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.53.1 - Clarify Diagnostics Toggle UX";
+const APP_VERSION = "Rev 1.54.1 - Diagnostics Instruction Line Repair";
 const REVISION_NOTE =
-  "Diagnostics compact mode now uses clearer Show Details and Hide Details language so the header reads as a summary, not an action panel.";
+  "The expanded diagnostics detail panel now includes an explicit instruction to click company names to open Company Detail.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1852,13 +1852,14 @@ async function handleAnalyzeProspect() {
               <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-wide text-amber-700">
-                    Sales Coverage Diagnostics
+                    Coverage Detail
                   </p>
                   <h3 className="mt-1 text-base font-bold text-amber-950">
-                    Assignment health for company-based visibility
+                    Assignment health and company-level follow-up
                   </h3>
                   <p className="mt-1 text-xs text-amber-800">
                     These diagnostics help identify records that may disappear for Sales Reps because company sales coverage is missing or stale.
+                    Click a company name below to open Company Detail.
                   </p>
                 </div>
               </div>
@@ -9595,6 +9596,8 @@ function ReadableListItem({
     </div>
   );
 }
+
+
 
 
 
