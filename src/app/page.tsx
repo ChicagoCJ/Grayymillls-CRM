@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.47 - Sales Coverage Diagnostics Drilldown";
+const APP_VERSION = "Rev 1.48 - Open Company From Diagnostics";
 const REVISION_NOTE =
-  "Sales coverage diagnostics now show sample companies for unassigned, current-user, and inactive or missing-user coverage issues.";
+  "Sales coverage diagnostics drilldown company names now open the related company detail record.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1617,7 +1617,10 @@ async function handleAnalyzeProspect() {
   const unassignedSalespersonCompanySamples = crmSummary.companies
     .filter((company) => !company.assigned_salesperson_id)
     .slice(0, 5)
-    .map((company) => company.company_name || "Unnamed company");
+    .map((company) => ({
+      id: company.id,
+      name: company.company_name || "Unnamed company",
+    }));
 
   const currentUserCoverageCompanySamples = currentUserId
     ? crmSummary.companies
@@ -1628,7 +1631,10 @@ async function handleAnalyzeProspect() {
           );
         })
         .slice(0, 5)
-        .map((company) => company.company_name || "Unnamed company")
+        .map((company) => ({
+          id: company.id,
+          name: company.company_name || "Unnamed company",
+        }))
     : [];
 
   const inactiveCoverageCompanySamples = crmSummary.companies
@@ -1642,7 +1648,10 @@ async function handleAnalyzeProspect() {
       );
     })
     .slice(0, 5)
-    .map((company) => company.company_name || "Unnamed company");
+    .map((company) => ({
+      id: company.id,
+      name: company.company_name || "Unnamed company",
+    }));
 
   const unassignedSalespersonCompanyRemainder = Math.max(
     unassignedSalespersonCompanyCount - unassignedSalespersonCompanySamples.length,
@@ -1862,8 +1871,16 @@ async function handleAnalyzeProspect() {
                     <p className="mt-2 text-xs text-amber-800">No unassigned companies detected.</p>
                   ) : (
                     <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-amber-900">
-                      {unassignedSalespersonCompanySamples.map((companyName) => (
-                        <li key={`unassigned-${companyName}`}>{companyName}</li>
+                      {unassignedSalespersonCompanySamples.map((company) => (
+                        <li key={`unassigned-${company.id}`}>
+                          <button
+                            type="button"
+                            onClick={() => loadCompanyDetail(company.id)}
+                            className="text-left font-semibold text-amber-950 underline decoration-amber-300 underline-offset-2 hover:text-amber-700"
+                          >
+                            {company.name}
+                          </button>
+                        </li>
                       ))}
                     </ul>
                   )}
@@ -1880,8 +1897,16 @@ async function handleAnalyzeProspect() {
                     <p className="mt-2 text-xs text-amber-800">No companies assigned to the selected user.</p>
                   ) : (
                     <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-amber-900">
-                      {currentUserCoverageCompanySamples.map((companyName) => (
-                        <li key={`current-user-${companyName}`}>{companyName}</li>
+                      {currentUserCoverageCompanySamples.map((company) => (
+                        <li key={`current-user-${company.id}`}>
+                          <button
+                            type="button"
+                            onClick={() => loadCompanyDetail(company.id)}
+                            className="text-left font-semibold text-amber-950 underline decoration-amber-300 underline-offset-2 hover:text-amber-700"
+                          >
+                            {company.name}
+                          </button>
+                        </li>
                       ))}
                     </ul>
                   )}
@@ -1898,8 +1923,16 @@ async function handleAnalyzeProspect() {
                     <p className="mt-2 text-xs text-amber-800">No inactive or missing coverage detected.</p>
                   ) : (
                     <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-amber-900">
-                      {inactiveCoverageCompanySamples.map((companyName) => (
-                        <li key={`inactive-missing-${companyName}`}>{companyName}</li>
+                      {inactiveCoverageCompanySamples.map((company) => (
+                        <li key={`inactive-missing-${company.id}`}>
+                          <button
+                            type="button"
+                            onClick={() => loadCompanyDetail(company.id)}
+                            className="text-left font-semibold text-amber-950 underline decoration-amber-300 underline-offset-2 hover:text-amber-700"
+                          >
+                            {company.name}
+                          </button>
+                        </li>
                       ))}
                     </ul>
                   )}
@@ -9513,6 +9546,7 @@ function ReadableListItem({
     </div>
   );
 }
+
 
 
 
