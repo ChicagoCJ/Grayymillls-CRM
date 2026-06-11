@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.51.1 - Diagnostics Compact Mode State Repair";
+const APP_VERSION = "Rev 1.52 - Diagnostics Compact Summary Counts";
 const REVISION_NOTE =
-  "Diagnostics compact mode now defines its show/hide state before rendering the role visibility banner.";
+  "The compact diagnostics header now shows key coverage issue counts even when the detailed diagnostics panel is hidden.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1817,6 +1817,9 @@ async function handleAnalyzeProspect() {
                 <p className="font-bold">Sales Coverage Diagnostics</p>
                 <p className="mt-1 text-xs text-blue-800">
                   Review company assignment health when role visibility is active.
+                </p>
+                <p className="mt-1 text-xs font-semibold text-blue-900">
+                  Unassigned: {unassignedSalespersonCompanyCount} · Inactive/Missing: {inactiveCoverageCompanyCount} · Current User Coverage: {currentUserAssignedCompanyCount}
                 </p>
               </div>
               <button
@@ -9578,6 +9581,7 @@ function ReadableListItem({
     </div>
   );
 }
+
 
 
 
