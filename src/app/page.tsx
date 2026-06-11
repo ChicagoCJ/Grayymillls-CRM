@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.52 - Diagnostics Compact Summary Counts";
+const APP_VERSION = "Rev 1.53.1 - Clarify Diagnostics Toggle UX";
 const REVISION_NOTE =
-  "The compact diagnostics header now shows key coverage issue counts even when the detailed diagnostics panel is hidden.";
+  "Diagnostics compact mode now uses clearer Show Details and Hide Details language so the header reads as a summary, not an action panel.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1816,10 +1816,24 @@ async function handleAnalyzeProspect() {
               <div>
                 <p className="font-bold">Sales Coverage Diagnostics</p>
                 <p className="mt-1 text-xs text-blue-800">
-                  Review company assignment health when role visibility is active.
+                  Review company assignment health when role visibility is active. Open details to use company-level links.
                 </p>
                 <p className="mt-1 text-xs font-semibold text-blue-900">
                   Unassigned: {unassignedSalespersonCompanyCount} · Inactive/Missing: {inactiveCoverageCompanyCount} · Current User Coverage: {currentUserAssignedCompanyCount}
+                </p>
+                <p className="mt-1 text-xs font-semibold text-blue-900">
+                  Coverage Status:{" "}
+                  <span
+                    className={
+                      unassignedSalespersonCompanyCount + inactiveCoverageCompanyCount === 0
+                        ? "rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-800"
+                        : "rounded-full bg-amber-100 px-2 py-0.5 text-amber-800"
+                    }
+                  >
+                    {unassignedSalespersonCompanyCount + inactiveCoverageCompanyCount === 0
+                      ? "All Clear"
+                      : "Needs Review"}
+                  </span>
                 </p>
               </div>
               <button
@@ -1827,9 +1841,9 @@ async function handleAnalyzeProspect() {
                 onClick={() => setShowSalesCoverageDiagnostics(!showSalesCoverageDiagnostics)}
                 className="w-fit rounded-lg bg-blue-700 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-800"
                 aria-expanded={showSalesCoverageDiagnostics}
-                aria-label="Toggle Sales Coverage Diagnostics"
+                aria-label="Toggle Sales Coverage Diagnostics Details"
               >
-                {showSalesCoverageDiagnostics ? "Hide Diagnostics" : "Show Diagnostics"}
+                {showSalesCoverageDiagnostics ? "Hide Details" : "Show Details"}
               </button>
             </div>
 
@@ -9581,6 +9595,8 @@ function ReadableListItem({
     </div>
   );
 }
+
+
 
 
 
