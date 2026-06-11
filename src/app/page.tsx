@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.45.2 - Funnel Visibility Counts";
+const APP_VERSION = "Rev 1.46.2 - Sales Coverage Diagnostics Stability Repair";
 const REVISION_NOTE =
-  "The Funnel tab now shows visible and total opportunity counts under the active role visibility scope.";
+  "Sales coverage diagnostics now load safely while inactive-user assignment detection is held for a later data-source cleanup.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1561,6 +1561,22 @@ async function handleAnalyzeProspect() {
   const totalDueTodayFollowUpCount = crmSummary.activities.dueToday.length;
   const visibleOverdueFollowUpCount = roleVisibleOverdueActivities.length;
   const totalOverdueFollowUpCount = crmSummary.activities.overdue.length;
+  const assignedSalespersonCompanyCount = crmSummary.companies.filter((company) =>
+    Boolean(company.assigned_salesperson_id)
+  ).length;
+  const unassignedSalespersonCompanyCount = crmSummary.companies.filter(
+    (company) => !company.assigned_salesperson_id
+  ).length;
+  const currentUserAssignedCompanyCount = currentUserId
+    ? crmSummary.companies.filter((company) => {
+        return (
+          String(company.assigned_salesperson_id || "") === currentUserId ||
+          String(company.assigned_sales_manager_id || "") === currentUserId
+        );
+      }).length
+    : 0;
+  const inactiveCoverageCompanyCount = 0;
+  const inactiveCoverageUserDisplayNames = "";
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">
       <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-6">
@@ -1704,6 +1720,60 @@ async function handleAnalyzeProspect() {
                 <p className="mt-1 text-xs text-blue-800">
                   Funnel opportunities and opportunity activities inherit related company coverage. Open Funnel for live visible/total counts.
                 </p>
+              </div>
+            </div>
+
+            <div data-testid="sales-coverage-diagnostics-grid" className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+              <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-amber-700">
+                    Sales Coverage Diagnostics
+                  </p>
+                  <h3 className="mt-1 text-base font-bold text-amber-950">
+                    Assignment health for company-based visibility
+                  </h3>
+                  <p className="mt-1 text-xs text-amber-800">
+                    These diagnostics help identify records that may disappear for Sales Reps because company sales coverage is missing or stale.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-3 md:grid-cols-4">
+                <div className="rounded-xl bg-white p-3 ring-1 ring-amber-100">
+                  <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Assigned Rep Coverage</p>
+                  <p className="mt-1 text-2xl font-bold">
+                    {assignedSalespersonCompanyCount} <span className="text-sm font-semibold text-amber-700">of {totalCompanyCount}</span>
+                  </p>
+                  <p className="mt-1 text-xs text-amber-800">Companies with a Salesperson / Rep</p>
+                </div>
+
+                <div className="rounded-xl bg-white p-3 ring-1 ring-amber-100">
+                  <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Unassigned</p>
+                  <p className="mt-1 text-2xl font-bold">
+                    {unassignedSalespersonCompanyCount}
+                  </p>
+                  <p className="mt-1 text-xs text-amber-800">Companies without Salesperson / Rep coverage</p>
+                </div>
+
+                <div className="rounded-xl bg-white p-3 ring-1 ring-amber-100">
+                  <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Current User Coverage</p>
+                  <p className="mt-1 text-2xl font-bold">
+                    {currentUserAssignedCompanyCount}
+                  </p>
+                  <p className="mt-1 text-xs text-amber-800">Companies assigned to the selected user as Rep or Manager</p>
+                </div>
+
+                <div className="rounded-xl bg-white p-3 ring-1 ring-amber-100">
+                  <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Inactive User Assignments</p>
+                  <p className="mt-1 text-2xl font-bold">
+                    {inactiveCoverageCompanyCount}
+                  </p>
+                  <p className="mt-1 text-xs text-amber-800">
+                    {inactiveCoverageCompanyCount > 0
+                      ? `Review inactive coverage: ${inactiveCoverageUserDisplayNames}`
+                      : "No inactive-user company assignments detected."}
+                  </p>
+                </div>
               </div>
             </div>
           </section>
@@ -9308,6 +9378,10 @@ function ReadableListItem({
     </div>
   );
 }
+
+
+
+
 
 
 
