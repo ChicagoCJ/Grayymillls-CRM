@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.42.2 - Contact Visibility Hard Repair";
+const APP_VERSION = "Rev 1.42.4 - Contact Visibility Dependencies";
 const REVISION_NOTE =
-  "Contact role visibility now cleanly inherits company assignment without affecting Companies, Activities, or Funnel filters.";
+  "Contact visibility now recomputes immediately when role visibility, selected user, role, or company assignment data changes.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -909,13 +909,17 @@ export default function Home() {
         matchesContactRoleVisibility
       );
     });
-  }, [
+    }, [
     crmSummary.contacts,
+    crmSummary.companies,
     allContactTags,
     contactSearchTerm,
     contactMarketTagFilter,
     contactSectorTagFilter,
     contactCategoryTagFilter,
+    applyRoleVisibility,
+    currentUserId,
+    currentUserRole,
   ]);
   const companyPrimaryIndustryOptions = useMemo(() => {
     return [
@@ -928,7 +932,18 @@ export default function Home() {
         )
       ).sort((a, b) => a.localeCompare(b)),
     ];
-  }, [crmSummary.companies]);
+    }, [
+    crmSummary.contacts,
+    crmSummary.companies,
+    allContactTags,
+    contactSearchTerm,
+    contactMarketTagFilter,
+    contactSectorTagFilter,
+    contactCategoryTagFilter,
+    applyRoleVisibility,
+    currentUserId,
+    currentUserRole,
+  ]);
 
   const companyPrimarySubIndustryOptions = useMemo(() => {
     return [
@@ -941,7 +956,18 @@ export default function Home() {
         )
       ).sort((a, b) => a.localeCompare(b)),
     ];
-  }, [crmSummary.companies]);
+    }, [
+    crmSummary.contacts,
+    crmSummary.companies,
+    allContactTags,
+    contactSearchTerm,
+    contactMarketTagFilter,
+    contactSectorTagFilter,
+    contactCategoryTagFilter,
+    applyRoleVisibility,
+    currentUserId,
+    currentUserRole,
+  ]);
   const roleVisibilityNeedsUser =
     applyRoleVisibility && currentUserRole !== "admin" && !currentUserId;
 
@@ -3074,7 +3100,7 @@ function RoleTestingPanel({
               <span className="mt-1 block text-xs font-normal leading-5 text-slate-600">
                 When enabled, the Companies list is filtered by the selected CRM user assignment.
                 Admin sees all companies. Sales Managers see companies where they are assigned
-                Sales Manager. Sales Reps see companies where they are assigned Salesperson / Rep.
+                Sales Manager. Sales Reps see companies where they are assigned Salesperson / Rep. Contacts inherit related company visibility.
               </span>
             </span>
           </label>
@@ -9137,6 +9163,8 @@ function ReadableListItem({
     </div>
   );
 }
+
+
 
 
 
