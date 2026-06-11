@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.46.3 - Real Inactive User Diagnostics";
+const APP_VERSION = "Rev 1.47 - Sales Coverage Diagnostics Drilldown";
 const REVISION_NOTE =
-  "Sales coverage diagnostics now detect company assignments tied to inactive or missing CRM users.";
+  "Sales coverage diagnostics now show sample companies for unassigned, current-user, and inactive or missing-user coverage issues.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1613,6 +1613,49 @@ async function handleAnalyzeProspect() {
       return matchedUser?.display_name || matchedUser?.email || userId;
     })
     .join(", ");
+
+  const unassignedSalespersonCompanySamples = crmSummary.companies
+    .filter((company) => !company.assigned_salesperson_id)
+    .slice(0, 5)
+    .map((company) => company.company_name || "Unnamed company");
+
+  const currentUserCoverageCompanySamples = currentUserId
+    ? crmSummary.companies
+        .filter((company) => {
+          return (
+            String(company.assigned_salesperson_id || "") === currentUserId ||
+            String(company.assigned_sales_manager_id || "") === currentUserId
+          );
+        })
+        .slice(0, 5)
+        .map((company) => company.company_name || "Unnamed company")
+    : [];
+
+  const inactiveCoverageCompanySamples = crmSummary.companies
+    .filter((company) => {
+      return (
+        Boolean(company.assigned_salesperson_id) &&
+          !activeCoverageUserIds.has(String(company.assigned_salesperson_id))
+      ) || (
+        Boolean(company.assigned_sales_manager_id) &&
+          !activeCoverageUserIds.has(String(company.assigned_sales_manager_id))
+      );
+    })
+    .slice(0, 5)
+    .map((company) => company.company_name || "Unnamed company");
+
+  const unassignedSalespersonCompanyRemainder = Math.max(
+    unassignedSalespersonCompanyCount - unassignedSalespersonCompanySamples.length,
+    0
+  );
+  const currentUserCoverageCompanyRemainder = Math.max(
+    currentUserAssignedCompanyCount - currentUserCoverageCompanySamples.length,
+    0
+  );
+  const inactiveCoverageCompanyRemainder = Math.max(
+    inactiveCoverageCompanyCount - inactiveCoverageCompanySamples.length,
+    0
+  );
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">
       <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-6">
@@ -1809,6 +1852,62 @@ async function handleAnalyzeProspect() {
                       ? `Review inactive or missing coverage: ${inactiveCoverageUserDisplayNames}`
                       : "No inactive or missing-user company assignments detected."}
                   </p>
+                </div>
+              </div>
+
+              <div data-testid="sales-coverage-diagnostics-drilldown" className="mt-4 grid gap-3 md:grid-cols-3">
+                <div className="rounded-xl bg-white p-3 ring-1 ring-amber-100">
+                  <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Unassigned Companies</p>
+                  {unassignedSalespersonCompanySamples.length === 0 ? (
+                    <p className="mt-2 text-xs text-amber-800">No unassigned companies detected.</p>
+                  ) : (
+                    <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-amber-900">
+                      {unassignedSalespersonCompanySamples.map((companyName) => (
+                        <li key={`unassigned-${companyName}`}>{companyName}</li>
+                      ))}
+                    </ul>
+                  )}
+                  {unassignedSalespersonCompanyRemainder > 0 && (
+                    <p className="mt-2 text-xs font-semibold text-amber-800">
+                      + {unassignedSalespersonCompanyRemainder} more
+                    </p>
+                  )}
+                </div>
+
+                <div className="rounded-xl bg-white p-3 ring-1 ring-amber-100">
+                  <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Current User Coverage</p>
+                  {currentUserCoverageCompanySamples.length === 0 ? (
+                    <p className="mt-2 text-xs text-amber-800">No companies assigned to the selected user.</p>
+                  ) : (
+                    <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-amber-900">
+                      {currentUserCoverageCompanySamples.map((companyName) => (
+                        <li key={`current-user-${companyName}`}>{companyName}</li>
+                      ))}
+                    </ul>
+                  )}
+                  {currentUserCoverageCompanyRemainder > 0 && (
+                    <p className="mt-2 text-xs font-semibold text-amber-800">
+                      + {currentUserCoverageCompanyRemainder} more
+                    </p>
+                  )}
+                </div>
+
+                <div className="rounded-xl bg-white p-3 ring-1 ring-amber-100">
+                  <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Inactive / Missing Coverage</p>
+                  {inactiveCoverageCompanySamples.length === 0 ? (
+                    <p className="mt-2 text-xs text-amber-800">No inactive or missing coverage detected.</p>
+                  ) : (
+                    <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-amber-900">
+                      {inactiveCoverageCompanySamples.map((companyName) => (
+                        <li key={`inactive-missing-${companyName}`}>{companyName}</li>
+                      ))}
+                    </ul>
+                  )}
+                  {inactiveCoverageCompanyRemainder > 0 && (
+                    <p className="mt-2 text-xs font-semibold text-amber-800">
+                      + {inactiveCoverageCompanyRemainder} more
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -9414,6 +9513,7 @@ function ReadableListItem({
     </div>
   );
 }
+
 
 
 
