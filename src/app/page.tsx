@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.61 - Diagnostics No-Match Copy";
+const APP_VERSION = "Rev 1.62 - Move Primary Navigation Above Role Banner";
 const REVISION_NOTE =
-  "Diagnostics filtered empty states now distinguish true zero-record categories from search results with no matches.";
+  "Primary navigation tabs now appear above the role visibility scope banner for faster access to Dashboard, Companies, Contacts, and Funnel.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1718,6 +1718,37 @@ async function handleAnalyzeProspect() {
           </div>
         </header>
 
+        <nav className="flex flex-wrap gap-2">
+          {tabs
+              .filter((tab) => {
+                if (tab.key === "admin") return currentUserRole === "admin";
+                if (tab.key === "import") {
+                  return currentUserRole === "admin" || currentUserRole === "sales_manager";
+                }
+                return true;
+              })
+              .map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                activeTab === tab.key
+                  ? "bg-blue-700 text-white shadow-sm"
+                  : "bg-white text-slate-700 hover:bg-slate-50"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+
+          <button
+            onClick={loadCrmSummary}
+            className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            {isLoadingSummary ? "Refreshing..." : "Refresh CRM"}
+          </button>
+        </nav>
+
         {applyRoleVisibility && (
           <section className="rounded-2xl border border-blue-200 bg-blue-50 p-4 shadow-sm">
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -2067,36 +2098,7 @@ async function handleAnalyzeProspect() {
           </div>
         )}
 
-        <nav className="flex flex-wrap gap-2">
-          {tabs
-              .filter((tab) => {
-                if (tab.key === "admin") return currentUserRole === "admin";
-                if (tab.key === "import") {
-                  return currentUserRole === "admin" || currentUserRole === "sales_manager";
-                }
-                return true;
-              })
-              .map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-                activeTab === tab.key
-                  ? "bg-blue-700 text-white shadow-sm"
-                  : "bg-white text-slate-700 hover:bg-slate-50"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-
-          <button
-            onClick={loadCrmSummary}
-            className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-          >
-            {isLoadingSummary ? "Refreshing..." : "Refresh CRM"}
-          </button>
-        </nav>
+        
 
         {activeTab === "dashboard" && (
           <section className="grid max-w-full gap-6 overflow-hidden">
@@ -9653,6 +9655,7 @@ function ReadableListItem({
     </div>
   );
 }
+
 
 
 
