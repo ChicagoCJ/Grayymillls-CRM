@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.66 - Sticky Nav Button Width Polish";
+const APP_VERSION = "Rev 1.67.6 - Sticky Nav Button Type Accessibility";
 const REVISION_NOTE =
-  "Sticky primary navigation buttons now keep their readable width inside the horizontally scrollable nav row.";
+  "Sticky primary navigation now uses explicit button types while preserving sticky horizontal scrolling behavior.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1731,7 +1731,9 @@ async function handleAnalyzeProspect() {
               })
               .map((tab) => (
             <button
+              type="button"
               key={tab.key}
+              aria-current={activeTab === tab.key ? "page" : undefined}
               onClick={() => setActiveTab(tab.key)}
               className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition ${
                 activeTab === tab.key
@@ -1744,6 +1746,7 @@ async function handleAnalyzeProspect() {
           ))}
 
           <button
+            type="button"
             onClick={loadCrmSummary}
             className="shrink-0 rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
           >
@@ -9657,6 +9660,13 @@ function ReadableListItem({
     </div>
   );
 }
+
+
+
+
+
+
+
 
 
 
