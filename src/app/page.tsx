@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.70 - Sticky Nav Landmark Label";
+const APP_VERSION = "Rev 1.71 - Sticky Nav Refresh Separation";
 const REVISION_NOTE =
-  "Sticky primary navigation now has a clear accessibility label for the CRM tab controls.";
+  "Sticky primary navigation now visually separates the Refresh CRM utility action from the main tab controls.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1750,7 +1750,7 @@ async function handleAnalyzeProspect() {
             onClick={loadCrmSummary}
             disabled={isLoadingSummary}
             aria-busy={isLoadingSummary}
-            className="shrink-0 rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+            className="ml-auto shrink-0 rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
           >
             {isLoadingSummary ? "Refreshing CRM..." : "Refresh CRM"}
           </button>
@@ -9662,6 +9662,7 @@ function ReadableListItem({
     </div>
   );
 }
+
 
 
 
