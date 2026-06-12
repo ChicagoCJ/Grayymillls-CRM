@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.77 - Company Detail Back Focus Polish";
+const APP_VERSION = "Rev 1.78 - Company Detail Back Context Cue";
 const REVISION_NOTE =
-  "Company Detail Back controls now have clearer keyboard focus styling while preserving return-tab behavior.";
+  "Company Detail Back controls now include clearer tooltip and accessibility context for returning to the prior CRM view.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -6594,6 +6594,8 @@ function CompanyDetailSection({
       <section className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
         <button
           type="button"
+          aria-label="Return to previous CRM view"
+          title="Return to previous CRM view"
           onClick={onBack}
           className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
         >
@@ -6625,6 +6627,8 @@ function CompanyDetailSection({
         <div className="flex flex-wrap gap-3">
           <button
             type="button"
+            aria-label="Return to previous CRM view"
+            title="Return to previous CRM view"
             onClick={onBack}
             className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
           >
@@ -9666,6 +9670,7 @@ function ReadableListItem({
     </div>
   );
 }
+
 
 
 
