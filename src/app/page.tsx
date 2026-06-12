@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.75.1 - Company Detail Back Label Repair";
+const APP_VERSION = "Rev 1.76.1 - Company Detail Back Button Type Repair";
 const REVISION_NOTE =
-  "Company Detail back button labels were repaired to use neutral Back wording wherever the old Companies-specific label remained.";
+  "Company Detail Back controls now use explicit button types while preserving the remembered return-tab behavior.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -6593,6 +6593,7 @@ function CompanyDetailSection({
     return (
       <section className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
         <button
+          type="button"
           onClick={onBack}
           className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
         >
@@ -6623,6 +6624,7 @@ function CompanyDetailSection({
       <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
         <div className="flex flex-wrap gap-3">
           <button
+            type="button"
             onClick={onBack}
             className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
           >
@@ -9664,6 +9666,7 @@ function ReadableListItem({
     </div>
   );
 }
+
 
 
 
