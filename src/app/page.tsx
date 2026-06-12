@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.81 - Clear Filter Button Type Polish";
+const APP_VERSION = "Rev 1.82 - Clear Filter Keyboard Focus Polish";
 const REVISION_NOTE =
-  "Company and Contact filter clear controls now use explicit button types for safer UI behavior.";
+  "Company and Contact clear-filter controls now have clearer keyboard focus styling.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -6089,7 +6089,7 @@ function CompanyTagFilterPanel({
           <button
             type="button"
             onClick={clearCompanyFilters}
-            className="w-full rounded-xl bg-slate-800 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-slate-900"
+            className="w-full rounded-xl bg-slate-800 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
           >
             Clear All Filters
           </button>
@@ -6322,7 +6322,7 @@ function CompaniesSection({
             <button
               type="button"
               onClick={clearCompanyFilters}
-              className="w-full rounded-xl bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-100"
+              className="w-full rounded-xl bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
             >
               Clear Filters
             </button>
@@ -6496,7 +6496,7 @@ function ContactTagFilterPanel({
           <button
             type="button"
             onClick={clearContactFilters}
-            className="rounded-xl bg-slate-800 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-slate-900"
+            className="rounded-xl bg-slate-800 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
           >
             Clear Contact Filters
           </button>
@@ -9676,6 +9676,7 @@ function ReadableListItem({
     </div>
   );
 }
+
 
 
 
