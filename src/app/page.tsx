@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.62 - Sticky Primary Navigation";
+const APP_VERSION = "Rev 1.63 - Sticky Nav Spacing Polish";
 const REVISION_NOTE =
-  "Primary navigation tabs now sit above the role visibility banner and remain sticky while scrolling.";
+  "Sticky primary navigation now has improved spacing and visual separation while scrolling.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1720,7 +1720,7 @@ async function handleAnalyzeProspect() {
 
         
 
-        <nav className="sticky top-0 z-30 flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white/95 p-2 shadow-sm backdrop-blur">
+        <nav className="sticky top-2 z-40 flex flex-wrap gap-2 rounded-2xl border border-slate-300 bg-white/95 p-2 shadow-md backdrop-blur supports-[backdrop-filter]:bg-white/80">
           {tabs
               .filter((tab) => {
                 if (tab.key === "admin") return currentUserRole === "admin";
@@ -9657,6 +9657,7 @@ function ReadableListItem({
     </div>
   );
 }
+
 
 
 
