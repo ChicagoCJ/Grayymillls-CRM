@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.68 - Sticky Nav Keyboard Focus Polish";
+const APP_VERSION = "Rev 1.69.1 - Sticky Nav Refresh State Repair";
 const REVISION_NOTE =
-  "Sticky primary navigation now has clearer keyboard focus styling for tab and refresh controls.";
+  "Sticky primary navigation Refresh CRM loading and disabled state was repaired by targeting the primary nav block.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1748,9 +1748,11 @@ async function handleAnalyzeProspect() {
           <button
             type="button"
             onClick={loadCrmSummary}
-            className="shrink-0 rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+            disabled={isLoadingSummary}
+            aria-busy={isLoadingSummary}
+            className="shrink-0 rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
           >
-            {isLoadingSummary ? "Refreshing..." : "Refresh CRM"}
+            {isLoadingSummary ? "Refreshing CRM..." : "Refresh CRM"}
           </button>
         </nav>
 
@@ -9660,6 +9662,8 @@ function ReadableListItem({
     </div>
   );
 }
+
+
 
 
 
