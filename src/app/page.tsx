@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.64 - Sticky Nav Scroll Polish";
+const APP_VERSION = "Rev 1.65.1 - Sticky Nav Active Tab Style Repair";
 const REVISION_NOTE =
-  "Sticky primary navigation now stays in a single horizontally scrollable row so it remains compact on smaller screens.";
+  "Sticky primary navigation active and inactive tab styles now update reliably against the current tab class structure.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1735,8 +1735,8 @@ async function handleAnalyzeProspect() {
               onClick={() => setActiveTab(tab.key)}
               className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
                 activeTab === tab.key
-                  ? "bg-blue-700 text-white shadow-sm"
-                  : "bg-white text-slate-700 hover:bg-slate-50"
+                  ? "bg-blue-700 text-white shadow-md ring-2 ring-blue-200"
+                  : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-blue-50 hover:text-blue-800"
               }`}
             >
               {tab.label}
@@ -9657,6 +9657,8 @@ function ReadableListItem({
     </div>
   );
 }
+
+
 
 
 
