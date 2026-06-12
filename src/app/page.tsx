@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.78 - Company Detail Back Context Cue";
+const APP_VERSION = "Rev 1.79 - Company Detail Back Button Visual Consistency";
 const REVISION_NOTE =
-  "Company Detail Back controls now include clearer tooltip and accessibility context for returning to the prior CRM view.";
+  "Company Detail Back controls now use consistent inline-flex alignment while preserving return-tab behavior.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -6597,7 +6597,7 @@ function CompanyDetailSection({
           aria-label="Return to previous CRM view"
           title="Return to previous CRM view"
           onClick={onBack}
-          className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+          className="inline-flex items-center justify-center rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
         >
           Back
         </button>
@@ -6630,7 +6630,7 @@ function CompanyDetailSection({
             aria-label="Return to previous CRM view"
             title="Return to previous CRM view"
             onClick={onBack}
-            className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+            className="inline-flex items-center justify-center rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
           >
             Back
           </button>
@@ -9670,6 +9670,7 @@ function ReadableListItem({
     </div>
   );
 }
+
 
 
 
