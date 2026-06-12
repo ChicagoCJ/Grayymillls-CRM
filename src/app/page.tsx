@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.80 - Company Detail Back Handler Consolidation";
+const APP_VERSION = "Rev 1.81 - Clear Filter Button Type Polish";
 const REVISION_NOTE =
-  "Company Detail return-tab behavior now uses a named Back handler for clearer maintenance.";
+  "Company and Contact filter clear controls now use explicit button types for safer UI behavior.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -6087,6 +6087,7 @@ function CompanyTagFilterPanel({
 
         <div className="flex items-end">
           <button
+            type="button"
             onClick={clearCompanyFilters}
             className="w-full rounded-xl bg-slate-800 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-slate-900"
           >
@@ -6319,6 +6320,7 @@ function CompaniesSection({
 
           <div className="flex items-end">
             <button
+              type="button"
               onClick={clearCompanyFilters}
               className="w-full rounded-xl bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-100"
             >
@@ -6492,6 +6494,7 @@ function ContactTagFilterPanel({
 
         <div className="lg:col-span-5 flex justify-start">
           <button
+            type="button"
             onClick={clearContactFilters}
             className="rounded-xl bg-slate-800 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-slate-900"
           >
@@ -9673,6 +9676,7 @@ function ReadableListItem({
     </div>
   );
 }
+
 
 
 
