@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.59 - Diagnostics Filter Result Counts";
+const APP_VERSION = "Rev 1.60 - Diagnostics Search Clear Button";
 const REVISION_NOTE =
-  "Diagnostics detail cards now show filtered result counts so users can see how search affects each coverage list.";
+  "Diagnostics search now includes a clear button so users can quickly reset filtered coverage lists.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1915,15 +1915,26 @@ async function handleAnalyzeProspect() {
                 <label className="font-bold text-amber-950" htmlFor="diagnostics-company-search">
                   Search diagnostic company lists
                 </label>
-                <input
-                  id="diagnostics-company-search"
-                  data-testid="sales-coverage-diagnostics-search"
-                  type="search"
-                  value={diagnosticsCompanySearch}
-                  onChange={(event) => setDiagnosticsCompanySearch(event.target.value)}
-                  placeholder="Type a company name..."
-                  className="mt-2 w-full rounded-lg border border-amber-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                />
+                <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                  <input
+                    id="diagnostics-company-search"
+                    data-testid="sales-coverage-diagnostics-search"
+                    type="search"
+                    value={diagnosticsCompanySearch}
+                    onChange={(event) => setDiagnosticsCompanySearch(event.target.value)}
+                    placeholder="Type a company name..."
+                    className="w-full rounded-lg border border-amber-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  />
+                  {diagnosticsCompanySearch && (
+                    <button
+                      type="button"
+                      onClick={() => setDiagnosticsCompanySearch("")}
+                      className="w-fit rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
                 {diagnosticsCompanySearchTerm && (
                   <p className="mt-2 text-[11px] font-semibold text-amber-800">
                     Filtering visible diagnostic lists by “{diagnosticsCompanySearch}”
@@ -2152,7 +2163,8 @@ async function handleAnalyzeProspect() {
             
             companyOwnerFilter={companyOwnerFilter}
             setCompanyOwnerFilter={setCompanyOwnerFilter}
-            companyOwnerOptions={companyOwnerOptions}clearCompanyFilters={clearCompanyFilters}
+            companyOwnerOptions={companyOwnerOptions}
+            clearCompanyFilters={clearCompanyFilters}
             onOpenCompany={loadCompanyDetail}
             isLoadingCompanyDetail={isLoadingCompanyDetail}
           />
@@ -9629,6 +9641,8 @@ function ReadableListItem({
     </div>
   );
 }
+
+
 
 
 
