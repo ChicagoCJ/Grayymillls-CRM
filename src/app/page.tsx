@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.57.2 - Remove Remaining Diagnostics Slice";
+const APP_VERSION = "Rev 1.58 - Diagnostics List Search Filter";
 const REVISION_NOTE =
-  "Diagnostics company lists now fully remove first-five caps and unused remainder calculations after becoming scrollable.";
+  "Diagnostics detail cards now include a company-name search filter for the scrollable coverage review lists.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -662,6 +662,7 @@ export default function Home() {
   const [importAssignedSalesManagerId, setImportAssignedSalesManagerId] = useState("");
   const [roleTestUsers, setRoleTestUsers] = useState<CrmUser[]>([]);
   const [showSalesCoverageDiagnostics, setShowSalesCoverageDiagnostics] = useState(true);
+  const [diagnosticsCompanySearch, setDiagnosticsCompanySearch] = useState("");
   const [isLoadingRoleUsers, setIsLoadingRoleUsers] = useState(false);
   const [roleUserError, setRoleUserError] = useState("");
   const currentPermissions = useMemo(
@@ -1650,6 +1651,22 @@ async function handleAnalyzeProspect() {
       id: company.id,
       name: company.company_name || "Unnamed company",
     }));
+  const diagnosticsCompanySearchTerm = diagnosticsCompanySearch.trim().toLowerCase();
+
+  function matchesDiagnosticsCompanySearch(company: { name: string }) {
+    if (!diagnosticsCompanySearchTerm) return true;
+    return company.name.toLowerCase().includes(diagnosticsCompanySearchTerm);
+  }
+
+  const filteredUnassignedSalespersonCompanySamples = unassignedSalespersonCompanySamples.filter(
+    matchesDiagnosticsCompanySearch
+  );
+  const filteredCurrentUserCoverageCompanySamples = currentUserCoverageCompanySamples.filter(
+    matchesDiagnosticsCompanySearch
+  );
+  const filteredInactiveCoverageCompanySamples = inactiveCoverageCompanySamples.filter(
+    matchesDiagnosticsCompanySearch
+  );
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">
       <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-6">
@@ -1894,6 +1911,26 @@ async function handleAnalyzeProspect() {
                 </p>
               </div>
 
+              <div className="mt-4 rounded-xl bg-white p-3 text-xs text-amber-900 ring-1 ring-amber-100">
+                <label className="font-bold text-amber-950" htmlFor="diagnostics-company-search">
+                  Search diagnostic company lists
+                </label>
+                <input
+                  id="diagnostics-company-search"
+                  data-testid="sales-coverage-diagnostics-search"
+                  type="search"
+                  value={diagnosticsCompanySearch}
+                  onChange={(event) => setDiagnosticsCompanySearch(event.target.value)}
+                  placeholder="Type a company name..."
+                  className="mt-2 w-full rounded-lg border border-amber-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                />
+                {diagnosticsCompanySearchTerm && (
+                  <p className="mt-2 text-[11px] font-semibold text-amber-800">
+                    Filtering visible diagnostic lists by “{diagnosticsCompanySearch}”
+                  </p>
+                )}
+              </div>
+
               <div data-testid="sales-coverage-diagnostics-drilldown" className="mt-4 grid gap-3 md:grid-cols-3">
                 <div className="rounded-xl bg-white p-3 ring-1 ring-amber-100">
                   <div className="flex items-start justify-between gap-2">
@@ -1903,11 +1940,11 @@ async function handleAnalyzeProspect() {
                     </span>
                   </div>
                   <p className="mt-1 text-[11px] font-semibold text-amber-800">Fix in Company Detail → Sales Coverage</p>
-                  {unassignedSalespersonCompanySamples.length === 0 ? (
+                  {filteredUnassignedSalespersonCompanySamples.length === 0 ? (
                     <p className="mt-2 text-xs text-amber-800">No unassigned companies detected.</p>
                   ) : (
                     <ul className="mt-2 max-h-48 list-disc space-y-1 overflow-y-auto pr-2 pl-4 text-xs text-amber-900">
-                      {unassignedSalespersonCompanySamples.map((company) => (
+                      {filteredUnassignedSalespersonCompanySamples.map((company) => (
                         <li key={`unassigned-${company.id}`}>
                           <button
                             type="button"
@@ -1931,11 +1968,11 @@ async function handleAnalyzeProspect() {
                     </span>
                   </div>
                   <p className="mt-1 text-[11px] font-semibold text-amber-800">Open Company Detail to review coverage</p>
-                  {currentUserCoverageCompanySamples.length === 0 ? (
+                  {filteredCurrentUserCoverageCompanySamples.length === 0 ? (
                     <p className="mt-2 text-xs text-amber-800">No companies assigned to the selected user.</p>
                   ) : (
                     <ul className="mt-2 max-h-48 list-disc space-y-1 overflow-y-auto pr-2 pl-4 text-xs text-amber-900">
-                      {currentUserCoverageCompanySamples.map((company) => (
+                      {filteredCurrentUserCoverageCompanySamples.map((company) => (
                         <li key={`current-user-${company.id}`}>
                           <button
                             type="button"
@@ -1959,11 +1996,11 @@ async function handleAnalyzeProspect() {
                     </span>
                   </div>
                   <p className="mt-1 text-[11px] font-semibold text-amber-800">Fix stale assignments in Company Detail</p>
-                  {inactiveCoverageCompanySamples.length === 0 ? (
+                  {filteredInactiveCoverageCompanySamples.length === 0 ? (
                     <p className="mt-2 text-xs text-amber-800">No inactive or missing coverage detected.</p>
                   ) : (
                     <ul className="mt-2 max-h-48 list-disc space-y-1 overflow-y-auto pr-2 pl-4 text-xs text-amber-900">
-                      {inactiveCoverageCompanySamples.map((company) => (
+                      {filteredInactiveCoverageCompanySamples.map((company) => (
                         <li key={`inactive-missing-${company.id}`}>
                           <button
                             type="button"
@@ -9583,6 +9620,7 @@ function ReadableListItem({
     </div>
   );
 }
+
 
 
 
