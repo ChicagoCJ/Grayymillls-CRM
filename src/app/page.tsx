@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.54.1 - Diagnostics Instruction Line Repair";
+const APP_VERSION = "Rev 1.55.1 - Diagnostics Click Style Repair";
 const REVISION_NOTE =
-  "The expanded diagnostics detail panel now includes an explicit instruction to click company names to open Company Detail.";
+  "All diagnostic company-name buttons now use the same clear blue link styling and Open cue.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1923,9 +1923,10 @@ async function handleAnalyzeProspect() {
                           <button
                             type="button"
                             onClick={() => loadCompanyDetail(company.id)}
-                            className="text-left font-semibold text-amber-950 underline decoration-amber-300 underline-offset-2 hover:text-amber-700"
+                            className="inline-flex items-center gap-1 rounded-md px-1 text-left font-semibold text-blue-800 underline decoration-blue-300 underline-offset-2 hover:bg-blue-50 hover:text-blue-950"
                           >
-                            {company.name}
+                            <span>{company.name}</span>
+                            <span className="text-[10px] font-bold uppercase tracking-wide text-blue-600">Open →</span>
                           </button>
                         </li>
                       ))}
@@ -1950,9 +1951,10 @@ async function handleAnalyzeProspect() {
                           <button
                             type="button"
                             onClick={() => loadCompanyDetail(company.id)}
-                            className="text-left font-semibold text-amber-950 underline decoration-amber-300 underline-offset-2 hover:text-amber-700"
+                            className="inline-flex items-center gap-1 rounded-md px-1 text-left font-semibold text-blue-800 underline decoration-blue-300 underline-offset-2 hover:bg-blue-50 hover:text-blue-950"
                           >
-                            {company.name}
+                            <span>{company.name}</span>
+                            <span className="text-[10px] font-bold uppercase tracking-wide text-blue-600">Open →</span>
                           </button>
                         </li>
                       ))}
@@ -1977,9 +1979,10 @@ async function handleAnalyzeProspect() {
                           <button
                             type="button"
                             onClick={() => loadCompanyDetail(company.id)}
-                            className="text-left font-semibold text-amber-950 underline decoration-amber-300 underline-offset-2 hover:text-amber-700"
+                            className="inline-flex items-center gap-1 rounded-md px-1 text-left font-semibold text-blue-800 underline decoration-blue-300 underline-offset-2 hover:bg-blue-50 hover:text-blue-950"
                           >
-                            {company.name}
+                            <span>{company.name}</span>
+                            <span className="text-[10px] font-bold uppercase tracking-wide text-blue-600">Open →</span>
                           </button>
                         </li>
                       ))}
@@ -9596,6 +9599,8 @@ function ReadableListItem({
     </div>
   );
 }
+
+
 
 
 
