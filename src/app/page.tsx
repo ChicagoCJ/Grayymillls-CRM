@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.72 - Sticky Nav Text Wrapping Polish";
+const APP_VERSION = "Rev 1.74 - Company Detail Back Flow Polish";
 const REVISION_NOTE =
-  "Sticky primary navigation buttons now keep labels on one line inside the horizontally scrollable nav row.";
+  "Company Detail now remembers the originating tab so Back returns users to their prior workflow context.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -653,6 +653,7 @@ function hasMeaningfulAnalysis(intelligence: Record<string, unknown> | null) {
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<TabKey>("dashboard");
+  const [companyDetailReturnTab, setCompanyDetailReturnTab] = useState<TabKey>("companies");
   const [currentUserRole, setCurrentUserRole] = useState<AppUserRole>("admin");
   const [currentUserId, setCurrentUserId] = useState("");
   const [currentUserDisplayName, setCurrentUserDisplayName] = useState("Manual Role Test");
@@ -1153,6 +1154,7 @@ return (
   }
 
   async function loadCompanyDetail(companyId: string) {
+    setCompanyDetailReturnTab((current) => (activeTab === "companyDetail" ? current : activeTab));
     setIsLoadingCompanyDetail(true);
     setErrorMessage("");
 
@@ -2239,7 +2241,7 @@ async function handleAnalyzeProspect() {
             onSaveActivity={handleSaveActivity}
             onCompleteActivity={handleCompleteActivity}
             onAnalyzeProspect={handleAnalyzeProspect}
-            onBack={() => setActiveTab("companies")}
+            onBack={() => setActiveTab(companyDetailReturnTab === "companyDetail" ? "companies" : companyDetailReturnTab)}
             salesCoverageCanEdit={currentPermissions.canAssignSalesCoverage}
             canMoveOpportunityStages={currentPermissions.canMoveOpportunityStages}
 />  
@@ -9662,6 +9664,7 @@ function ReadableListItem({
     </div>
   );
 }
+
 
 
 
