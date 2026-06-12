@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.74 - Company Detail Back Flow Polish";
+const APP_VERSION = "Rev 1.75.1 - Company Detail Back Label Repair";
 const REVISION_NOTE =
-  "Company Detail now remembers the originating tab so Back returns users to their prior workflow context.";
+  "Company Detail back button labels were repaired to use neutral Back wording wherever the old Companies-specific label remained.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -6596,7 +6596,7 @@ function CompanyDetailSection({
           onClick={onBack}
           className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
         >
-          Back to Companies
+          Back
         </button>
         <p className="mt-4 text-sm text-slate-600">No company detail loaded.</p>
       </section>
@@ -6626,7 +6626,7 @@ function CompanyDetailSection({
             onClick={onBack}
             className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
           >
-            Back to Companies
+            Back
           </button>
 
           <a
@@ -9664,6 +9664,8 @@ function ReadableListItem({
     </div>
   );
 }
+
+
 
 
 
