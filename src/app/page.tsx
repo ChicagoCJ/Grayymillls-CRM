@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.69.1 - Sticky Nav Refresh State Repair";
+const APP_VERSION = "Rev 1.70 - Sticky Nav Landmark Label";
 const REVISION_NOTE =
-  "Sticky primary navigation Refresh CRM loading and disabled state was repaired by targeting the primary nav block.";
+  "Sticky primary navigation now has a clear accessibility label for the CRM tab controls.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1720,7 +1720,7 @@ async function handleAnalyzeProspect() {
 
         
 
-        <nav className="sticky top-2 z-40 flex flex-nowrap gap-2 overflow-x-auto rounded-2xl border border-slate-300 bg-white/95 p-2 shadow-md backdrop-blur supports-[backdrop-filter]:bg-white/80">
+        <nav aria-label="Primary CRM navigation" className="sticky top-2 z-40 flex flex-nowrap gap-2 overflow-x-auto rounded-2xl border border-slate-300 bg-white/95 p-2 shadow-md backdrop-blur supports-[backdrop-filter]:bg-white/80">
           {tabs
               .filter((tab) => {
                 if (tab.key === "admin") return currentUserRole === "admin";
@@ -9662,6 +9662,7 @@ function ReadableListItem({
     </div>
   );
 }
+
 
 
 
