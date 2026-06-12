@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.65.1 - Sticky Nav Active Tab Style Repair";
+const APP_VERSION = "Rev 1.66 - Sticky Nav Button Width Polish";
 const REVISION_NOTE =
-  "Sticky primary navigation active and inactive tab styles now update reliably against the current tab class structure.";
+  "Sticky primary navigation buttons now keep their readable width inside the horizontally scrollable nav row.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1733,7 +1733,7 @@ async function handleAnalyzeProspect() {
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+              className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition ${
                 activeTab === tab.key
                   ? "bg-blue-700 text-white shadow-md ring-2 ring-blue-200"
                   : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-blue-50 hover:text-blue-800"
@@ -1745,7 +1745,7 @@ async function handleAnalyzeProspect() {
 
           <button
             onClick={loadCrmSummary}
-            className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            className="shrink-0 rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
           >
             {isLoadingSummary ? "Refreshing..." : "Refresh CRM"}
           </button>
@@ -9657,6 +9657,7 @@ function ReadableListItem({
     </div>
   );
 }
+
 
 
 
