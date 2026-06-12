@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.71 - Sticky Nav Refresh Separation";
+const APP_VERSION = "Rev 1.72 - Sticky Nav Text Wrapping Polish";
 const REVISION_NOTE =
-  "Sticky primary navigation now visually separates the Refresh CRM utility action from the main tab controls.";
+  "Sticky primary navigation buttons now keep labels on one line inside the horizontally scrollable nav row.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1735,7 +1735,7 @@ async function handleAnalyzeProspect() {
               key={tab.key}
               aria-current={activeTab === tab.key ? "page" : undefined}
               onClick={() => setActiveTab(tab.key)}
-              className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
+              className={`shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
                 activeTab === tab.key
                   ? "bg-blue-700 text-white shadow-md ring-2 ring-blue-200"
                   : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-blue-50 hover:text-blue-800"
@@ -1750,7 +1750,7 @@ async function handleAnalyzeProspect() {
             onClick={loadCrmSummary}
             disabled={isLoadingSummary}
             aria-busy={isLoadingSummary}
-            className="ml-auto shrink-0 rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+            className="ml-auto shrink-0 whitespace-nowrap rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
           >
             {isLoadingSummary ? "Refreshing CRM..." : "Refresh CRM"}
           </button>
@@ -9662,6 +9662,7 @@ function ReadableListItem({
     </div>
   );
 }
+
 
 
 
