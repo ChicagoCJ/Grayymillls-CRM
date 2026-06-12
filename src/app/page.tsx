@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.56 - Diagnostics Detail Count Badges";
+const APP_VERSION = "Rev 1.57.2 - Remove Remaining Diagnostics Slice";
 const REVISION_NOTE =
-  "Diagnostics detail cards now show total counts for each coverage review category before listing sample company links.";
+  "Diagnostics company lists now fully remove first-five caps and unused remainder calculations after becoming scrollable.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1617,7 +1617,6 @@ async function handleAnalyzeProspect() {
 
   const unassignedSalespersonCompanySamples = crmSummary.companies
     .filter((company) => !company.assigned_salesperson_id)
-    .slice(0, 5)
     .map((company) => ({
       id: company.id,
       name: company.company_name || "Unnamed company",
@@ -1631,7 +1630,6 @@ async function handleAnalyzeProspect() {
             String(company.assigned_sales_manager_id || "") === currentUserId
           );
         })
-        .slice(0, 5)
         .map((company) => ({
           id: company.id,
           name: company.company_name || "Unnamed company",
@@ -1648,24 +1646,10 @@ async function handleAnalyzeProspect() {
           !activeCoverageUserIds.has(String(company.assigned_sales_manager_id))
       );
     })
-    .slice(0, 5)
     .map((company) => ({
       id: company.id,
       name: company.company_name || "Unnamed company",
     }));
-
-  const unassignedSalespersonCompanyRemainder = Math.max(
-    unassignedSalespersonCompanyCount - unassignedSalespersonCompanySamples.length,
-    0
-  );
-  const currentUserCoverageCompanyRemainder = Math.max(
-    currentUserAssignedCompanyCount - currentUserCoverageCompanySamples.length,
-    0
-  );
-  const inactiveCoverageCompanyRemainder = Math.max(
-    inactiveCoverageCompanyCount - inactiveCoverageCompanySamples.length,
-    0
-  );
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">
       <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-6">
@@ -1922,7 +1906,7 @@ async function handleAnalyzeProspect() {
                   {unassignedSalespersonCompanySamples.length === 0 ? (
                     <p className="mt-2 text-xs text-amber-800">No unassigned companies detected.</p>
                   ) : (
-                    <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-amber-900">
+                    <ul className="mt-2 max-h-48 list-disc space-y-1 overflow-y-auto pr-2 pl-4 text-xs text-amber-900">
                       {unassignedSalespersonCompanySamples.map((company) => (
                         <li key={`unassigned-${company.id}`}>
                           <button
@@ -1937,11 +1921,6 @@ async function handleAnalyzeProspect() {
                       ))}
                     </ul>
                   )}
-                  {unassignedSalespersonCompanyRemainder > 0 && (
-                    <p className="mt-2 text-xs font-semibold text-amber-800">
-                      + {unassignedSalespersonCompanyRemainder} more
-                    </p>
-                  )}
                 </div>
 
                 <div className="rounded-xl bg-white p-3 ring-1 ring-amber-100">
@@ -1955,7 +1934,7 @@ async function handleAnalyzeProspect() {
                   {currentUserCoverageCompanySamples.length === 0 ? (
                     <p className="mt-2 text-xs text-amber-800">No companies assigned to the selected user.</p>
                   ) : (
-                    <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-amber-900">
+                    <ul className="mt-2 max-h-48 list-disc space-y-1 overflow-y-auto pr-2 pl-4 text-xs text-amber-900">
                       {currentUserCoverageCompanySamples.map((company) => (
                         <li key={`current-user-${company.id}`}>
                           <button
@@ -1970,11 +1949,6 @@ async function handleAnalyzeProspect() {
                       ))}
                     </ul>
                   )}
-                  {currentUserCoverageCompanyRemainder > 0 && (
-                    <p className="mt-2 text-xs font-semibold text-amber-800">
-                      + {currentUserCoverageCompanyRemainder} more
-                    </p>
-                  )}
                 </div>
 
                 <div className="rounded-xl bg-white p-3 ring-1 ring-amber-100">
@@ -1988,7 +1962,7 @@ async function handleAnalyzeProspect() {
                   {inactiveCoverageCompanySamples.length === 0 ? (
                     <p className="mt-2 text-xs text-amber-800">No inactive or missing coverage detected.</p>
                   ) : (
-                    <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-amber-900">
+                    <ul className="mt-2 max-h-48 list-disc space-y-1 overflow-y-auto pr-2 pl-4 text-xs text-amber-900">
                       {inactiveCoverageCompanySamples.map((company) => (
                         <li key={`inactive-missing-${company.id}`}>
                           <button
@@ -2002,11 +1976,6 @@ async function handleAnalyzeProspect() {
                         </li>
                       ))}
                     </ul>
-                  )}
-                  {inactiveCoverageCompanyRemainder > 0 && (
-                    <p className="mt-2 text-xs font-semibold text-amber-800">
-                      + {inactiveCoverageCompanyRemainder} more
-                    </p>
                   )}
                 </div>
               </div>
@@ -9614,6 +9583,9 @@ function ReadableListItem({
     </div>
   );
 }
+
+
+
 
 
 
