@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.55.1 - Diagnostics Click Style Repair";
+const APP_VERSION = "Rev 1.56 - Diagnostics Detail Count Badges";
 const REVISION_NOTE =
-  "All diagnostic company-name buttons now use the same clear blue link styling and Open cue.";
+  "Diagnostics detail cards now show total counts for each coverage review category before listing sample company links.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1912,7 +1912,12 @@ async function handleAnalyzeProspect() {
 
               <div data-testid="sales-coverage-diagnostics-drilldown" className="mt-4 grid gap-3 md:grid-cols-3">
                 <div className="rounded-xl bg-white p-3 ring-1 ring-amber-100">
-                  <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Unassigned Companies</p>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Unassigned Companies</p>
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800">
+                      {unassignedSalespersonCompanyCount}
+                    </span>
+                  </div>
                   <p className="mt-1 text-[11px] font-semibold text-amber-800">Fix in Company Detail → Sales Coverage</p>
                   {unassignedSalespersonCompanySamples.length === 0 ? (
                     <p className="mt-2 text-xs text-amber-800">No unassigned companies detected.</p>
@@ -1940,7 +1945,12 @@ async function handleAnalyzeProspect() {
                 </div>
 
                 <div className="rounded-xl bg-white p-3 ring-1 ring-amber-100">
-                  <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Current User Coverage</p>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Current User Coverage</p>
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800">
+                      {currentUserAssignedCompanyCount}
+                    </span>
+                  </div>
                   <p className="mt-1 text-[11px] font-semibold text-amber-800">Open Company Detail to review coverage</p>
                   {currentUserCoverageCompanySamples.length === 0 ? (
                     <p className="mt-2 text-xs text-amber-800">No companies assigned to the selected user.</p>
@@ -1968,7 +1978,12 @@ async function handleAnalyzeProspect() {
                 </div>
 
                 <div className="rounded-xl bg-white p-3 ring-1 ring-amber-100">
-                  <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Inactive / Missing Coverage</p>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Inactive / Missing Coverage</p>
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800">
+                      {inactiveCoverageCompanyCount}
+                    </span>
+                  </div>
                   <p className="mt-1 text-[11px] font-semibold text-amber-800">Fix stale assignments in Company Detail</p>
                   {inactiveCoverageCompanySamples.length === 0 ? (
                     <p className="mt-2 text-xs text-amber-800">No inactive or missing coverage detected.</p>
@@ -9599,6 +9614,7 @@ function ReadableListItem({
     </div>
   );
 }
+
 
 
 
