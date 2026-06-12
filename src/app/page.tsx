@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.79 - Company Detail Back Button Visual Consistency";
+const APP_VERSION = "Rev 1.80 - Company Detail Back Handler Consolidation";
 const REVISION_NOTE =
-  "Company Detail Back controls now use consistent inline-flex alignment while preserving return-tab behavior.";
+  "Company Detail return-tab behavior now uses a named Back handler for clearer maintenance.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1153,7 +1153,10 @@ return (
     }
   }
 
-  async function loadCompanyDetail(companyId: string) {
+    function returnFromCompanyDetail() {
+    setActiveTab(companyDetailReturnTab === "companyDetail" ? "companies" : companyDetailReturnTab);
+  }
+async function loadCompanyDetail(companyId: string) {
     setCompanyDetailReturnTab((current) => (activeTab === "companyDetail" ? current : activeTab));
     setIsLoadingCompanyDetail(true);
     setErrorMessage("");
@@ -2241,7 +2244,7 @@ async function handleAnalyzeProspect() {
             onSaveActivity={handleSaveActivity}
             onCompleteActivity={handleCompleteActivity}
             onAnalyzeProspect={handleAnalyzeProspect}
-            onBack={() => setActiveTab(companyDetailReturnTab === "companyDetail" ? "companies" : companyDetailReturnTab)}
+            onBack={returnFromCompanyDetail}
             salesCoverageCanEdit={currentPermissions.canAssignSalesCoverage}
             canMoveOpportunityStages={currentPermissions.canMoveOpportunityStages}
 />  
@@ -9670,6 +9673,7 @@ function ReadableListItem({
     </div>
   );
 }
+
 
 
 
