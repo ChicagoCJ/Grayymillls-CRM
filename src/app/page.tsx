@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.58 - Diagnostics List Search Filter";
+const APP_VERSION = "Rev 1.59 - Diagnostics Filter Result Counts";
 const REVISION_NOTE =
-  "Diagnostics detail cards now include a company-name search filter for the scrollable coverage review lists.";
+  "Diagnostics detail cards now show filtered result counts so users can see how search affects each coverage list.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1940,6 +1940,9 @@ async function handleAnalyzeProspect() {
                     </span>
                   </div>
                   <p className="mt-1 text-[11px] font-semibold text-amber-800">Fix in Company Detail → Sales Coverage</p>
+                  <p className="mt-1 text-[11px] text-amber-700">
+                    Showing {filteredUnassignedSalespersonCompanySamples.length} of {unassignedSalespersonCompanyCount}
+                  </p>
                   {filteredUnassignedSalespersonCompanySamples.length === 0 ? (
                     <p className="mt-2 text-xs text-amber-800">No unassigned companies detected.</p>
                   ) : (
@@ -1968,6 +1971,9 @@ async function handleAnalyzeProspect() {
                     </span>
                   </div>
                   <p className="mt-1 text-[11px] font-semibold text-amber-800">Open Company Detail to review coverage</p>
+                  <p className="mt-1 text-[11px] text-amber-700">
+                    Showing {filteredCurrentUserCoverageCompanySamples.length} of {currentUserAssignedCompanyCount}
+                  </p>
                   {filteredCurrentUserCoverageCompanySamples.length === 0 ? (
                     <p className="mt-2 text-xs text-amber-800">No companies assigned to the selected user.</p>
                   ) : (
@@ -1996,6 +2002,9 @@ async function handleAnalyzeProspect() {
                     </span>
                   </div>
                   <p className="mt-1 text-[11px] font-semibold text-amber-800">Fix stale assignments in Company Detail</p>
+                  <p className="mt-1 text-[11px] text-amber-700">
+                    Showing {filteredInactiveCoverageCompanySamples.length} of {inactiveCoverageCompanyCount}
+                  </p>
                   {filteredInactiveCoverageCompanySamples.length === 0 ? (
                     <p className="mt-2 text-xs text-amber-800">No inactive or missing coverage detected.</p>
                   ) : (
@@ -9620,6 +9629,7 @@ function ReadableListItem({
     </div>
   );
 }
+
 
 
 
