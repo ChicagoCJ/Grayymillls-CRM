@@ -153,9 +153,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.60 - Diagnostics Search Clear Button";
+const APP_VERSION = "Rev 1.61 - Diagnostics No-Match Copy";
 const REVISION_NOTE =
-  "Diagnostics search now includes a clear button so users can quickly reset filtered coverage lists.";
+  "Diagnostics filtered empty states now distinguish true zero-record categories from search results with no matches.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1955,7 +1955,11 @@ async function handleAnalyzeProspect() {
                     Showing {filteredUnassignedSalespersonCompanySamples.length} of {unassignedSalespersonCompanyCount}
                   </p>
                   {filteredUnassignedSalespersonCompanySamples.length === 0 ? (
-                    <p className="mt-2 text-xs text-amber-800">No unassigned companies detected.</p>
+                    <p className="mt-2 text-xs text-amber-800">
+                      {diagnosticsCompanySearchTerm && unassignedSalespersonCompanyCount > 0
+                        ? "No unassigned companies match this search."
+                        : "No unassigned companies detected."}
+                    </p>
                   ) : (
                     <ul className="mt-2 max-h-48 list-disc space-y-1 overflow-y-auto pr-2 pl-4 text-xs text-amber-900">
                       {filteredUnassignedSalespersonCompanySamples.map((company) => (
@@ -1986,7 +1990,11 @@ async function handleAnalyzeProspect() {
                     Showing {filteredCurrentUserCoverageCompanySamples.length} of {currentUserAssignedCompanyCount}
                   </p>
                   {filteredCurrentUserCoverageCompanySamples.length === 0 ? (
-                    <p className="mt-2 text-xs text-amber-800">No companies assigned to the selected user.</p>
+                    <p className="mt-2 text-xs text-amber-800">
+                      {diagnosticsCompanySearchTerm && currentUserAssignedCompanyCount > 0
+                        ? "No assigned companies match this search."
+                        : "No companies assigned to the selected user."}
+                    </p>
                   ) : (
                     <ul className="mt-2 max-h-48 list-disc space-y-1 overflow-y-auto pr-2 pl-4 text-xs text-amber-900">
                       {filteredCurrentUserCoverageCompanySamples.map((company) => (
@@ -2017,7 +2025,11 @@ async function handleAnalyzeProspect() {
                     Showing {filteredInactiveCoverageCompanySamples.length} of {inactiveCoverageCompanyCount}
                   </p>
                   {filteredInactiveCoverageCompanySamples.length === 0 ? (
-                    <p className="mt-2 text-xs text-amber-800">No inactive or missing coverage detected.</p>
+                    <p className="mt-2 text-xs text-amber-800">
+                      {diagnosticsCompanySearchTerm && inactiveCoverageCompanyCount > 0
+                        ? "No inactive or missing coverage records match this search."
+                        : "No inactive or missing coverage detected."}
+                    </p>
                   ) : (
                     <ul className="mt-2 max-h-48 list-disc space-y-1 overflow-y-auto pr-2 pl-4 text-xs text-amber-900">
                       {filteredInactiveCoverageCompanySamples.map((company) => (
@@ -9641,6 +9653,7 @@ function ReadableListItem({
     </div>
   );
 }
+
 
 
 
