@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { ChangeEvent, ReactNode, useEffect, useMemo, useState } from "react";
 
@@ -593,6 +593,11 @@ export default function Home() {
   const [applyRoleVisibility, setApplyRoleVisibility] = useState(false);
   const [importAssignedSalespersonId, setImportAssignedSalespersonId] = useState("");
   const [importAssignedSalesManagerId, setImportAssignedSalesManagerId] = useState("");
+  const [selectedCompanyIds, setSelectedCompanyIds] = useState<string[]>([]);
+  const [bulkAssignedSalespersonId, setBulkAssignedSalespersonId] = useState("");
+  const [bulkAssignedSalesManagerId, setBulkAssignedSalesManagerId] = useState("");
+  const [isBulkAssigningCompanies, setIsBulkAssigningCompanies] = useState(false);
+  const [bulkCompanyAssignmentMessage, setBulkCompanyAssignmentMessage] = useState("");
   const [roleTestUsers, setRoleTestUsers] = useState<CrmUser[]>([]);
   const [showSalesCoverageDiagnostics, setShowSalesCoverageDiagnostics] = useState(true);
   const [diagnosticsCompanySearch, setDiagnosticsCompanySearch] = useState("");
@@ -1393,6 +1398,84 @@ async function handleAnalyzeProspect() {
     const user = roleTestUsers.find((candidate) => candidate.id === userId);
     return user?.display_name || user?.email || userId;
   }
+
+  async function handleBulkCompanyAssignment() {
+    if (selectedCompanyIds.length === 0) {
+      setBulkCompanyAssignmentMessage("Select at least one company before applying bulk assignment.");
+      return;
+    }
+
+    if (!bulkAssignedSalespersonId && !bulkAssignedSalesManagerId) {
+      setBulkCompanyAssignmentMessage("Select a salesperson and/or sales manager before applying bulk assignment.");
+      return;
+    }
+
+    setIsBulkAssigningCompanies(true);
+    setBulkCompanyAssignmentMessage("");
+
+    try {
+      const payload: Record<string, unknown> = {
+        companyIds: selectedCompanyIds,
+      };
+
+      if (bulkAssignedSalespersonId) {
+        payload.assignedSalespersonId = bulkAssignedSalespersonId;
+      }
+
+      if (bulkAssignedSalesManagerId) {
+        payload.assignedSalesManagerId = bulkAssignedSalesManagerId;
+      }
+
+      const response = await fetch("/api/company-sales-assignments", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...apiPermissionHeaders(),
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Bulk company assignment failed.");
+      }
+
+      const updatedAssignments = Array.isArray(data.companyAssignments)
+        ? data.companyAssignments
+        : [];
+
+      setCrmSummary((previous: any) => ({
+        ...previous,
+        companies: previous.companies.map((company: any) => {
+          const updatedAssignment = updatedAssignments.find(
+            (assignment: any) => String(assignment.id) === String(company.id)
+          );
+
+          return updatedAssignment
+            ? {
+                ...company,
+                assigned_salesperson_id: updatedAssignment.assigned_salesperson_id,
+                assigned_sales_manager_id: updatedAssignment.assigned_sales_manager_id,
+              }
+            : company;
+        }),
+      }));
+
+      await loadCompanyOwnerFilterData();
+
+      setBulkCompanyAssignmentMessage(
+        `Bulk assignment updated ${data.updatedCount ?? selectedCompanyIds.length} companies.`
+      );
+      setSelectedCompanyIds([]);
+    } catch (error) {
+      setBulkCompanyAssignmentMessage(
+        error instanceof Error ? error.message : "Bulk company assignment failed."
+      );
+    } finally {
+      setIsBulkAssigningCompanies(false);
+    }
+  }
   async function loadRoleTestUsers() {
     setIsLoadingRoleUsers(true);
     setRoleUserError("");
@@ -1714,10 +1797,10 @@ async function handleAnalyzeProspect() {
                   </span>
                   {currentUserId ? (
                     <>
-                      {" "}· User ID: <span className="font-mono text-xs">{currentUserId}</span>
+                      {" "}Ãƒâ€šÃ‚Â· User ID: <span className="font-mono text-xs">{currentUserId}</span>
                     </>
                   ) : (
-                    <> · Manual role test mode</>
+                    <> Ãƒâ€šÃ‚Â· Manual role test mode</>
                   )}
                 </p>
               </div>
@@ -1768,7 +1851,7 @@ async function handleAnalyzeProspect() {
                 <p className="mt-1 text-2xl font-bold text-blue-950">
                   {visibleDueTodayFollowUpCount} <span className="text-sm font-semibold text-blue-700">of {totalDueTodayFollowUpCount}</span>
                 </p>
-                <p className="mt-1 text-xs text-blue-800">Today’s visible follow-ups</p>
+                <p className="mt-1 text-xs text-blue-800">TodayÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢s visible follow-ups</p>
               </div>
 
               <div className="rounded-xl bg-white p-3 ring-1 ring-blue-100">
@@ -1795,7 +1878,7 @@ async function handleAnalyzeProspect() {
                   Review company assignment health when role visibility is active. Open details to use company-level links.
                 </p>
                 <p className="mt-1 text-xs font-semibold text-blue-900">
-                  Unassigned: {unassignedSalespersonCompanyCount} · Inactive/Missing: {inactiveCoverageCompanyCount} · Current User Coverage: {currentUserAssignedCompanyCount}
+                  Unassigned: {unassignedSalespersonCompanyCount} Ãƒâ€šÃ‚Â· Inactive/Missing: {inactiveCoverageCompanyCount} Ãƒâ€šÃ‚Â· Current User Coverage: {currentUserAssignedCompanyCount}
                 </p>
                 <p className="mt-1 text-xs font-semibold text-blue-900">
                   Coverage Status:{" "}
@@ -1912,7 +1995,7 @@ async function handleAnalyzeProspect() {
                 </div>
                 {diagnosticsCompanySearchTerm && (
                   <p className="mt-2 text-[11px] font-semibold text-amber-800">
-                    Filtering visible diagnostic lists by “{diagnosticsCompanySearch}”
+                    Filtering visible diagnostic lists by ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ{diagnosticsCompanySearch}ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â
                   </p>
                 )}
               </div>
@@ -1925,7 +2008,7 @@ async function handleAnalyzeProspect() {
                       {unassignedSalespersonCompanyCount}
                     </span>
                   </div>
-                  <p className="mt-1 text-[11px] font-semibold text-amber-800">Fix in Company Detail → Sales Coverage</p>
+                  <p className="mt-1 text-[11px] font-semibold text-amber-800">Fix in Company Detail ? Sales Coverage</p>
                   <p className="mt-1 text-[11px] text-amber-700">
                     Showing {filteredUnassignedSalespersonCompanySamples.length} of {unassignedSalespersonCompanyCount}
                   </p>
@@ -1945,7 +2028,7 @@ async function handleAnalyzeProspect() {
                             className="inline-flex items-center gap-1 rounded-md px-1 text-left font-semibold text-blue-800 underline decoration-blue-300 underline-offset-2 hover:bg-blue-50 hover:text-blue-950"
                           >
                             <span>{company.name}</span>
-                            <span className="text-[10px] font-bold uppercase tracking-wide text-blue-600">Open →</span>
+                            <span className="text-[10px] font-bold uppercase tracking-wide text-blue-600">Open ?</span>
                           </button>
                         </li>
                       ))}
@@ -1980,7 +2063,7 @@ async function handleAnalyzeProspect() {
                             className="inline-flex items-center gap-1 rounded-md px-1 text-left font-semibold text-blue-800 underline decoration-blue-300 underline-offset-2 hover:bg-blue-50 hover:text-blue-950"
                           >
                             <span>{company.name}</span>
-                            <span className="text-[10px] font-bold uppercase tracking-wide text-blue-600">Open →</span>
+                            <span className="text-[10px] font-bold uppercase tracking-wide text-blue-600">Open ?</span>
                           </button>
                         </li>
                       ))}
@@ -2015,7 +2098,7 @@ async function handleAnalyzeProspect() {
                             className="inline-flex items-center gap-1 rounded-md px-1 text-left font-semibold text-blue-800 underline decoration-blue-300 underline-offset-2 hover:bg-blue-50 hover:text-blue-950"
                           >
                             <span>{company.name}</span>
-                            <span className="text-[10px] font-bold uppercase tracking-wide text-blue-600">Open →</span>
+                            <span className="text-[10px] font-bold uppercase tracking-wide text-blue-600">Open ?</span>
                           </button>
                         </li>
                       ))}
@@ -2129,6 +2212,15 @@ async function handleAnalyzeProspect() {
             setCompanyPrimarySubIndustryFilter={setCompanyPrimarySubIndustryFilter}
             companyPrimarySubIndustryOptions={companyPrimarySubIndustryOptions}
             clearCompanyFilters={clearCompanyFilters}
+            selectedCompanyIds={selectedCompanyIds}
+            setSelectedCompanyIds={setSelectedCompanyIds}
+            bulkAssignedSalespersonId={bulkAssignedSalespersonId}
+            setBulkAssignedSalespersonId={setBulkAssignedSalespersonId}
+            bulkAssignedSalesManagerId={bulkAssignedSalesManagerId}
+            setBulkAssignedSalesManagerId={setBulkAssignedSalesManagerId}
+            isBulkAssigningCompanies={isBulkAssigningCompanies}
+            bulkCompanyAssignmentMessage={bulkCompanyAssignmentMessage}
+            onApplyBulkCompanyAssignment={handleBulkCompanyAssignment}
             onOpenCompany={loadCompanyDetail}
             isLoadingCompanyDetail={isLoadingCompanyDetail}
           />
@@ -2397,7 +2489,7 @@ async function handleAnalyzeProspect() {
                   <h3 className="text-lg font-bold">Manual CRM Field Mapping</h3>
                   <p className="mt-2 text-sm text-slate-600">
                     Review each CRM field and choose the correct ZoomInfo CSV column. Use
-                    â€œSkip / Not mappedâ€ for optional fields you do not want to import.
+                    ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“Skip / Not mappedÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â for optional fields you do not want to import.
                   </p>
 
                   <div className="mt-4 max-w-4xl overflow-x-auto">
@@ -2489,7 +2581,7 @@ async function handleAnalyzeProspect() {
                                 className="max-w-[220px] truncate px-3 py-3 text-slate-700"
                                 title={row[header]}
                               >
-                                {row[header] || "â€”"}
+                                {row[header] || "ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â"}
                               </td>
                             ))}
                           </tr>
@@ -3421,6 +3513,7 @@ function RoleTestingPanel({
   setCurrentUserRole: (role: AppUserRole) => void;
   permissions: AppPermissions;
 }) {
+
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -3453,7 +3546,7 @@ function RoleTestingPanel({
           <p className="mt-2 text-xs text-slate-500">
             {isLoadingRoleUsers
               ? "Loading users..."
-              : `Current user: ${currentUserDisplayName} · ${formatCoverageType(currentCoverageType)}`}
+              : `Current user: ${currentUserDisplayName} Ãƒâ€šÃ‚Â· ${formatCoverageType(currentCoverageType)}`}
           </p>
           {roleUserError && (
             <p className="mt-2 text-xs font-semibold text-red-700">{roleUserError}</p>
@@ -4535,6 +4628,7 @@ function AdminTagGroup({
   onArchive: (tag: CrmTag) => void;
   onReactivate: (tag: CrmTag) => void;
 }) {
+
   return (
     <section className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
       <h3 className="text-xl font-bold">{title}</h3>
@@ -4571,7 +4665,7 @@ function AdminTagGroup({
                       <div>
                         <p className="font-semibold text-slate-900">{tag.tag_name}</p>
                         <p className="mt-1 text-xs text-slate-500">
-                          Sort {tag.sort_order ?? 100} · {tag.color ?? "blue"} · {tag.status ?? "active"}
+                          Sort {tag.sort_order ?? 100} Ãƒâ€šÃ‚Â· {tag.color ?? "blue"} Ãƒâ€šÃ‚Â· {tag.status ?? "active"}
                         </p>
                       </div>
                       <span
@@ -5248,7 +5342,7 @@ const filteredOpportunities = useMemo(() => {
         <MetricCard
           label="Filtered opportunities"
           value={displayedFunnelOpportunities.length.toString()}
-          note={`Open ${statusCounts.open} · Won ${statusCounts.won} · Lost ${statusCounts.lost}`}
+          note={`Open ${statusCounts.open} Ãƒâ€šÃ‚Â· Won ${statusCounts.won} Ãƒâ€šÃ‚Â· Lost ${statusCounts.lost}`}
         />
         <MetricCard
           label="Pipeline value"
@@ -5258,7 +5352,7 @@ const filteredOpportunities = useMemo(() => {
         <MetricCard
           label="Weighted value"
           value={formatCurrency(weightedPipelineValue)}
-          note="Estimated value × probability"
+          note="Estimated value ÃƒÆ’Ã¢â‚¬â€ probability"
         />
         <MetricCard
           label="Avg. probability"
@@ -5271,7 +5365,7 @@ const filteredOpportunities = useMemo(() => {
         <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
           <p className="font-bold">Funnel opportunities are filtered by current role visibility.</p>
           <p className="mt-1">
-            Current user: <span className="font-semibold">{funnelCurrentUserDisplayName}</span> · Role:{" "}
+            Current user: <span className="font-semibold">{funnelCurrentUserDisplayName}</span> Ãƒâ€šÃ‚Â· Role:{" "}
             <span className="font-semibold">{formatAppUserRole(funnelCurrentUserRole)}</span>
           </p>
           <p className="mt-1 text-xs leading-5">
@@ -5410,7 +5504,7 @@ const filteredOpportunities = useMemo(() => {
               <thead>
                 <tr className="border-b border-slate-200">
                   <th className="py-3 pr-4 font-semibold">Opportunity</th>
-                  <th className="py-3 pr-4 font-semibold">Company</th>
+<th className="py-3 pr-4 font-semibold">Company</th>
                   <th className="py-3 pr-4 font-semibold">Stage</th>
                   <th className="py-3 pr-4 font-semibold">Status</th>
                   <th className="py-3 pr-4 font-semibold">Value</th>
@@ -5754,6 +5848,7 @@ function MetricCard({
   value: string;
   note: string;
 }) {
+
   return (
     <div className="rounded-2xl bg-white p-5 shadow-sm">
       <p className="text-sm font-medium text-slate-500">{label}</p>
@@ -5791,6 +5886,7 @@ function ReviewCard({
 }
 
 function InfoPanel({ title, items }: { title: string; items: string[] }) {
+
   return (
     <div className="rounded-xl border border-slate-200 p-4">
       <h3 className="font-semibold">{title}</h3>
@@ -5894,6 +5990,7 @@ function FollowUpDashboard({
 }
 
 function RecentImports({ imports }: { imports: ImportSummary[] }) {
+
   return (
     <section className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
       <h2 className="text-xl font-bold">Recent Imports</h2>
@@ -5957,6 +6054,7 @@ function CompanyTagFilterPanel({
   companyCategoryTagOptions: string[];
   clearCompanyFilters: () => void;
 }) {
+
   return (
     <section className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
       <div>
@@ -6057,6 +6155,15 @@ function CompaniesSection({
   setCompanyPrimarySubIndustryFilter = () => {},
   companyPrimarySubIndustryOptions = ["All"],
   clearCompanyFilters,
+  selectedCompanyIds = [],
+  setSelectedCompanyIds = () => {},
+  bulkAssignedSalespersonId = "",
+  setBulkAssignedSalespersonId = () => {},
+  bulkAssignedSalesManagerId = "",
+  setBulkAssignedSalesManagerId = () => {},
+  isBulkAssigningCompanies = false,
+  bulkCompanyAssignmentMessage = "",
+  onApplyBulkCompanyAssignment = () => {},
   onOpenCompany,
   isLoadingCompanyDetail,
 }: {
@@ -6090,9 +6197,45 @@ function CompaniesSection({
   setCompanyPrimarySubIndustryFilter: (value: string) => void;
   companyPrimarySubIndustryOptions: string[];
   clearCompanyFilters: () => void;
+  selectedCompanyIds?: string[];
+  setSelectedCompanyIds?: (companyIds: string[]) => void;
+  bulkAssignedSalespersonId?: string;
+  setBulkAssignedSalespersonId?: (value: string) => void;
+  bulkAssignedSalesManagerId?: string;
+  setBulkAssignedSalesManagerId?: (value: string) => void;
+  isBulkAssigningCompanies?: boolean;
+  bulkCompanyAssignmentMessage?: string;
+  onApplyBulkCompanyAssignment?: () => void;
   onOpenCompany: (companyId: string) => void;
   isLoadingCompanyDetail: boolean;
 }) {
+
+  const visibleCompanyIds = companies.map((company) => String(company.id));
+  const selectedVisibleCompanyCount = visibleCompanyIds.filter((companyId) =>
+    selectedCompanyIds.includes(companyId)
+  ).length;
+  const allVisibleCompaniesSelected =
+    visibleCompanyIds.length > 0 && selectedVisibleCompanyCount === visibleCompanyIds.length;
+
+  function toggleCompanySelection(companyId: string) {
+    setSelectedCompanyIds(
+      selectedCompanyIds.includes(companyId)
+        ? selectedCompanyIds.filter((selectedCompanyId) => selectedCompanyId !== companyId)
+        : [...selectedCompanyIds, companyId]
+    );
+  }
+
+  function toggleAllVisibleCompanies() {
+    if (allVisibleCompaniesSelected) {
+      setSelectedCompanyIds(
+        selectedCompanyIds.filter((companyId) => !visibleCompanyIds.includes(companyId))
+      );
+      return;
+    }
+
+    setSelectedCompanyIds(Array.from(new Set([...selectedCompanyIds, ...visibleCompanyIds])));
+  }
+
   return (
     <section className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -6113,8 +6256,8 @@ function CompaniesSection({
         <div className="mt-6 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
           <p className="font-bold">Companies are filtered by current role visibility.</p>
           <p className="mt-1">
-            Current user: <span className="font-semibold">{currentUserDisplayName}</span> · Role:{" "}
-            <span className="font-semibold">{formatAppUserRole(currentUserRole)}</span> · Coverage:{" "}
+            Current user: <span className="font-semibold">{currentUserDisplayName}</span> Ãƒâ€šÃ‚Â· Role:{" "}
+            <span className="font-semibold">{formatAppUserRole(currentUserRole)}</span> Ãƒâ€šÃ‚Â· Coverage:{" "}
             <span className="font-semibold">{formatCoverageType(currentCoverageType)}</span>
           </p>
           <p className="mt-1 text-xs leading-5">
@@ -6202,7 +6345,7 @@ function CompaniesSection({
                 {companyOwnerOptions.map((owner) => (
                   <option key={owner.id} value={owner.display_name}>
                     {owner.display_name}
-                    {owner.user_role === "admin" ? " — Admin" : ""}
+                    {owner.user_role === "admin" ? " ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Admin" : ""}
                   </option>
                 ))}
               </select>
@@ -6251,6 +6394,81 @@ function CompaniesSection({
         </div>
       </div>
 
+      <div className="mt-6 rounded-2xl border border-blue-200 bg-blue-50 p-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="text-sm font-bold text-blue-900">Bulk Company Assignment</p>
+            <p className="mt-1 text-xs leading-5 text-blue-800">
+              Select companies below, then assign the selected records to one salesperson and/or one sales manager.
+            </p>
+            <p className="mt-2 text-xs font-semibold text-blue-900">
+              Selected: {selectedCompanyIds.length} total Ãƒâ€šÃ‚Â· {selectedVisibleCompanyCount} visible
+            </p>
+          </div>
+
+          <div className="grid flex-1 gap-3 md:grid-cols-3">
+            <div>
+              <label className="text-xs font-bold uppercase tracking-wide text-blue-900">Salesperson / Rep</label>
+              <select
+                value={bulkAssignedSalespersonId}
+                onChange={(event) => setBulkAssignedSalespersonId(event.target.value)}
+                className="mt-2 w-full rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              >
+                <option value="">Do not change</option>
+                {companyOwnerOptions
+                  .filter((user) => !user.status || user.status === "active")
+                  .map((user) => (
+                    <option key={`bulk-rep-${user.id}`} value={user.id}>
+                      {user.display_name || user.email}
+                    </option>
+                  ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold uppercase tracking-wide text-blue-900">Sales Manager</label>
+              <select
+                value={bulkAssignedSalesManagerId}
+                onChange={(event) => setBulkAssignedSalesManagerId(event.target.value)}
+                className="mt-2 w-full rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              >
+                <option value="">Do not change</option>
+                {companyOwnerOptions
+                  .filter(
+                    (user) =>
+                      (!user.status || user.status === "active") &&
+                      (user.user_role === "sales_manager" || user.user_role === "admin")
+                  )
+                  .map((user) => (
+                    <option key={`bulk-manager-${user.id}`} value={user.id}>
+                      {user.display_name || user.email}
+                    </option>
+                  ))}
+              </select>
+            </div>
+
+            <button
+              type="button"
+              onClick={onApplyBulkCompanyAssignment}
+              disabled={
+                isBulkAssigningCompanies ||
+                selectedCompanyIds.length === 0 ||
+                (!bulkAssignedSalespersonId && !bulkAssignedSalesManagerId)
+              }
+              className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+            >
+              {isBulkAssigningCompanies ? "Assigning..." : "Apply Bulk Assignment"}
+            </button>
+          </div>
+        </div>
+
+        {bulkCompanyAssignmentMessage && (
+          <p className="mt-3 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-blue-900 ring-1 ring-blue-100">
+            {bulkCompanyAssignmentMessage}
+          </p>
+        )}
+      </div>
+
       {companies.length === 0 ? (
         <p className="mt-6 rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-600">
           No companies match the current search or filters.
@@ -6260,6 +6478,15 @@ function CompaniesSection({
           <table className="w-full min-w-[980px] border-collapse text-left text-sm">
             <thead>
               <tr className="border-b border-slate-200">
+                <th className="py-3 pr-4 font-semibold">
+                  <input
+                    type="checkbox"
+                    checked={allVisibleCompaniesSelected}
+                    onChange={toggleAllVisibleCompanies}
+                    aria-label="Select all visible companies"
+                    className="h-4 w-4 rounded border-slate-300 text-blue-700 focus:ring-blue-500"
+                  />
+                </th>
                 <th className="py-3 pr-4 font-semibold">Company</th>
                 <th className="py-3 pr-4 font-semibold">Industry</th>
                 <th className="py-3 pr-4 font-semibold">Location</th>
@@ -6276,6 +6503,15 @@ function CompaniesSection({
 
                 return (
                   <tr key={company.id} className="border-b border-slate-100 align-top">
+                    <td className="py-3 pr-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedCompanyIds.includes(String(company.id))}
+                        onChange={() => toggleCompanySelection(String(company.id))}
+                        aria-label={`Select ${company.company_name}`}
+                        className="h-4 w-4 rounded border-slate-300 text-blue-700 focus:ring-blue-500"
+                      />
+                    </td>
                     <td className="py-3 pr-4">
                       <button
                         onClick={() => onOpenCompany(company.id)}
@@ -6295,14 +6531,14 @@ function CompaniesSection({
                       {[company.city, company.state].filter(Boolean).join(", ") || "Not provided"}
                     </td>
                     <td className="py-3 pr-4 text-slate-700">
-                      {company.employee_count ?? "â€”"}
+                      {company.employee_count ?? "ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â"}
                     </td>
                     <td className="py-3 pr-4 font-semibold">
-                      {prospect?.priority_score ?? "â€”"}
+                      {prospect?.priority_score ?? "ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â"}
                     </td>
                     <td className="py-3 pr-4">
                       <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800">
-                        {prospect?.priority_tier ?? "â€”"}
+                        {prospect?.priority_tier ?? "ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â"}
                       </span>
                     </td>
                     <td className="max-w-[320px] py-3 pr-4 text-slate-700">
@@ -6347,6 +6583,7 @@ function ContactTagFilterPanel({
   contactCategoryTagOptions: string[];
   clearContactFilters: () => void;
 }) {
+
   return (
     <section className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
       <div>
@@ -6434,6 +6671,7 @@ function ContactsSection({
   contacts: ContactSummary[];
   totalContactCount: number;
 }) {
+
   return (
     <section className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
       <h2 className="text-xl font-bold">Contacts</h2>
@@ -6451,7 +6689,7 @@ function ContactsSection({
             <thead>
               <tr className="border-b border-slate-200">
                 <th className="py-3 pr-4 font-semibold">Contact</th>
-                <th className="py-3 pr-4 font-semibold">Company</th>
+<th className="py-3 pr-4 font-semibold">Company</th>
                 <th className="py-3 pr-4 font-semibold">Title</th>
                 <th className="py-3 pr-4 font-semibold">Function</th>
                 <th className="py-3 pr-4 font-semibold">Email</th>
@@ -6476,9 +6714,9 @@ function ContactsSection({
                   <td className="py-3 pr-4 text-slate-700">
                     {contact.function_area || contact.department || "Not provided"}
                   </td>
-                  <td className="py-3 pr-4 text-slate-700">{contact.email || "â€”"}</td>
-                  <td className="py-3 pr-4 text-slate-700">{contact.direct_phone || "â€”"}</td>
-                  <td className="py-3 pr-4 text-slate-700">{contact.mobile_phone || "â€”"}</td>
+                  <td className="py-3 pr-4 text-slate-700">{contact.email || "ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â"}</td>
+                  <td className="py-3 pr-4 text-slate-700">{contact.direct_phone || "ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â"}</td>
+                  <td className="py-3 pr-4 text-slate-700">{contact.mobile_phone || "ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â"}</td>
                 </tr>
               ))}
             </tbody>
@@ -6602,11 +6840,11 @@ function CompanyDetailSection({
             />
             <SmallScoreCard
               label="Tier"
-              value={hasAiAnalysis && primaryProspect ? displayValue(primaryProspect.priority_tier) : "—"}
+              value={hasAiAnalysis && primaryProspect ? displayValue(primaryProspect.priority_tier) : "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}
             />
             <SmallScoreCard
               label="Fit"
-              value={hasAiAnalysis && primaryProspect ? displayValue(primaryProspect.fit_rating) : "—"}
+              value={hasAiAnalysis && primaryProspect ? displayValue(primaryProspect.fit_rating) : "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}
             />
           </div>
         </div>
@@ -7382,7 +7620,7 @@ function CompanyOwnerPanel({
             {owners.map((owner) => (
               <option key={owner.id} value={owner.id}>
                 {owner.display_name}
-                {owner.user_role === "admin" ? " — Admin" : ""}
+                {owner.user_role === "admin" ? " ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Admin" : ""}
               </option>
             ))}
           </select>
@@ -9124,6 +9362,7 @@ function TagAssignmentColumn({
   onAddTag: () => void;
   onRemoveTag: (tagId: string) => void;
 }) {
+
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
       <h4 className="text-lg font-bold text-slate-900">{title}</h4>
@@ -9145,7 +9384,7 @@ function TagAssignmentColumn({
                 className="rounded-full px-1 text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:text-slate-400"
                 aria-label={`Remove ${tag.crm_tags?.tag_name || "tag"}`}
               >
-                ×
+                ÃƒÆ’Ã¢â‚¬â€
               </button>
             </span>
           ))}
@@ -9427,6 +9666,7 @@ function ContactTagAssignmentRow({
   onAddTag: () => void;
   onRemoveTag: (tagId: string) => void;
 }) {
+
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-3">
       <p className="text-sm font-semibold text-slate-800">{title}</p>
@@ -9448,7 +9688,7 @@ function ContactTagAssignmentRow({
                 className="rounded-full px-1 text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:text-slate-400"
                 aria-label={`Remove ${tag.crm_tags?.tag_name || "tag"}`}
               >
-                ×
+                ÃƒÆ’Ã¢â‚¬â€
               </button>
             </span>
           ))}
@@ -9482,6 +9722,7 @@ function ContactTagAssignmentRow({
 }
 
 function SmallScoreCard({ label, value }: { label: string; value: string }) {
+
   return (
     <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
       <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">{label}</p>
@@ -9497,6 +9738,7 @@ function DetailCard({
   title: string;
   children: ReactNode;
 }) {
+
   return (
     <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
       <h3 className="text-lg font-bold">{title}</h3>
@@ -9506,6 +9748,7 @@ function DetailCard({
 }
 
 function DetailRow({ label, value }: { label: string; value: unknown }) {
+
   return (
     <div className="border-b border-slate-100 py-2 text-sm last:border-b-0">
       <p className="font-semibold text-slate-700">{label}</p>
@@ -9525,6 +9768,7 @@ function ReadableListCard({
   primaryKeys: string[];
   secondaryKeys: string[];
 }) {
+
   return (
     <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
       <h3 className="text-lg font-bold">{title}</h3>
@@ -9597,6 +9841,8 @@ function ReadableListItem({
     </div>
   );
 }
+
+
 
 
 

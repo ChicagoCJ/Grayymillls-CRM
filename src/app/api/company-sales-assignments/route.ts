@@ -1,4 +1,4 @@
-﻿import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { canAssignSalesCoverage, getPermissionContext, logSoftPermissionCheck } from "../_shared/permissions";
 
@@ -101,29 +101,52 @@ export async function PATCH(request: Request) {
     const supabase = getSupabaseAdmin();
     const payload = await request.json();
 
-    if (!payload.companyId) {
+    const rawCompanyIds = Array.isArray(payload.companyIds)
+      ? payload.companyIds
+      : payload.companyId
+        ? [payload.companyId]
+        : [];
+
+    const companyIds = Array.from(
+      new Set(
+        rawCompanyIds
+          .map((companyId: unknown) => (typeof companyId === "string" ? companyId.trim() : ""))
+          .filter(Boolean)
+      )
+    );
+
+    if (companyIds.length === 0) {
       return NextResponse.json(
-        { error: "companyId is required." },
+        { error: "companyId or companyIds is required." },
         { status: 400 }
       );
     }
 
+    const update: Record<string, string | null> = {
+      updated_at: new Date().toISOString(),
+    };
+
+    if (Object.prototype.hasOwnProperty.call(payload, "assignedSalespersonId")) {
+      update.assigned_salesperson_id = cleanAssignmentId(payload.assignedSalespersonId);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(payload, "assignedSalesManagerId")) {
+      update.assigned_sales_manager_id = cleanAssignmentId(payload.assignedSalesManagerId);
+    }
+
     const { data, error } = await supabase
       .from("companies")
-      .update({
-        assigned_salesperson_id: cleanAssignmentId(payload.assignedSalespersonId),
-        assigned_sales_manager_id: cleanAssignmentId(payload.assignedSalesManagerId),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", payload.companyId)
-      .select("id, assigned_salesperson_id, assigned_sales_manager_id")
-      .single();
+      .update(update)
+      .in("id", companyIds)
+      .select("id, assigned_salesperson_id, assigned_sales_manager_id");
 
     if (error) throw error;
 
     return NextResponse.json({
       status: "updated",
-      companyAssignment: data,
+      updatedCount: data?.length ?? 0,
+      companyAssignment: data?.[0] ?? null,
+      companyAssignments: data ?? [],
     });
   } catch (error) {
     return NextResponse.json(
@@ -137,6 +160,7 @@ export async function PATCH(request: Request) {
     );
   }
 }
+
 
 
 
