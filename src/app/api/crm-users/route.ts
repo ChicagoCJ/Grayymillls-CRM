@@ -13,6 +13,8 @@ type CrmUserPayload = {
   phone?: string | null;
   notes?: string | null;
   sortOrder?: number | string | null;
+  userRole?: string | null;
+  coverageType?: string | null;
   status?: "active" | "archived";
 };
 
@@ -244,5 +246,7 @@ export async function PATCH(request: Request) {
     );
   }
 }
+
+
 
 

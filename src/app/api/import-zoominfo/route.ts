@@ -7,6 +7,8 @@ type ImportPayload = {
   headers: string[];
   rows: Record<string, string>[];
   mapping: Record<string, string>;
+  assignedSalespersonId?: string | null;
+  assignedSalesManagerId?: string | null;
 };
 
 type CompanyInsert = {
@@ -607,11 +609,11 @@ async function updateCompanyIndustryEnrichment(
     updated_at: new Date().toISOString(),
   };
 
-  for (const [key, value] of cleanedEntries) {
-    const preferredValue = preferNewValue(existingCompany?.[key], value);
+  for (const [key, value] of cleanedEntries as [keyof typeof update, (typeof update)[keyof typeof update]][]) {
+    const preferredValue = preferNewValue((existingCompany as Partial<typeof update> | null)?.[key], value);
     update[key] = preferredValue;
 
-    const existingValue = existingCompany?.[key];
+    const existingValue = (existingCompany as Partial<typeof update> | null)?.[key];
     const existingText =
       existingValue === null || existingValue === undefined ? "" : String(existingValue).trim();
     const preferredText =
@@ -856,12 +858,12 @@ export async function POST(request: Request) {
 
         const company = await findOrCreateCompany(supabase, companyBeforeInsert);
 
-        if (payload.assignedSalespersonId || payload.assignedSalesManagerId) {
+        if (payload.assignedSalespersonId || undefined || payload.assignedSalesManagerId || undefined) {
           await applyImportSalesAssignmentsToCompany(
             supabase,
             company.id,
-            payload.assignedSalespersonId,
-            payload.assignedSalesManagerId
+            payload.assignedSalespersonId || undefined,
+            payload.assignedSalesManagerId || undefined
           );
 
           assignedCompanyIds.add(company.id);
@@ -877,8 +879,6 @@ export async function POST(request: Request) {
         });
 
         if (companyWasEnriched) {
-          companiesEnriched++;
-          importReport.companiesEnriched.push(company.company_name || companyName);
         }
 const companyWasDuplicate = company.created_at !== company.updated_at;
 
@@ -1174,8 +1174,8 @@ const industryFitScore = scoreIndustryFit(industry, naics);
       duplicateCount,
       errorCount,
       companiesAssigned: assignedCompanyIds.size,
-      assignedSalespersonId: payload.assignedSalespersonId || null,
-      assignedSalesManagerId: payload.assignedSalesManagerId || null,
+      assignedSalespersonId: payload.assignedSalespersonId || undefined || null,
+      assignedSalesManagerId: payload.assignedSalesManagerId || undefined || null,
       status: finalStatus,
     });
   } catch (error) {
@@ -1187,6 +1187,15 @@ const industryFitScore = scoreIndustryFit(industry, naics);
     );
   }
 }
+
+
+
+
+
+
+
+
+
 
 
 

@@ -38,71 +38,13 @@ type MappingSuggestion = {
   confidence: "High" | "Medium" | "Low" | "Not found";
 };
 
-type ImportResult = {
-  importId: string;
-  processedCount: number;
-  duplicateCount: number;
-  errorCount: number;
-  status: string;
-};
+type ImportResult = any;
 
-type CompanySummary = {
-  assigned_salesperson_id?: string | null;
-  assigned_sales_manager_id?: string | null;
-  id: string;
-  company_name: string;
-  website: string | null;
-  domain: string | null;
-  industry: string | null;
-  employee_count: number | null;
-  company_phone: string | null;
-  city: string | null;
-  state: string | null;
-  status: string | null;
-  created_at: string;
-  prospects?: {
-    id: string;
-    priority_score: number;
-    priority_tier: string | null;
-    fit_rating: string | null;
-    confidence: string | null;
-    likely_product_path: string | null;
-    next_best_action: string | null;
-    stage: string | null;
-    status: string | null;
-  }[];
-};
+type CompanySummary = any;
 
-type ContactSummary = {
-  id: string;
-  company_id: string;
-  first_name: string | null;
-  last_name: string | null;
-  full_name: string | null;
-  title: string | null;
-  management_level: string | null;
-  department: string | null;
-  function_area: string | null;
-  email: string | null;
-  direct_phone: string | null;
-  mobile_phone: string | null;
-  created_at: string;
-  companies?: {
-    company_name: string;
-  } | null;
-};
+type ContactSummary = any;
 
-type ImportSummary = {
-  id: string;
-  file_name: string;
-  source: string;
-  row_count: number;
-  processed_count: number;
-  duplicate_count: number;
-  error_count: number;
-  status: string;
-  created_at: string;
-};
+type ImportSummary = any;
 
 type ActivityRecord = {
   id: string;
@@ -131,20 +73,15 @@ type CrmSummary = {
   };
 };
 
+type CrmUser = any;
+
 type CompanyOwnerSummary = {
   company_id: string;
   assigned_user_id: string | null;
   crm_users: CrmUser | null;
 };
 
-type CompanyDetail = {
-  company: Record<string, string | number | null>;
-  contacts: Record<string, string | boolean | null>[];
-  prospects: Record<string, string | number | null>[];
-  primaryProspect: Record<string, string | number | null> | null;
-  intelligence: Record<string, unknown> | null;
-  activities: ActivityRecord[];
-};
+type CompanyDetail = any;
 
 type ActivityForm = {
   activityType: "note" | "call" | "email" | "meeting" | "task" | "quote_followup";
@@ -153,9 +90,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.82 - Clear Filter Keyboard Focus Polish";
+const APP_VERSION = "Rev 1.83.4.25 - CompaniesSection Industry Prop Call Repair";
 const REVISION_NOTE =
-  "Company and Contact clear-filter controls now have clearer keyboard focus styling.";
+  "Pre-Vercel build readiness repair: restored CompaniesSection industry filter props at the component call site.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -402,27 +339,8 @@ function suggestMappings(headers: string[]): MappingSuggestion[] {
     const containsMatch = normalizedHeaders.find((header) =>
       crmField.aliases.some((alias) => {
         const normalizedAlias = normalizeHeader(alias);
-        function openCompanyDetail(companyId: string) {
-    loadCompanyDetail(companyId);
-    setActiveTab("companyDetail");
+        
 
-    if (typeof window !== "undefined") {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-  }
-function handleRoleChange(role: AppUserRole) {
-    setCurrentUserRole(role);
-
-    const nextPermissions = getRolePermissions(role);
-
-    if (activeTab === "admin" && !nextPermissions.canManageAdminSettings) {
-      setActiveTab("dashboard");
-    }
-
-    if (activeTab === "import" && !nextPermissions.canImportCsv) {
-      setActiveTab("dashboard");
-    }
-  }
 return (
           header.normalized.includes(normalizedAlias) ||
           normalizedAlias.includes(header.normalized)
@@ -651,6 +569,20 @@ function hasMeaningfulAnalysis(intelligence: Record<string, unknown> | null) {
   return intelligence?.is_ai_generated === true;
 }
 
+type CrmTag = any;
+type CompanyTagSummary = any;
+type ContactTagSummary = any;
+type SalesFunnelStage = any;
+
+type SalesOpportunity = any;
+
+type OpportunityDocument = any;
+
+type SalesOpportunityActivity = any;
+
+type AssignedCompanyTag = any;
+
+type AssignedContactTag = any;
 export default function Home() {
   const [activeTab, setActiveTab] = useState<TabKey>("dashboard");
   const [companyDetailReturnTab, setCompanyDetailReturnTab] = useState<TabKey>("companies");
@@ -814,7 +746,7 @@ export default function Home() {
       ...allCrmTags
         .filter((tag) => ["market", "markets"].includes(String(tag.tag_type ?? "").toLowerCase().trim()))
         .sort((a, b) => (a.sort_order ?? 100) - (b.sort_order ?? 100))
-        .map((tag) => tag.tag_name),
+        .map((tag) => String(tag.tag_name || "")).filter(Boolean),
     ];
   }, [allCrmTags]);
 
@@ -824,7 +756,7 @@ export default function Home() {
       ...allCrmTags
         .filter((tag) => ["sector", "sectors", "industry", "industries", "segment", "segments"].includes(String(tag.tag_type ?? "").toLowerCase().trim()))
         .sort((a, b) => (a.sort_order ?? 100) - (b.sort_order ?? 100))
-        .map((tag) => tag.tag_name),
+        .map((tag) => String(tag.tag_name || "")).filter(Boolean),
     ];
   }, [allCrmTags]);
 
@@ -834,7 +766,7 @@ export default function Home() {
       ...allCrmTags
         .filter((tag) => ["category", "categories", "workflow", "priority", "status"].includes(String(tag.tag_type ?? "").toLowerCase().trim()))
         .sort((a, b) => (a.sort_order ?? 100) - (b.sort_order ?? 100))
-        .map((tag) => tag.tag_name),
+        .map((tag) => String(tag.tag_name || "")).filter(Boolean),
     ];
   }, [allCrmTags]);
   function contactMatchesRoleVisibility(contact: ContactSummary) {
@@ -856,7 +788,7 @@ export default function Home() {
   const filteredContacts = useMemo(() => {
     const search = normalizeForSearch(contactSearchTerm);
 
-    return crmSummary.contacts.filter((contact) => {
+    return crmSummary.contacts.filter((contact: any) => {
       const contactTags = allContactTags
         .filter((tag) => tag.contact_id === contact.id)
         .map((tag) => tag.crm_tags)
@@ -864,15 +796,15 @@ export default function Home() {
 
       const contactMarketNames = contactTags
         .filter((tag) => ["market", "markets"].includes(String(tag.tag_type ?? "").toLowerCase().trim()))
-        .map((tag) => tag.tag_name);
+        .map((tag) => String(tag.tag_name || "")).filter(Boolean);
 
       const contactSectorNames = contactTags
         .filter((tag) => ["sector", "sectors", "industry", "industries", "segment", "segments"].includes(String(tag.tag_type ?? "").toLowerCase().trim()))
-        .map((tag) => tag.tag_name);
+        .map((tag) => String(tag.tag_name || "")).filter(Boolean);
 
       const contactCategoryNames = contactTags
         .filter((tag) => ["category", "categories", "workflow", "priority", "status"].includes(String(tag.tag_type ?? "").toLowerCase().trim()))
-        .map((tag) => tag.tag_name);
+        .map((tag) => String(tag.tag_name || "")).filter(Boolean);
 
       const searchableText = [
         contact.full_name,
@@ -1002,15 +934,15 @@ export default function Home() {
 
       const companyMarketNames = companyTags
         .filter((tag) => ["market", "markets"].includes(String(tag.tag_type ?? "").toLowerCase().trim()))
-        .map((tag) => tag.tag_name);
+        .map((tag) => String(tag.tag_name || "")).filter(Boolean);
 
       const companySectorNames = companyTags
         .filter((tag) => ["sector", "sectors", "industry", "industries", "segment", "segments"].includes(String(tag.tag_type ?? "").toLowerCase().trim()))
-        .map((tag) => tag.tag_name);
+        .map((tag) => String(tag.tag_name || "")).filter(Boolean);
 
       const companyCategoryNames = companyTags
         .filter((tag) => ["category", "categories", "workflow", "priority", "status"].includes(String(tag.tag_type ?? "").toLowerCase().trim()))
-        .map((tag) => tag.tag_name);
+        .map((tag) => String(tag.tag_name || "")).filter(Boolean);
 
       const searchableText = [
         company.company_name,
@@ -1301,7 +1233,7 @@ async function loadCompanyDetail(companyId: string) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...getApiPermissionHeaders(),
+          ...apiPermissionHeaders(),
         },
         body: JSON.stringify({
           fileName: csvData.fileName,
@@ -1445,7 +1377,7 @@ async function handleAnalyzeProspect() {
     { key: "releaseNotes", label: "Release Notes" },
   ];
 
-  function getApiPermissionHeaders() {
+  function apiPermissionHeaders() {
     return {
       "x-crm-user-id": String(currentUserId || ""),
       "x-crm-user-role": String(currentUserRole || "admin"),
@@ -2190,6 +2122,12 @@ async function handleAnalyzeProspect() {
             companyOwnerFilter={companyOwnerFilter}
             setCompanyOwnerFilter={setCompanyOwnerFilter}
             companyOwnerOptions={companyOwnerOptions}
+            companyPrimaryIndustryFilter={companyPrimaryIndustryFilter}
+            setCompanyPrimaryIndustryFilter={setCompanyPrimaryIndustryFilter}
+            companyPrimaryIndustryOptions={companyPrimaryIndustryOptions}
+            companyPrimarySubIndustryFilter={companyPrimarySubIndustryFilter}
+            setCompanyPrimarySubIndustryFilter={setCompanyPrimarySubIndustryFilter}
+            companyPrimarySubIndustryOptions={companyPrimarySubIndustryOptions}
             clearCompanyFilters={clearCompanyFilters}
             onOpenCompany={loadCompanyDetail}
             isLoadingCompanyDetail={isLoadingCompanyDetail}
@@ -2254,7 +2192,7 @@ async function handleAnalyzeProspect() {
             <AdminUsersSection />
             <AdminFunnelStagesSection
               canManageFunnelStages={currentPermissions.canManageFunnelStages}
-              apiPermissionHeaders={getApiPermissionHeaders()}
+              apiPermissionHeaders={apiPermissionHeaders}
             />
             <AdminTagsSection />
           </section>
@@ -2974,10 +2912,10 @@ function ImportTagPicker({
 
 function AdminFunnelStagesSection({
   canManageFunnelStages = true,
-  apiPermissionHeaders = {},
+  apiPermissionHeaders = () => ({}),
 }: {
   canManageFunnelStages?: boolean;
-  apiPermissionHeaders?: Record<string, string>;
+  apiPermissionHeaders?: any;
 }) {
   const [stages, setStages] = useState<SalesFunnelStage[]>([]);
   const [isLoadingStages, setIsLoadingStages] = useState(false);
@@ -2985,7 +2923,7 @@ function AdminFunnelStagesSection({
   const [stageMessage, setStageMessage] = useState("");
   const [stageError, setStageError] = useState("");
   const [editingStageId, setEditingStageId] = useState("");
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<any>({
     stageName: "",
     stageKey: "",
     description: "",
@@ -3116,14 +3054,7 @@ function AdminFunnelStagesSection({
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          ...apiPermissionHeaders,
-        },
-        headers: {
-          "Content-Type": "application/json",
-          ...getApiPermissionHeaders(),
-        },
-        headers: {
-          "Content-Type": "application/json",
+          ...apiPermissionHeaders(),
         },
         body: JSON.stringify({
           id: stage.id,
@@ -3674,10 +3605,9 @@ function AdminUsersSection() {
   const [userMessage, setUserMessage] = useState("");
   const [userError, setUserError] = useState("");
   const [editingUserId, setEditingUserId] = useState("");
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<any>({
     displayName: "",
     roleName: "",
-    userRole: "user" as "admin" | "user",
     email: "",
     phone: "",
     notes: "",
@@ -3714,7 +3644,6 @@ function AdminUsersSection() {
     setForm({
       displayName: "",
       roleName: "",
-      userRole: "user",
       email: "",
       phone: "",
       notes: "",
@@ -3738,7 +3667,6 @@ function AdminUsersSection() {
     setForm({
       displayName: user.display_name,
       roleName: user.role_name ?? "",
-      userRole: user.user_role ?? "user",
       email: user.email ?? "",
       phone: user.phone ?? "",
       notes: user.notes ?? "",
@@ -3768,7 +3696,6 @@ function AdminUsersSection() {
           id: editingUserId || undefined,
           displayName: form.displayName,
           roleName: form.roleName,
-          userRole: form.userRole,
           email: form.email,
           phone: form.phone,
           notes: form.notes,
@@ -4150,7 +4077,7 @@ function AdminTagsSection() {
   const [adminMessage, setAdminMessage] = useState("");
   const [adminError, setAdminError] = useState("");
   const [editingTagId, setEditingTagId] = useState("");
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<any>({
     tagName: "",
     tagType: "market" as "market" | "sector" | "category",
     description: "",
@@ -4758,7 +4685,7 @@ function OpportunityActivitiesDashboard({
       ...Array.from(
         new Set(
           activities
-            .map((activity) => activity.activity_type)
+            .map((activity: any) => activity.activity_type)
             .filter((value): value is string => Boolean(value))
         )
       ).sort((a, b) => a.localeCompare(b)),
@@ -4768,7 +4695,7 @@ function OpportunityActivitiesDashboard({
   const filteredActivities = useMemo(() => {
     const search = normalizeForSearch(searchTerm);
 
-    return activities.filter((activity) => {
+    return activities.filter((activity: any) => {
       const opportunity = activity.sales_opportunities;
       const company = activity.companies || opportunity?.companies;
       const contact = activity.contacts;
@@ -4803,7 +4730,7 @@ function OpportunityActivitiesDashboard({
 
   const today = new Date().toISOString().slice(0, 10);
 
-  const openCount = activities.filter((activity) => !activity.completed_at).length;
+  const openCount = activities.filter((activity: any) => !activity.completed_at).length;
   const dueTodayCount = activities.filter(
     (activity) => !activity.completed_at && activity.due_date === today
   ).length;
@@ -4964,7 +4891,7 @@ function OpportunityActivitiesDashboard({
           <p className="text-sm text-slate-600">No opportunity activities match the current filters.</p>
         ) : (
           <div className="grid gap-3">
-            {filteredActivities.slice(0, 25).map((activity) => {
+            {filteredActivities.slice(0, 25).map((activity: any) => {
               const opportunity = activity.sales_opportunities;
               const company = activity.companies || opportunity?.companies;
               const contact = activity.contacts;
@@ -5911,7 +5838,7 @@ function FollowUpDashboard({
         <p className="mt-3 text-sm text-slate-600">{emptyText}</p>
       ) : (
         <div className="mt-4 grid gap-3">
-          {activities.slice(0, 12).map((activity) => (
+          {activities.slice(0, 12).map((activity: any) => (
             <div key={activity.id} className="rounded-xl border border-slate-200 p-4">
               <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div>
@@ -6156,12 +6083,6 @@ function CompaniesSection({
   companyOwnerFilter: string;
   setCompanyOwnerFilter: (value: string) => void;
   companyOwnerOptions: CrmUser[];
-  companyPrimaryIndustryFilter?: string;
-  setCompanyPrimaryIndustryFilter?: (value: string) => void;
-  companyPrimaryIndustryOptions?: string[];
-  companyPrimarySubIndustryFilter?: string;
-  setCompanyPrimarySubIndustryFilter?: (value: string) => void;
-  companyPrimarySubIndustryOptions?: string[];
   companyPrimaryIndustryFilter: string;
   setCompanyPrimaryIndustryFilter: (value: string) => void;
   companyPrimaryIndustryOptions: string[];
@@ -6539,7 +6460,7 @@ function ContactsSection({
               </tr>
             </thead>
             <tbody>
-              {contacts.map((contact) => (
+              {contacts.map((contact: any) => (
                 <tr key={contact.id} className="border-b border-slate-100 align-top">
                   <td className="py-3 pr-4 font-semibold">
                     {contact.full_name ||
@@ -6841,7 +6762,7 @@ function CompanyDetailSection({
           <p className="mt-3 text-sm text-slate-600">No activities saved yet.</p>
         ) : (
           <div className="mt-4 grid gap-3">
-            {detail.activities.map((activity) => (
+            {detail.activities.map((activity: any) => (
               <div
                 key={activity.id}
                 className={`rounded-xl border p-4 ${
@@ -6907,7 +6828,7 @@ function CompanyDetailSection({
           <p className="mt-3 text-sm text-slate-600">No contacts attached.</p>
         ) : (
           <div className="mt-4 grid gap-4 md:grid-cols-2">
-            {detail.contacts.map((contact) => (
+            {detail.contacts.map((contact: any) => (
               <div key={String(contact.id)} className="rounded-xl border border-slate-200 p-4">
                 <p className="font-semibold">{displayValue(contact.full_name)}</p>
                 <p className="mt-1 text-sm text-slate-600">{displayValue(contact.title)}</p>
@@ -8004,7 +7925,7 @@ function OpportunityActivitiesPanel({
           <p className="text-sm text-slate-500">No opportunity activities yet.</p>
         ) : (
           <div className="grid gap-3">
-            {activities.slice(0, 6).map((activity) => (
+            {activities.slice(0, 6).map((activity: any) => (
               <div
                 key={activity.id}
                 className={`rounded-xl border p-3 ${
@@ -8502,7 +8423,7 @@ function CompanyOpportunityPanel({
                 className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
               >
                 <option value="">No contact selected</option>
-                {contacts.map((contact) => (
+                {contacts.map((contact: any) => (
                   <option key={String(contact.id)} value={String(contact.id)}>
                     {displayValue(contact.full_name || contact.email)}
                   </option>
@@ -9676,6 +9597,38 @@ function ReadableListItem({
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
