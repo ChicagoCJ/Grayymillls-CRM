@@ -90,9 +90,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.84.1 - Bulk Assignment Dropdown Repair";
+const APP_VERSION = "Rev 1.84.2 - Bulk Assignment Manager and Text Repair";
 const REVISION_NOTE =
-  "Bulk company assignment added; repaired CRM user dropdown source and selected-count display.";
+  "Repaired bulk assignment selected-count display and broadened manager-role recognition.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1797,10 +1797,10 @@ async function handleAnalyzeProspect() {
                   </span>
                   {currentUserId ? (
                     <>
-                      {" "}ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· User ID: <span className="font-mono text-xs">{currentUserId}</span>
+                      {" "}ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· User ID: <span className="font-mono text-xs">{currentUserId}</span>
                     </>
                   ) : (
-                    <> ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Manual role test mode</>
+                    <> ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Manual role test mode</>
                   )}
                 </p>
               </div>
@@ -1851,7 +1851,7 @@ async function handleAnalyzeProspect() {
                 <p className="mt-1 text-2xl font-bold text-blue-950">
                   {visibleDueTodayFollowUpCount} <span className="text-sm font-semibold text-blue-700">of {totalDueTodayFollowUpCount}</span>
                 </p>
-                <p className="mt-1 text-xs text-blue-800">TodayÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢s visible follow-ups</p>
+                <p className="mt-1 text-xs text-blue-800">TodayÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢s visible follow-ups</p>
               </div>
 
               <div className="rounded-xl bg-white p-3 ring-1 ring-blue-100">
@@ -1878,7 +1878,7 @@ async function handleAnalyzeProspect() {
                   Review company assignment health when role visibility is active. Open details to use company-level links.
                 </p>
                 <p className="mt-1 text-xs font-semibold text-blue-900">
-                  Unassigned: {unassignedSalespersonCompanyCount} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Inactive/Missing: {inactiveCoverageCompanyCount} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Current User Coverage: {currentUserAssignedCompanyCount}
+                  Unassigned: {unassignedSalespersonCompanyCount} ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Inactive/Missing: {inactiveCoverageCompanyCount} ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Current User Coverage: {currentUserAssignedCompanyCount}
                 </p>
                 <p className="mt-1 text-xs font-semibold text-blue-900">
                   Coverage Status:{" "}
@@ -1995,7 +1995,7 @@ async function handleAnalyzeProspect() {
                 </div>
                 {diagnosticsCompanySearchTerm && (
                   <p className="mt-2 text-[11px] font-semibold text-amber-800">
-                    Filtering visible diagnostic lists by ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“{diagnosticsCompanySearch}ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â
+                    Filtering visible diagnostic lists by ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ{diagnosticsCompanySearch}ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â
                   </p>
                 )}
               </div>
@@ -2490,7 +2490,7 @@ async function handleAnalyzeProspect() {
                   <h3 className="text-lg font-bold">Manual CRM Field Mapping</h3>
                   <p className="mt-2 text-sm text-slate-600">
                     Review each CRM field and choose the correct ZoomInfo CSV column. Use
-                    ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œSkip / Not mappedÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â for optional fields you do not want to import.
+                    ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“Skip / Not mappedÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â for optional fields you do not want to import.
                   </p>
 
                   <div className="mt-4 max-w-4xl overflow-x-auto">
@@ -2582,7 +2582,7 @@ async function handleAnalyzeProspect() {
                                 className="max-w-[220px] truncate px-3 py-3 text-slate-700"
                                 title={row[header]}
                               >
-                                {row[header] || "ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â"}
+                                {row[header] || "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â"}
                               </td>
                             ))}
                           </tr>
@@ -3547,7 +3547,7 @@ function RoleTestingPanel({
           <p className="mt-2 text-xs text-slate-500">
             {isLoadingRoleUsers
               ? "Loading users..."
-              : `Current user: ${currentUserDisplayName} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${formatCoverageType(currentCoverageType)}`}
+              : `Current user: ${currentUserDisplayName} ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${formatCoverageType(currentCoverageType)}`}
           </p>
           {roleUserError && (
             <p className="mt-2 text-xs font-semibold text-red-700">{roleUserError}</p>
@@ -4666,7 +4666,7 @@ function AdminTagGroup({
                       <div>
                         <p className="font-semibold text-slate-900">{tag.tag_name}</p>
                         <p className="mt-1 text-xs text-slate-500">
-                          Sort {tag.sort_order ?? 100} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {tag.color ?? "blue"} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {tag.status ?? "active"}
+                          Sort {tag.sort_order ?? 100} ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {tag.color ?? "blue"} ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {tag.status ?? "active"}
                         </p>
                       </div>
                       <span
@@ -5343,7 +5343,7 @@ const filteredOpportunities = useMemo(() => {
         <MetricCard
           label="Filtered opportunities"
           value={displayedFunnelOpportunities.length.toString()}
-          note={`Open ${statusCounts.open} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Won ${statusCounts.won} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Lost ${statusCounts.lost}`}
+          note={`Open ${statusCounts.open} ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Won ${statusCounts.won} ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Lost ${statusCounts.lost}`}
         />
         <MetricCard
           label="Pipeline value"
@@ -5353,7 +5353,7 @@ const filteredOpportunities = useMemo(() => {
         <MetricCard
           label="Weighted value"
           value={formatCurrency(weightedPipelineValue)}
-          note="Estimated value ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â probability"
+          note="Estimated value ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â probability"
         />
         <MetricCard
           label="Avg. probability"
@@ -5366,7 +5366,7 @@ const filteredOpportunities = useMemo(() => {
         <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
           <p className="font-bold">Funnel opportunities are filtered by current role visibility.</p>
           <p className="mt-1">
-            Current user: <span className="font-semibold">{funnelCurrentUserDisplayName}</span> ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Role:{" "}
+            Current user: <span className="font-semibold">{funnelCurrentUserDisplayName}</span> ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Role:{" "}
             <span className="font-semibold">{formatAppUserRole(funnelCurrentUserRole)}</span>
           </p>
           <p className="mt-1 text-xs leading-5">
@@ -6219,6 +6219,13 @@ function CompaniesSection({
   const activeBulkAssignmentUsers = bulkAssignmentUsers.filter(
     (user) => !user.status || String(user.status).toLowerCase() === "active"
   );
+  const bulkManagerUsers = activeBulkAssignmentUsers.filter((user) => {
+    const role = String(user.user_role || user.role || user.userRole || "")
+      .toLowerCase()
+      .replace(/[\s-]+/g, "_");
+
+    return role === "admin" || role === "sales_manager" || role === "manager";
+  });
   const selectedVisibleCompanyCount = visibleCompanyIds.filter((companyId) =>
     selectedCompanyIds.includes(companyId)
   ).length;
@@ -6264,8 +6271,8 @@ function CompaniesSection({
         <div className="mt-6 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
           <p className="font-bold">Companies are filtered by current role visibility.</p>
           <p className="mt-1">
-            Current user: <span className="font-semibold">{currentUserDisplayName}</span> ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Role:{" "}
-            <span className="font-semibold">{formatAppUserRole(currentUserRole)}</span> ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Coverage:{" "}
+            Current user: <span className="font-semibold">{currentUserDisplayName}</span> ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Role:{" "}
+            <span className="font-semibold">{formatAppUserRole(currentUserRole)}</span> ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Coverage:{" "}
             <span className="font-semibold">{formatCoverageType(currentCoverageType)}</span>
           </p>
           <p className="mt-1 text-xs leading-5">
@@ -6353,7 +6360,7 @@ function CompaniesSection({
                 {companyOwnerOptions.map((owner) => (
                   <option key={owner.id} value={owner.display_name}>
                     {owner.display_name}
-                    {owner.user_role === "admin" ? " ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Admin" : ""}
+                    {owner.user_role === "admin" ? " ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â Admin" : ""}
                   </option>
                 ))}
               </select>
@@ -6410,7 +6417,7 @@ function CompaniesSection({
               Select companies below, then assign the selected records to one salesperson and/or one sales manager.
             </p>
             <p className="mt-2 text-xs font-semibold text-blue-900">
-              Selected: {selectedCompanyIds.length} total ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {selectedVisibleCompanyCount} visible
+              Selected: {selectedCompanyIds.length} total - {selectedVisibleCompanyCount} visible
             </p>
           </div>
 
@@ -6440,11 +6447,7 @@ function CompaniesSection({
                 className="mt-2 w-full rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
               >
                 <option value="">Do not change</option>
-                {activeBulkAssignmentUsers
-                  .filter((user) => {
-                    const role = String(user.user_role || "").toLowerCase();
-                    return role === "sales_manager" || role === "admin";
-                  })
+                {bulkManagerUsers
                   .map((user) => (
                     <option key={`bulk-manager-${user.id}`} value={user.id}>
                       {user.display_name || user.email}
@@ -6537,14 +6540,14 @@ function CompaniesSection({
                       {[company.city, company.state].filter(Boolean).join(", ") || "Not provided"}
                     </td>
                     <td className="py-3 pr-4 text-slate-700">
-                      {company.employee_count ?? "ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â"}
+                      {company.employee_count ?? "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â"}
                     </td>
                     <td className="py-3 pr-4 font-semibold">
-                      {prospect?.priority_score ?? "ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â"}
+                      {prospect?.priority_score ?? "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â"}
                     </td>
                     <td className="py-3 pr-4">
                       <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800">
-                        {prospect?.priority_tier ?? "ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â"}
+                        {prospect?.priority_tier ?? "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â"}
                       </span>
                     </td>
                     <td className="max-w-[320px] py-3 pr-4 text-slate-700">
@@ -6720,9 +6723,9 @@ function ContactsSection({
                   <td className="py-3 pr-4 text-slate-700">
                     {contact.function_area || contact.department || "Not provided"}
                   </td>
-                  <td className="py-3 pr-4 text-slate-700">{contact.email || "ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â"}</td>
-                  <td className="py-3 pr-4 text-slate-700">{contact.direct_phone || "ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â"}</td>
-                  <td className="py-3 pr-4 text-slate-700">{contact.mobile_phone || "ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â"}</td>
+                  <td className="py-3 pr-4 text-slate-700">{contact.email || "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â"}</td>
+                  <td className="py-3 pr-4 text-slate-700">{contact.direct_phone || "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â"}</td>
+                  <td className="py-3 pr-4 text-slate-700">{contact.mobile_phone || "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â"}</td>
                 </tr>
               ))}
             </tbody>
@@ -6846,11 +6849,11 @@ function CompanyDetailSection({
             />
             <SmallScoreCard
               label="Tier"
-              value={hasAiAnalysis && primaryProspect ? displayValue(primaryProspect.priority_tier) : "ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â"}
+              value={hasAiAnalysis && primaryProspect ? displayValue(primaryProspect.priority_tier) : "ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â"}
             />
             <SmallScoreCard
               label="Fit"
-              value={hasAiAnalysis && primaryProspect ? displayValue(primaryProspect.fit_rating) : "ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â"}
+              value={hasAiAnalysis && primaryProspect ? displayValue(primaryProspect.fit_rating) : "ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â"}
             />
           </div>
         </div>
@@ -7626,7 +7629,7 @@ function CompanyOwnerPanel({
             {owners.map((owner) => (
               <option key={owner.id} value={owner.id}>
                 {owner.display_name}
-                {owner.user_role === "admin" ? " ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Admin" : ""}
+                {owner.user_role === "admin" ? " ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â Admin" : ""}
               </option>
             ))}
           </select>
@@ -9390,7 +9393,7 @@ function TagAssignmentColumn({
                 className="rounded-full px-1 text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:text-slate-400"
                 aria-label={`Remove ${tag.crm_tags?.tag_name || "tag"}`}
               >
-                ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â
+                ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â
               </button>
             </span>
           ))}
@@ -9694,7 +9697,7 @@ function ContactTagAssignmentRow({
                 className="rounded-full px-1 text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:text-slate-400"
                 aria-label={`Remove ${tag.crm_tags?.tag_name || "tag"}`}
               >
-                ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â
+                ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â
               </button>
             </span>
           ))}
