@@ -90,9 +90,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.89 - Sales Manager Assignment Controls";
+const APP_VERSION = "Rev 1.89.1 - Owner Summary Tolerant Refresh";
 const REVISION_NOTE =
-  "Connected company bulk assignment controls to role permissions for Admin and Sales Manager users.";
+  "Prevented legacy company owner summary refresh failures from showing after sales coverage assignment saves.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1052,24 +1052,29 @@ return (
   }
   async function loadCompanyOwnerFilterData() {
     try {
-      const [usersResponse, ownersResponse] = await Promise.all([
-        fetch("/api/crm-users"),
-        fetch("/api/company-owner-summary"),
-      ]);
-
+      const usersResponse = await fetch("/api/crm-users");
       const usersData = await usersResponse.json();
-      const ownersData = await ownersResponse.json();
 
       if (!usersResponse.ok) {
         throw new Error(usersData.error || "Could not load CRM owners.");
       }
 
-      if (!ownersResponse.ok) {
-        throw new Error(ownersData.error || "Could not load company owner assignments.");
-      }
-
       setCompanyOwnerOptions(usersData.users ?? []);
-      setAllCompanyOwners(ownersData.companyOwners ?? []);
+
+      try {
+        const ownersResponse = await fetch("/api/company-owner-summary");
+        const ownersData = await ownersResponse.json();
+
+        if (ownersResponse.ok) {
+          setAllCompanyOwners(ownersData.companyOwners ?? []);
+        } else {
+          setAllCompanyOwners([]);
+          console.warn("Company owner summary unavailable:", ownersData.error || ownersResponse.statusText);
+        }
+      } catch (ownerSummaryError) {
+        setAllCompanyOwners([]);
+        console.warn("Company owner summary unavailable:", ownerSummaryError);
+      }
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Could not load company owner filters."
