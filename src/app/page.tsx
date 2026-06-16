@@ -90,9 +90,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.84.9 - Company Detail Display Guard";
+const APP_VERSION = "Rev 1.84.10 - Company Detail Payload Sanitizer";
 const REVISION_NOTE =
-  "Added broad Company Detail display guards for corrupted prospect and tag text.";
+  "Sanitizes corrupted Company Detail payload strings before rendering.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -591,6 +591,27 @@ function safeDisplayText(value: unknown, fallback = "Unavailable") {
   if (!text || isLikelyCorruptedDisplayText(text)) return fallback;
 
   return text.length > 80 ? `${text.slice(0, 77)}...` : text;
+}
+
+function sanitizeCorruptedDisplayData(value: any): any {
+  if (typeof value === "string") {
+    return isLikelyCorruptedDisplayText(value) ? "" : value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeCorruptedDisplayData(item));
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [
+        key,
+        sanitizeCorruptedDisplayData(item),
+      ])
+    );
+  }
+
+  return value;
 }
 
 type CrmTag = any;
@@ -1104,9 +1125,9 @@ return (
       }
 
       setCrmSummary(summaryData);
-      setAllCrmTags(tagsData.tags ?? []);
-      setAllCompanyTags(companyTagsData.companyTags ?? []);
-      setAllContactTags(contactTagsData.contactTags ?? []);
+      setAllCrmTags(sanitizeCorruptedDisplayData(tagsData.tags ?? []));
+      setAllCompanyTags(sanitizeCorruptedDisplayData(companyTagsData.companyTags ?? []));
+      setAllContactTags(sanitizeCorruptedDisplayData(contactTagsData.contactTags ?? []));
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Could not load CRM summary.");
     } finally {
@@ -1130,7 +1151,7 @@ async function loadCompanyDetail(companyId: string) {
         throw new Error(data.error || "Could not load company detail.");
       }
 
-      setSelectedCompanyDetail(data);
+      setSelectedCompanyDetail(sanitizeCorruptedDisplayData(data));
       setActiveTab("companyDetail");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Could not load company detail.");
