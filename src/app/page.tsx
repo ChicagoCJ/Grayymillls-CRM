@@ -90,9 +90,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.85 - CRM User Edit Drawer";
+const APP_VERSION = "Rev 1.86 - CRM User Role Cleanup";
 const REVISION_NOTE =
-  "Changed CRM user editing from an inline jump form to a right-side edit drawer.";
+  "Removed duplicate CRM owner access field and clarified role and coverage controls.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1798,7 +1798,7 @@ async function handleAnalyzeProspect() {
             onClick={loadCrmSummary}
             disabled={isLoadingSummary}
             aria-busy={isLoadingSummary}
-            className="ml-auto shrink-0 whitespace-nowrap rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+            className="ml-auto shrink-0 whitespace-nowrap rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:text-slate-400"
           >
             {isLoadingSummary ? "Refreshing CRM..." : "Refresh CRM"}
           </button>
@@ -2402,7 +2402,7 @@ async function handleAnalyzeProspect() {
                       type="button"
                       onClick={clearImportAssignments}
                       disabled={!importAssignedSalespersonId && !importAssignedSalesManagerId}
-                      className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                      className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:text-slate-400"
                     >
                       Clear import assignment
                     </button>
@@ -2423,7 +2423,7 @@ async function handleAnalyzeProspect() {
                   <button
                     onClick={resetMappingToSuggestions}
                     disabled={!csvData}
-                    className="inline-flex items-center justify-center rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                    className="inline-flex items-center justify-center rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:text-slate-400"
                   >
                     Reset Mapping
                   </button>
@@ -2431,7 +2431,7 @@ async function handleAnalyzeProspect() {
                   <button
                     onClick={handleImportToCrm}
                     disabled={!csvData || isImporting || !isReadyToImport}
-                    className="inline-flex items-center justify-center rounded-xl bg-green-700 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-green-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                    className="inline-flex items-center justify-center rounded-xl bg-green-700 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-green-800 disabled:bg-slate-300"
                   >
                     {isImporting ? "Importing..." : "Import to CRM"}
                   </button>
@@ -2903,7 +2903,7 @@ const [isLoadingTags, setIsLoadingTags] = useState(false);
           <button
             onClick={loadImportTags}
             disabled={isLoadingTags}
-            className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
+            className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
           >
             {isLoadingTags ? "Refreshing..." : "Refresh Tags"}
           </button>
@@ -3250,7 +3250,7 @@ function AdminFunnelStagesSection({
           <button
             onClick={loadStages}
             disabled={isLoadingStages}
-            className="w-fit rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
+            className="w-fit rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
           >
             {isLoadingStages ? "Refreshing..." : "Refresh Stages"}
           </button>
@@ -3342,6 +3342,7 @@ function AdminFunnelStagesSection({
             <label className="text-sm font-semibold text-slate-700">User Role</label>
             <select
               value={form.userRole}
+
               onChange={(event) => setForm({ ...form, userRole: event.target.value })}
               className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
             >
@@ -3355,6 +3356,7 @@ function AdminFunnelStagesSection({
             <label className="text-sm font-semibold text-slate-700">Coverage Type</label>
             <select
               value={form.coverageType}
+
               onChange={(event) => setForm({ ...form, coverageType: event.target.value })}
               className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
             >
@@ -3393,7 +3395,7 @@ function AdminFunnelStagesSection({
           <button
             onClick={saveStage}
             disabled={isSavingStage || !canManageFunnelStages}
-            className="rounded-xl bg-green-700 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-green-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+            className="rounded-xl bg-green-700 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-green-800 disabled:bg-slate-300"
           >
             {isSavingStage ? "Saving..." : editingStageId ? "Save Stage" : "Create Stage"}
           </button>
@@ -3478,14 +3480,14 @@ function AdminFunnelStagesSection({
                     <button
                       onClick={() => startEditingStage(stage)}
                       disabled={isSavingStage || !canManageFunnelStages}
-                      className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
+                      className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
                     >Edit User</button>
 
                     {stage.status === "archived" ? (
                       <button
                         onClick={() => updateStageStatus(stage, "active")}
                         disabled={isSavingStage || !canManageFunnelStages}
-                        className="rounded-lg bg-blue-700 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                        className="rounded-lg bg-blue-700 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-800 disabled:bg-slate-300"
                       >
                         Reactivate
                       </button>
@@ -3493,7 +3495,7 @@ function AdminFunnelStagesSection({
                       <button
                         onClick={() => updateStageStatus(stage, "archived")}
                         disabled={isSavingStage || !canManageFunnelStages}
-                        className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                        className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-amber-700 disabled:bg-slate-300"
                       >
                         Archive
                       </button>
@@ -4019,21 +4021,6 @@ function AdminUsersSection() {
               className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm disabled:cursor-not-allowed disabled:bg-slate-100"
               placeholder="Sales"
             />
-          </div>
-
-          <div>
-            <label className="text-sm font-semibold text-slate-700">Access Type</label>
-            <select
-              value={form.userRole}
-              disabled={!isAdminMode}
-              onChange={(event) =>
-                setForm({ ...form, userRole: event.target.value as "admin" | "user" })
-              }
-              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm disabled:cursor-not-allowed disabled:bg-slate-100"
-            >
-              <option value="user">User</option>
-              <option value="admin">Admin</option>
-            </select>
           </div>
 
           <div>
