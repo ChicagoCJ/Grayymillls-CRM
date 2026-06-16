@@ -90,9 +90,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.88 - Formal Role Rules UI";
+const APP_VERSION = "Rev 1.89 - Sales Manager Assignment Controls";
 const REVISION_NOTE =
-  "Formalized Admin, Sales Manager, and Sales Rep visibility rules in the role testing panel.";
+  "Connected company bulk assignment controls to role permissions for Admin and Sales Manager users.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1430,6 +1430,11 @@ async function handleAnalyzeProspect() {
   }
 
   async function handleBulkCompanyAssignment() {
+    if (!currentPermissions.canAssignSalesCoverage) {
+      setBulkCompanyAssignmentMessage("Your current role cannot assign sales coverage.");
+      return;
+    }
+
     if (selectedCompanyIds.length === 0) {
       setBulkCompanyAssignmentMessage("Select at least one company before applying bulk assignment.");
       return;
@@ -2261,6 +2266,7 @@ async function handleAnalyzeProspect() {
             setCompanyPrimarySubIndustryFilter={setCompanyPrimarySubIndustryFilter}
             companyPrimarySubIndustryOptions={companyPrimarySubIndustryOptions}
             clearCompanyFilters={clearCompanyFilters}
+            canAssignSalesCoverage={currentPermissions.canAssignSalesCoverage}
             selectedCompanyIds={selectedCompanyIds}
             setSelectedCompanyIds={setSelectedCompanyIds}
             bulkAssignedSalespersonId={bulkAssignedSalespersonId}
@@ -6298,6 +6304,7 @@ function CompaniesSection({
   setCompanyPrimarySubIndustryFilter = () => {},
   companyPrimarySubIndustryOptions = ["All"],
   clearCompanyFilters,
+  canAssignSalesCoverage = false,
   selectedCompanyIds = [],
   setSelectedCompanyIds = () => {},
   bulkAssignedSalespersonId = "",
@@ -6341,6 +6348,7 @@ function CompaniesSection({
   setCompanyPrimarySubIndustryFilter: (value: string) => void;
   companyPrimarySubIndustryOptions: string[];
   clearCompanyFilters: () => void;
+  canAssignSalesCoverage?: boolean;
   selectedCompanyIds?: string[];
   setSelectedCompanyIds?: (companyIds: string[]) => void;
   bulkAssignedSalespersonId?: string;
@@ -6374,6 +6382,8 @@ function CompaniesSection({
     visibleCompanyIds.length > 0 && selectedVisibleCompanyCount === visibleCompanyIds.length;
 
   function toggleCompanySelection(companyId: string) {
+    if (!canAssignSalesCoverage) return;
+
     setSelectedCompanyIds(
       selectedCompanyIds.includes(companyId)
         ? selectedCompanyIds.filter((selectedCompanyId) => selectedCompanyId !== companyId)
@@ -6382,6 +6392,8 @@ function CompaniesSection({
   }
 
   function toggleAllVisibleCompanies() {
+    if (!canAssignSalesCoverage) return;
+
     if (allVisibleCompaniesSelected) {
       setSelectedCompanyIds(
         selectedCompanyIds.filter((companyId) => !visibleCompanyIds.includes(companyId))
@@ -6569,6 +6581,11 @@ function CompaniesSection({
             <p className="mt-1 text-xs leading-5 text-blue-800">
               Select companies below, then assign the selected records to one salesperson and/or one sales manager.
             </p>
+            {!canAssignSalesCoverage && (
+              <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs font-semibold leading-5 text-amber-800">
+                Assignment controls are available to Admins and Sales Managers only.
+              </p>
+            )}
             <p className="mt-2 text-xs font-semibold text-blue-900">
               Selected: {selectedCompanyIds.length} total - {selectedVisibleCompanyCount} visible
             </p>
@@ -6579,8 +6596,9 @@ function CompaniesSection({
               <label className="text-xs font-bold uppercase tracking-wide text-blue-900">Salesperson / Rep</label>
               <select
                 value={bulkAssignedSalespersonId}
+                disabled={!canAssignSalesCoverage || isBulkAssigningCompanies}
                 onChange={(event) => setBulkAssignedSalespersonId(event.target.value)}
-                className="mt-2 w-full rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                className="mt-2 w-full rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100"
               >
                 <option value="">Do not change</option>
                 {activeBulkAssignmentUsers
@@ -6596,8 +6614,9 @@ function CompaniesSection({
               <label className="text-xs font-bold uppercase tracking-wide text-blue-900">Sales Manager</label>
               <select
                 value={bulkAssignedSalesManagerId}
+                disabled={!canAssignSalesCoverage || isBulkAssigningCompanies}
                 onChange={(event) => setBulkAssignedSalesManagerId(event.target.value)}
-                className="mt-2 w-full rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                className="mt-2 w-full rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100"
               >
                 <option value="">Do not change</option>
                 {bulkManagerUsers
@@ -6613,6 +6632,7 @@ function CompaniesSection({
               type="button"
               onClick={onApplyBulkCompanyAssignment}
               disabled={
+                !canAssignSalesCoverage ||
                 isBulkAssigningCompanies ||
                 selectedCompanyIds.length === 0 ||
                 (!bulkAssignedSalespersonId && !bulkAssignedSalesManagerId)
@@ -6669,9 +6689,10 @@ function CompaniesSection({
                       <input
                         type="checkbox"
                         checked={selectedCompanyIds.includes(String(company.id))}
+                        disabled={!canAssignSalesCoverage}
                         onChange={() => toggleCompanySelection(String(company.id))}
                         aria-label={`Select ${company.company_name}`}
-                        className="h-4 w-4 rounded border-slate-300 text-blue-700 focus:ring-blue-500"
+                        className="h-4 w-4 rounded border-slate-300 text-blue-700 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
                       />
                     </td>
                     <td className="py-3 pr-4">
