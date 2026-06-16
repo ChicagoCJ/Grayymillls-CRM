@@ -90,9 +90,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.87.3 - Sales Manager Scoped Visibility";
+const APP_VERSION = "Rev 1.87.4 - Sales Manager Assignment View";
 const REVISION_NOTE =
-  "Scoped Sales Manager role visibility to companies assigned by sales manager.";
+  "Restored Sales Manager visibility to all companies so managers can assign coverage.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -805,15 +805,8 @@ export default function Home() {
   function contactMatchesRoleVisibility(contact: ContactSummary) {
     if (!applyRoleVisibility) return true;
     if (currentUserRole === "admin") return true;
+    if (currentUserRole === "sales_manager") return true;
     if (!currentUserId) return true;
-
-    if (currentUserRole === "sales_manager") {
-      const relatedCompany = crmSummary.companies.find(
-        (company) => String(company.id || company.company_id || "") === String(contact.company_id || "")
-      );
-
-      return String(relatedCompany?.assigned_sales_manager_id || "") === currentUserId;
-    }
 
     if (currentUserRole === "sales_rep") {
       const relatedCompany = crmSummary.companies.find(
@@ -954,7 +947,7 @@ export default function Home() {
     if (!currentUserId) return true;
 
     if (currentUserRole === "sales_manager") {
-      return String(company.assigned_sales_manager_id || "") === currentUserId;
+      return true;
     }
 
     if (currentUserRole === "sales_rep") {
@@ -1578,7 +1571,7 @@ async function handleAnalyzeProspect() {
 
     return companies.filter((company) => {
       if (currentUserRole === "sales_manager") {
-        return String(company.assigned_sales_manager_id || "") === currentUserId;
+        return true;
       }
 
       if (currentUserRole === "sales_rep") {
@@ -1592,15 +1585,8 @@ async function handleAnalyzeProspect() {
   function activityRecordMatchesRoleVisibility(activity: ActivityRecord) {
     if (!applyRoleVisibility) return true;
     if (currentUserRole === "admin") return true;
+    if (currentUserRole === "sales_manager") return true;
     if (!currentUserId) return true;
-
-    if (currentUserRole === "sales_manager") {
-      const relatedCompany = crmSummary.companies.find(
-        (company) => String(company.id || company.company_id || "") === String(activity.company_id || "")
-      );
-
-      return String(relatedCompany?.assigned_sales_manager_id || "") === currentUserId;
-    }
 
     if (currentUserRole === "sales_rep") {
       const relatedCompany = crmSummary.companies.find(
@@ -1636,7 +1622,7 @@ async function handleAnalyzeProspect() {
   const currentUserAssignedCompanyCount = currentUserId
     ? crmSummary.companies.filter((company) => {
         if (currentUserRole === "sales_manager") {
-          return String(company.assigned_sales_manager_id || "") === currentUserId;
+          return true;
         }
 
         if (currentUserRole === "sales_rep") {
@@ -3718,7 +3704,7 @@ function RoleTestingPanel({
               Apply Role Visibility
               <span className="mt-1 block text-xs font-normal leading-5 text-slate-600">
                 When enabled, the UI applies the selected CRM user's visibility scope.
-                Admins see all records. Sales Managers see records tied to companies where they are assigned as Sales Manager. Sales Reps see companies
+                Admins and Sales Managers see all records. Sales Reps see records tied to companies where they are assigned as Salesperson / Rep. Sales Reps see companies
                 where they are assigned as Salesperson / Rep. Contacts, Funnel, and Activities inherit related company visibility.
               </span>
             </span>
@@ -5297,11 +5283,8 @@ function FunnelDashboardSection({
   function opportunityMatchesRoleVisibility(opportunity: SalesOpportunity) {
     if (!funnelApplyRoleVisibility) return true;
     if (funnelCurrentUserRole === "admin") return true;
+    if (funnelCurrentUserRole === "sales_manager") return true;
     if (!funnelCurrentUserId) return true;
-
-    if (funnelCurrentUserRole === "sales_manager") {
-      return String(opportunity.companies?.assigned_sales_manager_id || "") === funnelCurrentUserId;
-    }
 
     if (funnelCurrentUserRole === "sales_rep") {
       return String(opportunity.companies?.assigned_salesperson_id || "") === funnelCurrentUserId;
@@ -5367,13 +5350,8 @@ const filteredOpportunities = useMemo(() => {
   const displayedFunnelOpportunities = useMemo(() => {
     if (!funnelApplyRoleVisibility) return filteredOpportunities;
     if (funnelCurrentUserRole === "admin") return filteredOpportunities;
+    if (funnelCurrentUserRole === "sales_manager") return filteredOpportunities;
     if (!funnelCurrentUserId) return filteredOpportunities;
-
-    if (funnelCurrentUserRole === "sales_manager") {
-      return filteredOpportunities.filter((opportunity) => {
-        return String(opportunity.companies?.assigned_sales_manager_id || "") === funnelCurrentUserId;
-      });
-    }
 
     if (funnelCurrentUserRole === "sales_rep") {
       return filteredOpportunities.filter((opportunity) => {
@@ -5514,7 +5492,7 @@ const filteredOpportunities = useMemo(() => {
             <span className="font-semibold">{formatAppUserRole(funnelCurrentUserRole)}</span>
           </p>
           <p className="mt-1 text-xs leading-5">
-            Admins see all funnel opportunities. Sales Managers see opportunities where the related company is assigned to them as Sales Manager. Sales Reps see opportunities where the related company is assigned to them as Salesperson / Rep.
+            Admins and Sales Managers see all funnel opportunities. Sales Reps see opportunities where the related company is assigned to them as Salesperson / Rep.
           </p>
           <p className="mt-2 rounded-lg bg-white p-2 text-xs font-semibold text-blue-900 ring-1 ring-blue-100">
             Funnel visibility reason: {getRoleVisibilityReason(funnelCurrentUserRole, funnelCurrentUserDisplayName)}
@@ -6432,8 +6410,7 @@ function CompaniesSection({
             <span className="font-semibold">{formatCoverageType(currentCoverageType)}</span>
           </p>
           <p className="mt-1 text-xs leading-5">
-            Admins see all companies.
-            Sales Managers see companies where they are assigned as Sales Manager.
+            Admins and Sales Managers see all companies.
             Sales Reps see companies where they are assigned as Salesperson / Rep.
           </p>
           <p className="mt-2 rounded-lg bg-white p-2 text-xs font-semibold text-blue-900 ring-1 ring-blue-100">
