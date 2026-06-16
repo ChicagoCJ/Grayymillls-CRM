@@ -75,11 +75,6 @@ type CrmSummary = {
 
 type CrmUser = any;
 
-type CompanyOwnerSummary = {
-  company_id: string;
-  assigned_user_id: string | null;
-  crm_users: CrmUser | null;
-};
 
 type CompanyDetail = any;
 
@@ -90,9 +85,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.91 - Remove Legacy Owner Panel";
+const APP_VERSION = "Rev 1.92 - Remove Legacy Owner Summary";
 const REVISION_NOTE =
-  "Removed the old visible company detail owner assignment panel so sales coverage is managed through Salesperson / Rep and Sales Manager.";
+  "Stopped loading the deprecated company owner summary and kept company assignment focused on Salesperson / Rep and Sales Manager coverage.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -666,7 +661,6 @@ export default function Home() {
   const [companyPrimaryIndustryFilter, setCompanyPrimaryIndustryFilter] = useState("All");
   const [companyPrimarySubIndustryFilter, setCompanyPrimarySubIndustryFilter] = useState("All");
   const [companyOwnerOptions, setCompanyOwnerOptions] = useState<CrmUser[]>([]);
-  const [allCompanyOwners, setAllCompanyOwners] = useState<CompanyOwnerSummary[]>([]);
   const [contactSearchTerm, setContactSearchTerm] = useState("");
   const [contactMarketTagFilter, setContactMarketTagFilter] = useState("All");
   const [contactSectorTagFilter, setContactSectorTagFilter] = useState("All");
@@ -1091,31 +1085,16 @@ return (
       const usersData = await usersResponse.json();
 
       if (!usersResponse.ok) {
-        throw new Error(usersData.error || "Could not load CRM owners.");
+        throw new Error(usersData.error || "Could not load CRM users.");
       }
 
       setCompanyOwnerOptions(usersData.users ?? []);
-
-      try {
-        const ownersResponse = await fetch("/api/company-owner-summary");
-        const ownersData = await ownersResponse.json();
-
-        if (ownersResponse.ok) {
-          setAllCompanyOwners(ownersData.companyOwners ?? []);
-        } else {
-          setAllCompanyOwners([]);
-          console.warn("Company owner summary unavailable:", ownersData.error || ownersResponse.statusText);
-        }
-      } catch (ownerSummaryError) {
-        setAllCompanyOwners([]);
-        console.warn("Company owner summary unavailable:", ownerSummaryError);
-      }
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Could not load company owner filters."
-      );
+      console.warn("Failed to load CRM users for company coverage filters:", error);
+      setCompanyOwnerOptions([]);
     }
   }
+
   async function loadCrmSummary() {
     setIsLoadingSummary(true);
 
