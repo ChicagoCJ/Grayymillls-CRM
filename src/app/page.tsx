@@ -85,9 +85,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.92 - Remove Legacy Owner Summary";
+const APP_VERSION = "Rev 1.93 - CRM User Wording Cleanup";
 const REVISION_NOTE =
-  "Stopped loading the deprecated company owner summary and kept company assignment focused on Salesperson / Rep and Sales Manager coverage.";
+  "Renamed visible admin user-management language from CRM owners to CRM users while preserving the sales coverage model.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -3726,7 +3726,7 @@ function RoleTestingPanel({
             <p className="font-bold text-slate-900">Sales Manager</p>
             <p className="mt-1">
               Can view all companies, contacts, opportunities, and activities so they can manage team coverage,
-              assign Sales Manager / Sales Rep ownership, and rebalance accounts. Cannot manage admin settings or users.
+              assign Sales Manager / Sales Rep coverage, and rebalance accounts. Cannot manage admin settings or users.
             </p>
           </div>
 
@@ -3910,7 +3910,7 @@ function AdminUsersSection() {
     if (isAdminMode) return true;
 
     setUserMessage("");
-    setUserError("Owner editing is restricted to Admin Mode. Turn on Admin Mode to create, edit, archive, or reactivate owners.");
+    setUserError("CRM user editing is restricted to Admin Mode. Turn on Admin Mode to create, edit, archive, or reactivate CRM users.");
     return false;
   }
 
@@ -3968,7 +3968,7 @@ function AdminUsersSection() {
         throw new Error(data.error || "Could not save CRM user.");
       }
 
-      setUserMessage(editingUserId ? "Owner updated." : "Owner created.");
+      setUserMessage(editingUserId ? "CRM user updated." : "CRM user created.");
       resetUserForm();
       await loadUsers();
     } catch (error) {
@@ -4000,13 +4000,13 @@ function AdminUsersSection() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Could not update owner status.");
+        throw new Error(data.error || "Could not update CRM user status.");
       }
 
-      setUserMessage(status === "active" ? "Owner reactivated." : "Owner archived.");
+      setUserMessage(status === "active" ? "CRM user reactivated." : "CRM user archived.");
       await loadUsers();
     } catch (error) {
-      setUserError(error instanceof Error ? error.message : "Could not update owner status.");
+      setUserError(error instanceof Error ? error.message : "Could not update CRM user status.");
     } finally {
       setIsSavingUser(false);
     }
@@ -4022,9 +4022,9 @@ function AdminUsersSection() {
             <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
               Admin
             </p>
-            <h2 className="mt-2 text-2xl font-bold">Manage CRM Owners</h2>
+            <h2 className="mt-2 text-2xl font-bold">Manage CRM Users</h2>
             <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-600">
-              Everyone can view CRM owners. Creating, editing, archiving, and reactivating owners is restricted to Admin Mode until formal login-based permissions are added.
+              Everyone can view CRM users. Creating, editing, archiving, and reactivating CRM users is restricted to Admin Mode until formal login-based permissions are added.
             </p>
           </div>
 
@@ -4033,7 +4033,7 @@ function AdminUsersSection() {
             disabled={isLoadingUsers}
             className="w-fit rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
           >
-            {isLoadingUsers ? "Refreshing..." : "Refresh Owners"}
+            {isLoadingUsers ? "Refreshing..." : "Refresh Users"}
           </button>
         </div>
 
@@ -4094,12 +4094,12 @@ function AdminUsersSection() {
             <h3 className="text-xl font-bold">{editingUserId ? "Edit CRM User" : "Create CRM User"}</h3>
             {editingUserId && (
               <p className="mt-2 text-sm text-slate-600">
-                Editing opens in this drawer. Save or cancel to return to the owner list.
+                Editing opens in this drawer. Save or cancel to return to the CRM user list.
               </p>
             )}
             {!isAdminMode && (
               <p className="mt-2 text-sm text-slate-600">
-                Turn on Admin Mode to create or edit owners.
+                Turn on Admin Mode to create or edit CRM users.
               </p>
             )}
           </div>
@@ -4219,7 +4219,7 @@ function AdminUsersSection() {
               disabled={!isAdminMode}
               onChange={(event) => setForm({ ...form, notes: event.target.value })}
               className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm disabled:cursor-not-allowed disabled:bg-slate-100"
-              placeholder="Owner notes, territory, routing rules, or assignment guidance."
+              placeholder="User notes, territory, routing rules, or assignment guidance."
             />
           </div>
         </div>
@@ -4246,10 +4246,10 @@ function AdminUsersSection() {
       </div>
 
       <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
-        <h3 className="text-xl font-bold">Owners</h3>
+        <h3 className="text-xl font-bold">CRM Users</h3>
 
         {users.length === 0 ? (
-          <p className="mt-3 text-sm text-slate-600">No owners found.</p>
+          <p className="mt-3 text-sm text-slate-600">No CRM users found.</p>
         ) : (
           <div className="mt-5 grid gap-3">
             {users.map((user) => (
@@ -7840,7 +7840,7 @@ function CompanyOwnerPanel({
           disabled={isLoadingOwners}
           className="w-fit rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
         >
-          {isLoadingOwners ? "Refreshing..." : "Refresh Owners"}
+          {isLoadingOwners ? "Refreshing..." : "Refresh Users"}
         </button>
       </div>
 
