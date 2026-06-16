@@ -90,9 +90,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.87.6 - Sales Manager Assignment Count Fix";
+const APP_VERSION = "Rev 1.88 - Formal Role Rules UI";
 const REVISION_NOTE =
-  "Fixed Sales Manager assignment count while preserving broad manager visibility.";
+  "Formalized Admin, Sales Manager, and Sales Rep visibility rules in the role testing panel.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -3683,30 +3683,30 @@ function RoleTestingPanel({
       </div>
 
       <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-        <p className="text-sm font-semibold text-slate-900">Draft Record Visibility Rules</p>
+        <p className="text-sm font-semibold text-slate-900">Record Visibility Rules</p>
         <div className="mt-3 grid gap-3 text-xs leading-5 text-slate-600 lg:grid-cols-3">
           <div className="rounded-xl bg-white p-3 ring-1 ring-slate-200">
             <p className="font-bold text-slate-900">Admin</p>
             <p className="mt-1">
               Can view all companies, contacts, opportunities, activities, documents, import history,
-              sales assignments, and admin settings.
+              sales assignments, user administration, and admin settings.
             </p>
           </div>
 
           <div className="rounded-xl bg-white p-3 ring-1 ring-slate-200">
             <p className="font-bold text-slate-900">Sales Manager</p>
             <p className="mt-1">
-              Draft rule: can view companies and opportunities where they are assigned as Sales Manager,
-              plus related contacts, activities, notes, and documents. CSV import remains allowed.
+              Can view all companies, contacts, opportunities, and activities so they can manage team coverage,
+              assign Sales Manager / Sales Rep ownership, and rebalance accounts. Cannot manage admin settings or users.
             </p>
           </div>
 
           <div className="rounded-xl bg-white p-3 ring-1 ring-slate-200">
             <p className="font-bold text-slate-900">Sales Rep</p>
             <p className="mt-1">
-              Draft rule: can view companies and opportunities where they are assigned as Salesperson / Rep,
-              plus related contacts, activities, notes, and documents. Can create and update opportunities,
-              move opportunity stages, and mark opportunities won or lost.
+              Can view only companies assigned to them as Salesperson / Rep, plus related contacts,
+              opportunities, activities, notes, and documents. Can create and update opportunities,
+              move opportunity stages, and mark opportunities won or lost within their assigned accounts.
             </p>
           </div>
         </div>
