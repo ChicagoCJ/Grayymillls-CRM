@@ -90,9 +90,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.87 - Role Visibility Test Panel";
+const APP_VERSION = "Rev 1.87.1 - Role Navigation Fix";
 const REVISION_NOTE =
-  "Added a controlled role visibility test panel without changing enforcement behavior.";
+  "Decoupled role visibility testing from primary tab navigation.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -939,6 +939,8 @@ export default function Home() {
   const roleVisibilityNeedsUser =
     applyRoleVisibility && currentUserRole !== "admin" && !currentUserId;
 
+  const navigationRole: AppUserRole = applyRoleVisibility ? "admin" : currentUserRole;
+
   function companyMatchesRoleVisibility(company: CompanySummary) {
     if (!applyRoleVisibility) return true;
     if (currentUserRole === "admin") return true;
@@ -1771,9 +1773,9 @@ async function handleAnalyzeProspect() {
         <nav aria-label="Primary CRM navigation" className="sticky top-2 z-40 flex flex-nowrap gap-2 overflow-x-auto rounded-2xl border border-slate-300 bg-white/95 p-2 shadow-md backdrop-blur supports-[backdrop-filter]:bg-white/80">
           {tabs
               .filter((tab) => {
-                if (tab.key === "admin") return currentUserRole === "admin";
+                if (tab.key === "admin") return navigationRole === "admin";
                 if (tab.key === "import") {
-                  return currentUserRole === "admin" || currentUserRole === "sales_manager";
+                  return navigationRole === "admin" || navigationRole === "sales_manager";
                 }
                 return true;
               })
