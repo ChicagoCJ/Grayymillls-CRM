@@ -90,9 +90,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.87.4 - Sales Manager Assignment View";
+const APP_VERSION = "Rev 1.87.5 - Role Visibility Count Labels";
 const REVISION_NOTE =
-  "Restored Sales Manager visibility to all companies so managers can assign coverage.";
+  "Clarified role visibility count labels for Sales Manager assignment-management view.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -3610,15 +3610,34 @@ function RoleTestingPanel({
                 Visible companies: <span className="font-semibold">{roleVisibleCompanyCount}</span>
               </p>
               <p>
-                Assigned to selected user: <span className="font-semibold">{roleAssignedCompanyCount}</span>
+                {currentUserRole === "sales_manager"
+                  ? "Companies assigned to this manager"
+                  : currentUserRole === "sales_rep"
+                    ? "Companies assigned to this rep"
+                    : "Companies assigned to selected user"}
+                : <span className="font-semibold">{roleAssignedCompanyCount}</span>
               </p>
               <p>
                 Unassigned companies: <span className="font-semibold">{roleUnassignedCompanyCount}</span>
               </p>
             </div>
+
+            {currentUserRole === "sales_manager" && (
+              <p className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-2 text-xs font-semibold leading-5 text-blue-900">
+                Sales Manager view is intentionally broad: managers see all companies and contacts so they can assign and rebalance sales coverage.
+              </p>
+            )}
+
+            {currentUserRole === "sales_rep" && (
+              <p className="mt-3 rounded-lg border border-green-200 bg-green-50 p-2 text-xs font-semibold leading-5 text-green-900">
+                Sales Rep view is scoped: reps see companies assigned to them as Salesperson / Rep, with related contacts, funnel, and activities.
+              </p>
+            )}
+
             <ol className="mt-3 list-decimal space-y-1 pl-5 text-xs leading-5 text-slate-600">
               <li>Keep Apply Role Visibility OFF while selecting and checking test users.</li>
-              <li>Use a Sales Rep with known company assignments for the first controlled test.</li>
+              <li>Use a Sales Manager to confirm broad assignment-management visibility.</li>
+              <li>Use a Sales Rep with known company assignments to confirm scoped rep visibility.</li>
               <li>Turn Apply Role Visibility ON only long enough to compare visible Companies, Contacts, Funnel, and Activities.</li>
               <li>Turn Apply Role Visibility OFF after each test pass.</li>
             </ol>
