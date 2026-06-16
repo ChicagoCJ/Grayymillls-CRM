@@ -90,9 +90,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.89.1 - Owner Summary Tolerant Refresh";
+const APP_VERSION = "Rev 1.90 - Explicit Coverage Filters";
 const REVISION_NOTE =
-  "Prevented legacy company owner summary refresh failures from showing after sales coverage assignment saves.";
+  "Replaced legacy Assigned Owner company filter with explicit Salesperson, Sales Manager, and assignment status filters.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -660,6 +660,9 @@ export default function Home() {
   const [allCrmTags, setAllCrmTags] = useState<CrmTag[]>([]);
   const [allCompanyTags, setAllCompanyTags] = useState<CompanyTagSummary[]>([]);
   const [companyOwnerFilter, setCompanyOwnerFilter] = useState("All");
+  const [companySalespersonFilter, setCompanySalespersonFilter] = useState("All");
+  const [companySalesManagerFilter, setCompanySalesManagerFilter] = useState("All");
+  const [companyAssignmentStatusFilter, setCompanyAssignmentStatusFilter] = useState("All");
   const [companyPrimaryIndustryFilter, setCompanyPrimaryIndustryFilter] = useState("All");
   const [companyPrimarySubIndustryFilter, setCompanyPrimarySubIndustryFilter] = useState("All");
   const [companyOwnerOptions, setCompanyOwnerOptions] = useState<CrmUser[]>([]);
@@ -1013,6 +1016,29 @@ export default function Home() {
       const matchesCategoryTag =
         companyCategoryTagFilter === "All" ||
         companyCategoryNames.includes(companyCategoryTagFilter);
+
+      const assignedSalespersonId = String(company.assigned_salesperson_id || "");
+      const assignedSalesManagerId = String(company.assigned_sales_manager_id || "");
+
+      const matchesSalespersonCoverage =
+        companySalespersonFilter === "All" ||
+        (companySalespersonFilter === "Unassigned" && !assignedSalespersonId) ||
+        assignedSalespersonId === companySalespersonFilter;
+
+      const matchesSalesManagerCoverage =
+        companySalesManagerFilter === "All" ||
+        (companySalesManagerFilter === "Unassigned" && !assignedSalesManagerId) ||
+        assignedSalesManagerId === companySalesManagerFilter;
+
+      const matchesAssignmentStatus =
+        companyAssignmentStatusFilter === "All" ||
+        (companyAssignmentStatusFilter === "Unassigned Salesperson" && !assignedSalespersonId) ||
+        (companyAssignmentStatusFilter === "Unassigned Sales Manager" && !assignedSalesManagerId) ||
+        (companyAssignmentStatusFilter === "Missing Any Coverage" &&
+          (!assignedSalespersonId || !assignedSalesManagerId)) ||
+        (companyAssignmentStatusFilter === "Fully Assigned" &&
+          Boolean(assignedSalespersonId) &&
+          Boolean(assignedSalesManagerId));
 return (
         matchesSearch &&
         matchesTier &&
@@ -1020,7 +1046,10 @@ return (
         matchesProductPath &&
         matchesMarketTag &&
         matchesSectorTag &&
-        matchesCategoryTag
+        matchesCategoryTag &&
+        matchesSalespersonCoverage &&
+        matchesSalesManagerCoverage &&
+        matchesAssignmentStatus
       );
     });
   }, [
@@ -1030,6 +1059,9 @@ return (
     companyTierFilter,
     companyStatusFilter,
     companyProductPathFilter,
+    companySalespersonFilter,
+    companySalesManagerFilter,
+    companyAssignmentStatusFilter,
     companyMarketTagFilter,
     companySectorTagFilter,
     companyCategoryTagFilter,
@@ -1040,6 +1072,9 @@ return (
     setCompanyStatusFilter("All");
     setCompanyProductPathFilter("All");
     setCompanyOwnerFilter("All");
+    setCompanySalespersonFilter("All");
+    setCompanySalesManagerFilter("All");
+    setCompanyAssignmentStatusFilter("All");
     setCompanyPrimaryIndustryFilter("All");
     setCompanyPrimarySubIndustryFilter("All");
   }
@@ -1501,8 +1536,6 @@ async function handleAnalyzeProspect() {
             : company;
         }),
       }));
-
-      await loadCompanyOwnerFilterData();
 
       setBulkCompanyAssignmentMessage(
         `Bulk assignment updated ${data.updatedCount ?? selectedCompanyIds.length} companies.`
@@ -2263,6 +2296,12 @@ async function handleAnalyzeProspect() {
             companyOwnerFilter={companyOwnerFilter}
             setCompanyOwnerFilter={setCompanyOwnerFilter}
             companyOwnerOptions={companyOwnerOptions}
+            companySalespersonFilter={companySalespersonFilter}
+            setCompanySalespersonFilter={setCompanySalespersonFilter}
+            companySalesManagerFilter={companySalesManagerFilter}
+            setCompanySalesManagerFilter={setCompanySalesManagerFilter}
+            companyAssignmentStatusFilter={companyAssignmentStatusFilter}
+            setCompanyAssignmentStatusFilter={setCompanyAssignmentStatusFilter}
             assignmentUserOptions={roleTestUsers}
             companyPrimaryIndustryFilter={companyPrimaryIndustryFilter}
             setCompanyPrimaryIndustryFilter={setCompanyPrimaryIndustryFilter}
@@ -6301,6 +6340,12 @@ function CompaniesSection({
   companyOwnerFilter,
   setCompanyOwnerFilter,
   companyOwnerOptions,
+  companySalespersonFilter = "All",
+  setCompanySalespersonFilter = () => {},
+  companySalesManagerFilter = "All",
+  setCompanySalesManagerFilter = () => {},
+  companyAssignmentStatusFilter = "All",
+  setCompanyAssignmentStatusFilter = () => {},
   assignmentUserOptions = [],
   companyPrimaryIndustryFilter = "All",
   setCompanyPrimaryIndustryFilter = () => {},
@@ -6345,6 +6390,12 @@ function CompaniesSection({
   companyOwnerFilter: string;
   setCompanyOwnerFilter: (value: string) => void;
   companyOwnerOptions: CrmUser[];
+  companySalespersonFilter?: string;
+  setCompanySalespersonFilter?: (value: string) => void;
+  companySalesManagerFilter?: string;
+  setCompanySalesManagerFilter?: (value: string) => void;
+  companyAssignmentStatusFilter?: string;
+  setCompanyAssignmentStatusFilter?: (value: string) => void;
   assignmentUserOptions?: CrmUser[];
   companyPrimaryIndustryFilter: string;
   setCompanyPrimaryIndustryFilter: (value: string) => void;
@@ -6519,20 +6570,58 @@ function CompaniesSection({
             </select>
           </div>
             <div>
-              <label className="text-sm font-semibold text-slate-700">Assigned Owner</label>
+              <label className="text-sm font-semibold text-slate-700">Salesperson / Rep</label>
               <select
-                value={companyOwnerFilter}
-                onChange={(event) => setCompanyOwnerFilter(event.target.value)}
+                value={companySalespersonFilter}
+                onChange={(event) => setCompanySalespersonFilter(event.target.value)}
                 className="mt-2 w-full max-w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
               >
                 <option value="All">All</option>
                 <option value="Unassigned">Unassigned</option>
-                {companyOwnerOptions.map((owner) => (
-                  <option key={owner.id} value={owner.display_name}>
-                    {owner.display_name}
-                    {owner.user_role === "admin" ? " Admin" : ""}
+                {activeBulkAssignmentUsers
+                  .filter((user) => {
+                    const role = String(user.user_role || user.role || user.userRole || "")
+                      .toLowerCase()
+                      .replace(/[\s-]+/g, "_");
+                    return role !== "sales_manager" && role !== "manager";
+                  })
+                  .map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.display_name || user.email}
+                    </option>
+                  ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold text-slate-700">Sales Manager</label>
+              <select
+                value={companySalesManagerFilter}
+                onChange={(event) => setCompanySalesManagerFilter(event.target.value)}
+                className="mt-2 w-full max-w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              >
+                <option value="All">All</option>
+                <option value="Unassigned">Unassigned</option>
+                {bulkManagerUsers.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.display_name || user.email}
                   </option>
                 ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold text-slate-700">Assignment Status</label>
+              <select
+                value={companyAssignmentStatusFilter}
+                onChange={(event) => setCompanyAssignmentStatusFilter(event.target.value)}
+                className="mt-2 w-full max-w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              >
+                <option value="All">All</option>
+                <option value="Unassigned Salesperson">Unassigned Salesperson</option>
+                <option value="Unassigned Sales Manager">Unassigned Sales Manager</option>
+                <option value="Missing Any Coverage">Missing Any Coverage</option>
+                <option value="Fully Assigned">Fully Assigned</option>
               </select>
             </div>
             <div>
