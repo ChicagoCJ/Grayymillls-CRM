@@ -90,9 +90,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.87.5 - Role Visibility Count Labels";
+const APP_VERSION = "Rev 1.87.6 - Sales Manager Assignment Count Fix";
 const REVISION_NOTE =
-  "Clarified role visibility count labels for Sales Manager assignment-management view.";
+  "Fixed Sales Manager assignment count while preserving broad manager visibility.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1622,7 +1622,7 @@ async function handleAnalyzeProspect() {
   const currentUserAssignedCompanyCount = currentUserId
     ? crmSummary.companies.filter((company) => {
         if (currentUserRole === "sales_manager") {
-          return true;
+          return String(company.assigned_sales_manager_id || "") === currentUserId;
         }
 
         if (currentUserRole === "sales_rep") {
