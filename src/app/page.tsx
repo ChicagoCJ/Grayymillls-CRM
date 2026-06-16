@@ -90,9 +90,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.90 - Explicit Coverage Filters";
+const APP_VERSION = "Rev 1.91 - Remove Legacy Owner Panel";
 const REVISION_NOTE =
-  "Replaced legacy Assigned Owner company filter with explicit Salesperson, Sales Manager, and assignment status filters.";
+  "Removed the old visible company detail owner assignment panel so sales coverage is managed through Salesperson / Rep and Sales Manager.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -7172,11 +7172,6 @@ function CompanyDetailSection({
       <CompanySalesAssignmentPanel
         companyId={String(detail.company.id)}
         canEditSalesCoverage={salesCoverageCanEdit}
-      />
-
-      <CompanyOwnerPanel
-        companyId={String(detail.company.id)}
-        currentOwnerId={detail.company.assigned_user_id ? String(detail.company.assigned_user_id) : ""}
       />
 
       <CompanyTagManager companyId={String(detail.company.id)} />
