@@ -85,9 +85,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.93 - CRM User Wording Cleanup";
+const APP_VERSION = "Rev 1.94 - Coverage Filter Polish";
 const REVISION_NOTE =
-  "Renamed visible admin user-management language from CRM owners to CRM users while preserving the sales coverage model.";
+  "Added guidance for company coverage filters and clarified Sales Manager labeling in company detail.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -6603,6 +6603,10 @@ function CompaniesSection({
                 <option value="Fully Assigned">Fully Assigned</option>
               </select>
             </div>
+
+<div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs leading-5 text-blue-900 lg:col-span-2 xl:col-span-3">
+              <span className="font-semibold">Coverage filters:</span> Salesperson / Rep identifies direct account coverage. Sales Manager identifies oversight coverage. Assignment Status helps find coverage gaps such as missing rep assignment, missing manager assignment, or fully assigned accounts.
+            </div>
             <div>
               <label className="text-sm font-semibold text-slate-700">Primary Industry</label>
               <select
@@ -7706,7 +7710,7 @@ function CompanySalesAssignmentPanel({
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-          <label className="text-sm font-semibold text-slate-700">Sales Manager / Internal Owner</label>
+          <label className="text-sm font-semibold text-slate-700">Sales Manager</label>
           <select
             value={assignedSalesManagerId}
             onChange={(event) => setAssignedSalesManagerId(event.target.value)}
