@@ -90,9 +90,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.86 - CRM User Role Cleanup";
+const APP_VERSION = "Rev 1.87 - Role Visibility Test Panel";
 const REVISION_NOTE =
-  "Removed duplicate CRM owner access field and clarified role and coverage controls.";
+  "Added a controlled role visibility test panel without changing enforcement behavior.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -3554,6 +3554,33 @@ function RoleTestingPanel({
           <p className="mt-1 text-sm leading-6 text-slate-600">
             UI-only permission testing. API-level enforcement will come in a later revision.
           </p>
+
+          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+            <p className="font-bold text-slate-900">Controlled test status</p>
+            <div className="mt-3 grid gap-2 md:grid-cols-2">
+              <p>
+                Selected user: <span className="font-semibold">{currentUserDisplayName}</span>
+              </p>
+              <p>
+                Role: <span className="font-semibold">{formatAppUserRole(currentUserRole)}</span>
+              </p>
+              <p>
+                Coverage: <span className="font-semibold">{formatCoverageType(currentCoverageType)}</span>
+              </p>
+              <p>
+                Visibility switch:{" "}
+                <span className={applyRoleVisibility ? "font-semibold text-green-700" : "font-semibold text-slate-700"}>
+                  {applyRoleVisibility ? "ON" : "OFF"}
+                </span>
+              </p>
+            </div>
+            <ol className="mt-3 list-decimal space-y-1 pl-5 text-xs leading-5 text-slate-600">
+              <li>Keep Apply Role Visibility OFF while selecting and checking test users.</li>
+              <li>Use a Sales Rep with known company assignments for the first controlled test.</li>
+              <li>Turn Apply Role Visibility ON only long enough to compare visible Companies, Contacts, Funnel, and Activities.</li>
+              <li>Turn Apply Role Visibility OFF after each test pass.</li>
+            </ol>
+          </div>
         </div>
 
         <div className="w-full max-w-xs">
@@ -3634,9 +3661,9 @@ function RoleTestingPanel({
             <span>
               Apply Role Visibility
               <span className="mt-1 block text-xs font-normal leading-5 text-slate-600">
-                When enabled, the Companies list is filtered by the selected CRM user assignment.
-                Admin sees all companies. Sales Managers see companies where they are assigned
-                Sales Manager. Sales Reps see companies where they are assigned Salesperson / Rep. Contacts inherit related company visibility.
+                When enabled, the UI applies the selected CRM user's visibility scope.
+                Admins and Sales Managers currently see all records. Sales Reps see companies
+                where they are assigned as Salesperson / Rep. Contacts, Funnel, and Activities inherit related company visibility.
               </span>
             </span>
           </label>
@@ -3655,7 +3682,7 @@ function RoleTestingPanel({
         </div>
 
         <p className="mt-3 text-xs font-semibold text-amber-700">
-          Role visibility filters Companies, Contacts, Funnel opportunities, and Activities for Sales Reps. Admins and Sales Managers see all records.
+          Role visibility filters Companies, Contacts, Funnel opportunities, and Activities for Sales Reps. Admins and Sales Managers currently see all records.
         </p>
       </div>
 
