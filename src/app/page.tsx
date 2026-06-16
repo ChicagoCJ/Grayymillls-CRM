@@ -90,9 +90,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.87.1 - Role Navigation Fix";
+const APP_VERSION = "Rev 1.87.2 - Role Visibility Count Validation";
 const REVISION_NOTE =
-  "Decoupled role visibility testing from primary tab navigation.";
+  "Added role visibility count validation to confirm filtered company scope during controlled tests.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -1741,6 +1741,10 @@ async function handleAnalyzeProspect() {
           applyRoleVisibility={applyRoleVisibility}
           setApplyRoleVisibility={setApplyRoleVisibility}
           roleVisibilityNeedsUser={roleVisibilityNeedsUser}
+          roleTotalCompanyCount={crmSummary.companies.length}
+          roleVisibleCompanyCount={getRoleVisibleCompanies(crmSummary.companies).length}
+          roleAssignedCompanyCount={currentUserAssignedCompanyCount}
+          roleUnassignedCompanyCount={unassignedSalespersonCompanyCount}
           roleTestUsers={roleTestUsers}
           isLoadingRoleUsers={isLoadingRoleUsers}
           roleUserError={roleUserError}
@@ -3521,6 +3525,10 @@ function RoleTestingPanel({
   applyRoleVisibility,
   setApplyRoleVisibility,
   roleVisibilityNeedsUser,
+  roleTotalCompanyCount,
+  roleVisibleCompanyCount,
+  roleAssignedCompanyCount,
+  roleUnassignedCompanyCount,
   roleTestUsers,
   isLoadingRoleUsers,
   roleUserError,
@@ -3535,6 +3543,10 @@ function RoleTestingPanel({
   applyRoleVisibility: boolean;
   setApplyRoleVisibility: (value: boolean) => void;
   roleVisibilityNeedsUser: boolean;
+  roleTotalCompanyCount: number;
+  roleVisibleCompanyCount: number;
+  roleAssignedCompanyCount: number;
+  roleUnassignedCompanyCount: number;
   roleTestUsers: CrmUser[];
   isLoadingRoleUsers: boolean;
   roleUserError: string;
@@ -3574,6 +3586,18 @@ function RoleTestingPanel({
                 <span className={applyRoleVisibility ? "font-semibold text-green-700" : "font-semibold text-slate-700"}>
                   {applyRoleVisibility ? "ON" : "OFF"}
                 </span>
+              </p>
+              <p>
+                Total companies: <span className="font-semibold">{roleTotalCompanyCount}</span>
+              </p>
+              <p>
+                Visible companies: <span className="font-semibold">{roleVisibleCompanyCount}</span>
+              </p>
+              <p>
+                Assigned to selected user: <span className="font-semibold">{roleAssignedCompanyCount}</span>
+              </p>
+              <p>
+                Unassigned companies: <span className="font-semibold">{roleUnassignedCompanyCount}</span>
               </p>
             </div>
             <ol className="mt-3 list-decimal space-y-1 pl-5 text-xs leading-5 text-slate-600">
