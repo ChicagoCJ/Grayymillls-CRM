@@ -90,9 +90,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.84.11 - Source Corruption Cleanup";
+const APP_VERSION = "Rev 1.85 - CRM User Edit Drawer";
 const REVISION_NOTE =
-  "Removed corrupted mojibake literals embedded in the page source.";
+  "Changed CRM user editing from an inline jump form to a right-side edit drawer.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -3479,9 +3479,7 @@ function AdminFunnelStagesSection({
                       onClick={() => startEditingStage(stage)}
                       disabled={isSavingStage || !canManageFunnelStages}
                       className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
-                    >
-                      Edit
-                    </button>
+                    >Edit User</button>
 
                     {stage.status === "archived" ? (
                       <button
@@ -3784,6 +3782,8 @@ function AdminUsersSection() {
       notes: "",
       sortOrder: "100",
       status: "active",
+      userRole: "sales_rep",
+      coverageType: "internal",
     });
   }
 
@@ -3962,16 +3962,38 @@ function AdminUsersSection() {
         )}
       </div>
 
-      <div id="admin-user-form" className={`scroll-mt-24 rounded-2xl bg-white p-6 shadow-sm ${!isAdminMode ? "opacity-75" : ""}`}>
+      <div
+        id="admin-user-form"
+        className={
+          editingUserId
+            ? "fixed inset-y-0 right-0 z-50 w-full max-w-3xl overflow-y-auto bg-white p-6 shadow-2xl ring-1 ring-slate-200"
+            : `scroll-mt-24 rounded-2xl bg-white p-6 shadow-sm ${!isAdminMode ? "opacity-75" : ""}`
+        }
+      >
         <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
           <div>
             <h3 className="text-xl font-bold">{editingUserId ? "Edit CRM User" : "Create CRM User"}</h3>
+            {editingUserId && (
+              <p className="mt-2 text-sm text-slate-600">
+                Editing opens in this drawer. Save or cancel to return to the owner list.
+              </p>
+            )}
             {!isAdminMode && (
               <p className="mt-2 text-sm text-slate-600">
                 Turn on Admin Mode to create or edit owners.
               </p>
             )}
           </div>
+
+          {editingUserId && (
+            <button
+              onClick={resetUserForm}
+              disabled={isSavingUser}
+              className="w-fit rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
+            >
+              Close
+            </button>
+          )}
         </div>
 
         <div className="mt-5 grid gap-4 lg:grid-cols-5">
@@ -4178,9 +4200,7 @@ function AdminUsersSection() {
                       onClick={() => startEditingUser(user)}
                       disabled={ownerControlsDisabled}
                       className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
-                    >
-                      Edit
-                    </button>
+                    >Edit User</button>
 
                     {user.status === "archived" ? (
                       <button
@@ -4736,9 +4756,7 @@ function AdminTagGroup({
                         onClick={() => onEdit(tag)}
                         disabled={isSaving}
                         className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
-                      >
-                        Edit
-                      </button>
+                      >Edit User</button>
 
                       {tag.status === "archived" ? (
                         <button
