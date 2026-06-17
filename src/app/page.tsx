@@ -85,9 +85,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.01 - Role Visibility Reminder Cleanup";
+const APP_VERSION = "Rev 2.02 - Role Visibility Test Pass Notes";
 const REVISION_NOTE =
-  "Cleaned up duplicate role visibility test reminders while keeping the production review checkpoint intact.";
+  "Added role visibility test pass notes to support Admin, Sales Manager, and Sales Rep production validation before removing manual test controls.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -3804,6 +3804,17 @@ function RoleTestingPanel({
             <p className="mt-1">
               Confirm Admin broad visibility, Sales Manager broad visibility, Sales Rep scoped visibility, coverage filters, work queue shortcuts, and assignment badges before treating the role model as stable.
             </p>
+          </div>
+
+          <div className="mt-4 rounded-xl border border-green-200 bg-white p-3 text-xs leading-5 text-green-900 ring-1 ring-green-100">
+            <p className="font-bold text-green-950">Role visibility test pass notes</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              <li>Admin pass: sees all companies, contacts, funnel records, and activities; Admin tab remains available.</li>
+              <li>Sales Manager pass: sees all companies, contacts, funnel records, and activities; Admin user management remains unavailable.</li>
+              <li>Sales Rep pass: sees only companies assigned as Salesperson / Rep, with related contacts, funnel records, and activities.</li>
+              <li>Coverage pass: KPI cards, assignment flags, work queue shortcuts, and coverage filters align with visible company records.</li>
+              <li>Cleanup pass: Apply Role Visibility is returned to OFF after testing.</li>
+            </ul>
           </div>
         </div>
       </div>
