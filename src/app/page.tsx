@@ -85,9 +85,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.99 - CRM User Role Status Cleanup";
+const APP_VERSION = "Rev 2.00 - Production Role Visibility Review";
 const REVISION_NOTE =
-  "Polished CRM user role and status guidance, clarified role responsibilities, and tightened Admin Mode controls for role and coverage fields.";
+  "Added a production role visibility review checkpoint confirming Admin, Sales Manager, and Sales Rep behavior before stabilizing the role model.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -3666,6 +3666,7 @@ function RoleTestingPanel({
               <li>Use a Sales Manager to confirm broad assignment-management visibility.</li>
               <li>Use a Sales Rep with known company assignments to confirm scoped rep visibility.</li>
               <li>Turn Apply Role Visibility ON only long enough to compare visible Companies, Contacts, Funnel, and Activities.</li>
+              <li>Return Apply Role Visibility to OFF after testing.</li>
               <li>Turn Apply Role Visibility OFF after each test pass.</li>
             </ol>
           </div>
@@ -3772,6 +3773,40 @@ function RoleTestingPanel({
         <p className="mt-3 text-xs font-semibold text-amber-700">
           Role visibility filters Companies, Contacts, Funnel opportunities, and Activities for Sales Reps. Admins and Sales Managers currently see all records.
         </p>
+
+        <div className="mt-5 rounded-2xl border border-green-200 bg-green-50 p-4">
+          <p className="text-xs font-bold uppercase tracking-wide text-green-700">Production Role Visibility Review</p>
+          <h4 className="mt-2 text-lg font-bold text-green-950">Role model checkpoint</h4>
+          <div className="mt-3 grid gap-3 lg:grid-cols-3">
+            <div className="rounded-xl bg-white p-3 ring-1 ring-green-100">
+              <p className="text-sm font-bold text-green-950">Admin</p>
+              <p className="mt-1 text-xs leading-5 text-green-900">
+                Sees all CRM records and can manage users, imports, workflow settings, assignments, and admin configuration.
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-white p-3 ring-1 ring-green-100">
+              <p className="text-sm font-bold text-green-950">Sales Manager</p>
+              <p className="mt-1 text-xs leading-5 text-green-900">
+                Sees all companies, contacts, funnel records, and activities for oversight and coverage management, without user/admin settings.
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-white p-3 ring-1 ring-green-100">
+              <p className="text-sm font-bold text-green-950">Sales Rep</p>
+              <p className="mt-1 text-xs leading-5 text-green-900">
+                Sees companies assigned as Salesperson / Rep; contacts, funnel opportunities, and activities inherit company visibility.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-xl bg-white p-3 text-xs leading-5 text-green-900 ring-1 ring-green-100">
+            <p className="font-bold text-green-950">Production validation checklist</p>
+            <p className="mt-1">
+              Confirm Admin broad visibility, Sales Manager broad visibility, Sales Rep scoped visibility, coverage filters, work queue shortcuts, and assignment badges before treating the role model as stable.
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
