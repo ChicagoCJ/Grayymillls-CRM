@@ -1,5 +1,7 @@
 "use client";
 
+
+import { getBrowserSupabaseClient, hasBrowserSupabaseConfig } from "../lib/supabase-browser";
 import { ChangeEvent, ReactNode, useEffect, useMemo, useState } from "react";
 
 type TabKey = "dashboard" | "companies" | "contacts" | "funnel" | "import" | "releaseNotes" | "admin" | "companyDetail";
@@ -85,11 +87,20 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.05 - Supabase Auth Foundation";
+const APP_VERSION = "Rev 2.06 - Signed-In Session Status Panel";
 const REVISION_NOTE =
-  "Added the browser Supabase client foundation needed for future signed-in user session and CRM role enforcement.";
+  "Added a non-permission-changing signed-in Supabase session status panel to prepare for production CRM user role enforcement.";
 
-  const REQUIRED_FIELDS = ["Company Name"];
+  
+
+type SignedInSessionStatus = {
+  state: "checking" | "not_configured" | "signed_out" | "signed_in" | "error";
+  email: string;
+  userId: string;
+  message: string;
+};
+
+const REQUIRED_FIELDS = ["Company Name"];
 
 const CRM_FIELDS = [
   {
@@ -3859,6 +3870,8 @@ function RoleTestingPanel({
               <li>Only after that should Apply Role Visibility and manual test controls be removed.</li>
             </ol>
           </div>
+
+          <SignedInSessionStatusPanel />
         </div>
       </div>
 
@@ -3917,6 +3930,133 @@ function UserRolePermissionsReference() {
         ))}
       </div>
     </section>
+  );
+}
+
+
+function SignedInSessionStatusPanel() {
+  const [sessionStatus, setSessionStatus] = useState<SignedInSessionStatus>({
+    state: "checking",
+    email: "",
+    userId: "",
+    message: "Checking browser Supabase session.",
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSessionStatus() {
+      try {
+        if (!hasBrowserSupabaseConfig()) {
+          if (!cancelled) {
+            setSessionStatus({
+              state: "not_configured",
+              email: "",
+              userId: "",
+              message: "Browser Supabase configuration is not available in this environment.",
+            });
+          }
+          return;
+        }
+
+        const supabase = getBrowserSupabaseClient();
+        const { data, error } = await supabase.auth.getSession();
+
+        if (cancelled) {
+          return;
+        }
+
+        if (error) {
+          setSessionStatus({
+            state: "error",
+            email: "",
+            userId: "",
+            message: error.message || "Could not read the browser Supabase session.",
+          });
+          return;
+        }
+
+        const session = data.session;
+        const user = session?.user;
+
+        if (!user) {
+          setSessionStatus({
+            state: "signed_out",
+            email: "",
+            userId: "",
+            message: "No signed-in Supabase user session is currently detected.",
+          });
+          return;
+        }
+
+        setSessionStatus({
+          state: "signed_in",
+          email: user.email || "",
+          userId: user.id || "",
+          message: "Signed-in Supabase user session detected. Permissions are not yet driven by this session.",
+        });
+      } catch (error) {
+        if (!cancelled) {
+          setSessionStatus({
+            state: "error",
+            email: "",
+            userId: "",
+            message: error instanceof Error ? error.message : "Could not inspect the browser Supabase session.",
+          });
+        }
+      }
+    }
+
+    loadSessionStatus();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const statusLabel =
+    sessionStatus.state === "signed_in"
+      ? "Signed in"
+      : sessionStatus.state === "signed_out"
+        ? "Signed out"
+        : sessionStatus.state === "not_configured"
+          ? "Not configured"
+          : sessionStatus.state === "error"
+            ? "Error"
+            : "Checking";
+
+  const statusClassName =
+    sessionStatus.state === "signed_in"
+      ? "bg-green-100 text-green-800 ring-green-200"
+      : sessionStatus.state === "error"
+        ? "bg-red-100 text-red-800 ring-red-200"
+        : sessionStatus.state === "not_configured"
+          ? "bg-amber-100 text-amber-800 ring-amber-200"
+          : "bg-slate-100 text-slate-800 ring-slate-200";
+
+  return (
+    <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3 text-xs leading-5 text-slate-800 ring-1 ring-slate-100">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="font-bold text-slate-950">Signed-In Session Status</p>
+        <span className={`rounded-full px-2 py-1 text-[11px] font-bold ring-1 ${statusClassName}`}>
+          {statusLabel}
+        </span>
+      </div>
+      <p className="mt-2">{sessionStatus.message}</p>
+      <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+        <div className="rounded-lg bg-slate-50 p-2">
+          <dt className="font-semibold text-slate-500">Detected email</dt>
+          <dd className="mt-1 break-all text-slate-900">{sessionStatus.email || "None detected"}</dd>
+        </div>
+        <div className="rounded-lg bg-slate-50 p-2">
+          <dt className="font-semibold text-slate-500">Detected auth user id</dt>
+          <dd className="mt-1 break-all text-slate-900">{sessionStatus.userId || "None detected"}</dd>
+        </div>
+      </dl>
+      <p className="mt-3 text-slate-600">
+        This panel is informational only. Manual role testing remains active until signed-in CRM user role matching is implemented and verified.
+      </p>
+    </div>
   );
 }
 
