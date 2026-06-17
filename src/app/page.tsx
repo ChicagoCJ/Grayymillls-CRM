@@ -85,9 +85,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.02 - Role Visibility Test Pass Notes";
+const APP_VERSION = "Rev 2.03 - Auth Role Source Review";
 const REVISION_NOTE =
-  "Added role visibility test pass notes to support Admin, Sales Manager, and Sales Rep production validation before removing manual test controls.";
+  "Added an auth and role source review plan for replacing manual role visibility testing with signed-in CRM user permissions.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -3815,6 +3815,21 @@ function RoleTestingPanel({
               <li>Coverage pass: KPI cards, assignment flags, work queue shortcuts, and coverage filters align with visible company records.</li>
               <li>Cleanup pass: Apply Role Visibility is returned to OFF after testing.</li>
             </ul>
+          </div>
+
+          <div className="mt-4 rounded-xl border border-blue-200 bg-white p-3 text-xs leading-5 text-blue-900 ring-1 ring-blue-100">
+            <p className="font-bold text-blue-950">Auth / Role Source Review</p>
+            <p className="mt-1">
+              Manual role testing should remain only until the app uses the signed-in Supabase user as the source of CRM identity.
+            </p>
+            <ol className="mt-2 list-decimal space-y-1 pl-5">
+              <li>Confirm Supabase auth identifies the signed-in user by email or user id.</li>
+              <li>Match the signed-in user to the CRM Users table.</li>
+              <li>Use CRM User Role to drive Admin, Sales Manager, and Sales Rep permissions.</li>
+              <li>Use CRM User Status so archived users cannot receive new assignment coverage.</li>
+              <li>Replace Apply Role Visibility with always-on production role enforcement.</li>
+              <li>Remove manual role dropdowns, test user selectors, and temporary role visibility controls after signed-in role enforcement is verified.</li>
+            </ol>
           </div>
         </div>
       </div>
