@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.10 - Auth Enforcement Readiness Gate";
+const APP_VERSION = "Rev 2.11 - Login Required CRM Shell";
 const REVISION_NOTE =
-  "Added an auth enforcement readiness gate before replacing manual role testing with signed-in CRM user permissions.";
+  "Blocked the CRM shell behind Supabase email/password login so unauthenticated users cannot enter the workspace.";
 
   
 
@@ -904,13 +904,11 @@ export default function Home() {
         contactCategoryTagFilter === "All" ||
         contactCategoryNames.includes(contactCategoryTagFilter);
 
-      return (
-        matchesSearch &&
+      return (matchesSearch &&
         matchesMarketTag &&
         matchesSectorTag &&
         matchesCategoryTag &&
-        matchesContactRoleVisibility
-      );
+        matchesContactRoleVisibility);
     });
     }, [
     crmSummary.contacts,
@@ -1794,6 +1792,7 @@ async function handleAnalyzeProspect() {
     matchesDiagnosticsCompanySearch
   );
   return (
+    <LoginRequiredCrmShellGate>
     <main className="min-h-screen bg-slate-100 text-slate-900">
       <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-6">
         <header className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
@@ -2712,7 +2711,8 @@ async function handleAnalyzeProspect() {
         )}
       </div>
     </main>
-  );
+  
+    </LoginRequiredCrmShellGate>);
 }
 
 function readSelectedImportTagIds() {
@@ -4012,6 +4012,185 @@ function UserRolePermissionsReference() {
   );
 }
 
+
+
+type LoginRequiredCrmShellGateProps = {
+  children: ReactNode;
+};
+
+type LoginRequiredCrmShellStatus = {
+  state: "checking" | "not_configured" | "signed_out" | "signed_in" | "error";
+  message: string;
+};
+
+function LoginRequiredCrmShellGate({ children }: LoginRequiredCrmShellGateProps) {
+  const [gateStatus, setGateStatus] = useState<LoginRequiredCrmShellStatus>({
+    state: "checking",
+    message: "Checking signed-in Supabase session.",
+  });
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginBusy, setLoginBusy] = useState(false);
+  const [loginMessage, setLoginMessage] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function checkSession() {
+      try {
+        if (!hasBrowserSupabaseConfig()) {
+          if (!cancelled) {
+            setGateStatus({
+              state: "not_configured",
+              message: "Browser Supabase configuration is not available. CRM access is locked.",
+            });
+          }
+          return;
+        }
+
+        const supabase = getBrowserSupabaseClient();
+        const { data, error } = await supabase.auth.getSession();
+
+        if (cancelled) {
+          return;
+        }
+
+        if (error) {
+          setGateStatus({
+            state: "error",
+            message: error.message || "Could not read the Supabase session. CRM access is locked.",
+          });
+          return;
+        }
+
+        setGateStatus(
+          data.session?.user
+            ? {
+                state: "signed_in",
+                message: "Signed-in Supabase session detected.",
+              }
+            : {
+                state: "signed_out",
+                message: "Sign in to access the Graymills CRM workspace.",
+              }
+        );
+      } catch (error) {
+        if (!cancelled) {
+          setGateStatus({
+            state: "error",
+            message: error instanceof Error ? error.message : "Could not verify Supabase session. CRM access is locked.",
+          });
+        }
+      }
+    }
+
+    checkSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function handleLoginRequiredShellSignIn(event: { preventDefault: () => void }) {
+    event.preventDefault();
+    setLoginBusy(true);
+    setLoginMessage("");
+
+    try {
+      if (!hasBrowserSupabaseConfig()) {
+        setLoginMessage("Browser Supabase configuration is not available.");
+        return;
+      }
+
+      const supabase = getBrowserSupabaseClient();
+      const { error } = await supabase.auth.signInWithPassword({
+        email: loginEmail.trim(),
+        password: loginPassword,
+      });
+
+      if (error) {
+        setLoginMessage(error.message || "Could not sign in.");
+        return;
+      }
+
+      setGateStatus({
+        state: "signed_in",
+        message: "Signed-in Supabase session detected.",
+      });
+      setLoginPassword("");
+    } catch (error) {
+      setLoginMessage(error instanceof Error ? error.message : "Could not sign in.");
+    } finally {
+      setLoginBusy(false);
+    }
+  }
+
+  if (gateStatus.state === "signed_in") {
+    return <>{children}</>;
+  }
+
+  return (
+    <main className="min-h-screen bg-slate-950 px-4 py-10 text-slate-100">
+      <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-xl items-center">
+        <section className="w-full rounded-3xl border border-slate-700 bg-white p-6 text-slate-900 shadow-2xl">
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-blue-700">Graymills CRM</p>
+          <h1 className="mt-3 text-3xl font-black text-slate-950">Login required</h1>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            The CRM workspace is locked until a Supabase Auth user signs in. Use the email and password created for the user in Supabase Authentication.
+          </p>
+
+          <div className="mt-4 rounded-xl bg-slate-50 p-3 text-xs leading-5 text-slate-700 ring-1 ring-slate-200">
+            <p className="font-bold text-slate-950">Access status</p>
+            <p className="mt-1">{gateStatus.message}</p>
+            <p className="mt-2 text-slate-500">{APP_VERSION}</p>
+          </div>
+
+          <form className="mt-5 grid gap-3" onSubmit={handleLoginRequiredShellSignIn}>
+            <label className="grid gap-1 text-sm font-semibold text-slate-700">
+              Email
+              <input
+                className="rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                type="email"
+                value={loginEmail}
+                onChange={(event) => setLoginEmail(event.target.value)}
+                placeholder="name@graymills.com"
+                autoComplete="email"
+              />
+            </label>
+
+            <label className="grid gap-1 text-sm font-semibold text-slate-700">
+              Password
+              <input
+                className="rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                type="password"
+                value={loginPassword}
+                onChange={(event) => setLoginPassword(event.target.value)}
+                placeholder="Password"
+                autoComplete="current-password"
+              />
+            </label>
+
+            <button
+              className="rounded-xl bg-blue-700 px-4 py-3 text-sm font-bold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-blue-300"
+              type="submit"
+              disabled={loginBusy || !loginEmail.trim() || !loginPassword}
+            >
+              {loginBusy ? "Signing in..." : "Sign in to CRM"}
+            </button>
+          </form>
+
+          {loginMessage ? (
+            <p className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-800 ring-1 ring-red-100">{loginMessage}</p>
+          ) : null}
+
+          <p className="mt-5 text-xs leading-5 text-slate-500">
+            After login, CRM role enforcement will still be validated separately through the signed-in CRM user match and role preview workflow.
+          </p>
+        </section>
+      </div>
+    </main>
+  );
+}
 
 function SignedInSessionStatusPanel() {
   const [sessionStatus, setSessionStatus] = useState<SignedInSessionStatus>({
