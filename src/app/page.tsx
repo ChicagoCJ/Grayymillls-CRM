@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.08 - Signed-In CRM User Match";
+const APP_VERSION = "Rev 2.09 - Signed-In CRM Role Preview";
 const REVISION_NOTE =
-  "Added an informational signed-in CRM user match panel that compares the Supabase Auth email to CRM Users before permission enforcement.";
+  "Added a signed-in CRM role preview showing which production permissions would be applied after CRM user matching is enforced.";
 
   
 
@@ -3903,6 +3903,8 @@ function RoleTestingPanel({
           <SupabaseEmailPasswordLoginPanel />
 
           <SignedInCrmUserMatchPanel />
+
+          <SignedInCrmRolePreviewPanel />
         </div>
       </div>
 
@@ -4092,6 +4094,53 @@ function SignedInSessionStatusPanel() {
 }
 
 
+
+
+type SignedInCrmRolePreviewStatus = {
+  state: "checking" | "not_configured" | "signed_out" | "ready" | "blocked" | "not_matched" | "error";
+  authEmail: string;
+  crmUserName: string;
+  crmUserRole: string;
+  crmUserStatus: string;
+  permissionPreview: string;
+  message: string;
+};
+
+function normalizeCrmRolePreviewValue(value: string) {
+  const normalized = value.trim().toLowerCase();
+
+  if (normalized === "admin") {
+    return "Admin";
+  }
+
+  if (normalized === "sales_manager" || normalized === "sales manager" || normalized === "manager") {
+    return "Sales Manager";
+  }
+
+  if (normalized === "sales_rep" || normalized === "sales rep" || normalized === "rep") {
+    return "Sales Rep";
+  }
+
+  return value.trim();
+}
+
+function getCrmRolePermissionPreview(role: string) {
+  const normalizedRole = normalizeCrmRolePreviewValue(role);
+
+  if (normalizedRole === "Admin") {
+    return "Would receive full CRM access, including Admin user management, imports, workflow settings, assignments, and all CRM records.";
+  }
+
+  if (normalizedRole === "Sales Manager") {
+    return "Would receive broad CRM visibility across companies, contacts, funnel records, and activities for assignment and pipeline oversight, without Admin user management.";
+  }
+
+  if (normalizedRole === "Sales Rep") {
+    return "Would receive scoped CRM visibility for companies assigned as Salesperson / Rep, with related contacts, funnel records, and activities.";
+  }
+
+  return "No recognized production permission preview is available for this CRM role.";
+}
 
 function SignedInCrmUserMatchPanel() {
   const [matchStatus, setMatchStatus] = useState<SignedInCrmUserMatchStatus>({
@@ -4327,6 +4376,247 @@ function SignedInCrmUserMatchPanel() {
 
       <p className="mt-3 text-emerald-800">
         This panel is informational only. Production permissions are not yet driven by the signed-in CRM user.
+      </p>
+    </div>
+  );
+}
+
+
+function SignedInCrmRolePreviewPanel() {
+  const [rolePreview, setRolePreview] = useState<SignedInCrmRolePreviewStatus>({
+    state: "checking",
+    authEmail: "",
+    crmUserName: "",
+    crmUserRole: "",
+    crmUserStatus: "",
+    permissionPreview: "",
+    message: "Checking which CRM role would be applied for the signed-in user.",
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSignedInCrmRolePreview() {
+      try {
+        if (!hasBrowserSupabaseConfig()) {
+          if (!cancelled) {
+            setRolePreview({
+              state: "not_configured",
+              authEmail: "",
+              crmUserName: "",
+              crmUserRole: "",
+              crmUserStatus: "",
+              permissionPreview: "",
+              message: "Browser Supabase configuration is not available in this environment.",
+            });
+          }
+          return;
+        }
+
+        const supabase = getBrowserSupabaseClient();
+        const { data, error } = await supabase.auth.getSession();
+
+        if (cancelled) {
+          return;
+        }
+
+        if (error) {
+          setRolePreview({
+            state: "error",
+            authEmail: "",
+            crmUserName: "",
+            crmUserRole: "",
+            crmUserStatus: "",
+            permissionPreview: "",
+            message: error.message || "Could not read the browser Supabase session.",
+          });
+          return;
+        }
+
+        const authUser = data.session?.user;
+        const authEmail = authUser?.email?.trim().toLowerCase() || "";
+
+        if (!authUser || !authEmail) {
+          setRolePreview({
+            state: "signed_out",
+            authEmail: "",
+            crmUserName: "",
+            crmUserRole: "",
+            crmUserStatus: "",
+            permissionPreview: "",
+            message: "No signed-in Supabase Auth user is available for CRM role preview.",
+          });
+          return;
+        }
+
+        const response = await fetch("/api/crm-users?includeInactive=true");
+        const payload = (await response.json()) as unknown;
+
+        if (!response.ok) {
+          const apiMessage =
+            typeof payload === "object" &&
+            payload !== null &&
+            "error" in payload &&
+            typeof (payload as { error?: unknown }).error === "string"
+              ? (payload as { error: string }).error
+              : "Could not load CRM Users.";
+
+          setRolePreview({
+            state: "error",
+            authEmail,
+            crmUserName: "",
+            crmUserRole: "",
+            crmUserStatus: "",
+            permissionPreview: "",
+            message: apiMessage,
+          });
+          return;
+        }
+
+        const crmUsers =
+          Array.isArray(payload)
+            ? payload
+            : typeof payload === "object" &&
+                payload !== null &&
+                "users" in payload &&
+                Array.isArray((payload as { users?: unknown }).users)
+              ? (payload as { users: unknown[] }).users
+              : [];
+
+        const matchedUser = crmUsers.find((candidate) => {
+          if (!candidate || typeof candidate !== "object") {
+            return false;
+          }
+
+          const record = candidate as CrmUserMatchRecord;
+          const crmEmail = getCrmUserMatchField(record, ["email", "user_email", "auth_email"]).toLowerCase();
+
+          return crmEmail === authEmail;
+        });
+
+        if (!matchedUser || typeof matchedUser !== "object") {
+          setRolePreview({
+            state: "not_matched",
+            authEmail,
+            crmUserName: "",
+            crmUserRole: "",
+            crmUserStatus: "",
+            permissionPreview: "",
+            message: "No CRM Users record matches the signed-in Supabase Auth email.",
+          });
+          return;
+        }
+
+        const crmUser = matchedUser as CrmUserMatchRecord;
+        const crmUserName =
+          getCrmUserMatchField(crmUser, ["display_name", "name", "full_name"]) || authEmail;
+        const crmUserRole = normalizeCrmRolePreviewValue(
+          getCrmUserMatchField(crmUser, ["role", "crm_role", "user_role"])
+        );
+        const crmUserStatus = getCrmUserMatchField(crmUser, ["status", "user_status"]);
+        const normalizedStatus = crmUserStatus.trim().toLowerCase();
+        const permissionPreview = getCrmRolePermissionPreview(crmUserRole);
+        const roleIsRecognized =
+          crmUserRole === "Admin" || crmUserRole === "Sales Manager" || crmUserRole === "Sales Rep";
+        const userIsActive = normalizedStatus === "active";
+
+        setRolePreview({
+          state: roleIsRecognized && userIsActive ? "ready" : "blocked",
+          authEmail,
+          crmUserName,
+          crmUserRole,
+          crmUserStatus,
+          permissionPreview,
+          message:
+            roleIsRecognized && userIsActive
+              ? "CRM user is active and has a recognized production role. This role is ready for future enforcement."
+              : "CRM user match exists, but role enforcement should remain blocked until the role is recognized and status is Active.",
+        });
+      } catch (error) {
+        if (!cancelled) {
+          setRolePreview({
+            state: "error",
+            authEmail: "",
+            crmUserName: "",
+            crmUserRole: "",
+            crmUserStatus: "",
+            permissionPreview: "",
+            message: error instanceof Error ? error.message : "Could not preview signed-in CRM role.",
+          });
+        }
+      }
+    }
+
+    loadSignedInCrmRolePreview();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const statusLabel =
+    rolePreview.state === "ready"
+      ? "Ready for enforcement"
+      : rolePreview.state === "blocked"
+        ? "Blocked"
+        : rolePreview.state === "not_matched"
+          ? "Not matched"
+          : rolePreview.state === "signed_out"
+            ? "Signed out"
+            : rolePreview.state === "not_configured"
+              ? "Not configured"
+              : rolePreview.state === "error"
+                ? "Error"
+                : "Checking";
+
+  const statusClassName =
+    rolePreview.state === "ready"
+      ? "bg-green-100 text-green-800 ring-green-200"
+      : rolePreview.state === "blocked" || rolePreview.state === "not_matched" || rolePreview.state === "error"
+        ? "bg-red-100 text-red-800 ring-red-200"
+        : rolePreview.state === "not_configured"
+          ? "bg-amber-100 text-amber-800 ring-amber-200"
+          : "bg-slate-100 text-slate-800 ring-slate-200";
+
+  return (
+    <div className="mt-4 rounded-xl border border-purple-200 bg-white p-3 text-xs leading-5 text-purple-900 ring-1 ring-purple-100">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="font-bold text-purple-950">Signed-In CRM Role Preview</p>
+        <span className={`rounded-full px-2 py-1 text-[11px] font-bold ring-1 ${statusClassName}`}>
+          {statusLabel}
+        </span>
+      </div>
+
+      <p className="mt-2">{rolePreview.message}</p>
+
+      <dl className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-lg bg-purple-50 p-2">
+          <dt className="font-semibold text-purple-700">Supabase Auth email</dt>
+          <dd className="mt-1 break-all text-slate-900">{rolePreview.authEmail || "None detected"}</dd>
+        </div>
+        <div className="rounded-lg bg-purple-50 p-2">
+          <dt className="font-semibold text-purple-700">CRM user</dt>
+          <dd className="mt-1 text-slate-900">{rolePreview.crmUserName || "No match"}</dd>
+        </div>
+        <div className="rounded-lg bg-purple-50 p-2">
+          <dt className="font-semibold text-purple-700">Role to enforce later</dt>
+          <dd className="mt-1 text-slate-900">{rolePreview.crmUserRole || "No role detected"}</dd>
+        </div>
+        <div className="rounded-lg bg-purple-50 p-2">
+          <dt className="font-semibold text-purple-700">CRM status</dt>
+          <dd className="mt-1 text-slate-900">{rolePreview.crmUserStatus || "No status detected"}</dd>
+        </div>
+      </dl>
+
+      <div className="mt-3 rounded-lg bg-purple-50 p-3 ring-1 ring-purple-100">
+        <p className="font-bold text-purple-950">Permission preview</p>
+        <p className="mt-1 text-purple-900">
+          {rolePreview.permissionPreview || "No permission preview is available yet."}
+        </p>
+      </div>
+
+      <p className="mt-3 text-purple-800">
+        This panel is a preview only. Production permissions are still controlled by the manual role visibility test harness.
       </p>
     </div>
   );
