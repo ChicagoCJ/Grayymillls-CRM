@@ -85,9 +85,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.94 - Coverage Filter Polish";
+const APP_VERSION = "Rev 1.95 - Coverage KPI Cards";
 const REVISION_NOTE =
-  "Added guidance for company coverage filters and clarified Sales Manager labeling in company detail.";
+  "Added coverage KPI cards for visible companies, missing Salesperson / Rep coverage, missing Sales Manager coverage, and fully assigned accounts.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -6403,6 +6403,19 @@ function CompaniesSection({
   const activeBulkAssignmentUsers = bulkAssignmentUsers.filter(
     (user) => !user.status || String(user.status).toLowerCase() === "active"
   );
+
+  const missingSalespersonCoverageCount = companies.filter(
+    (company) => !String(company.assigned_salesperson_id || "")
+  ).length;
+  const missingSalesManagerCoverageCount = companies.filter(
+    (company) => !String(company.assigned_sales_manager_id || "")
+  ).length;
+  const fullyAssignedCoverageCount = companies.filter(
+    (company) =>
+      Boolean(String(company.assigned_salesperson_id || "")) &&
+      Boolean(String(company.assigned_sales_manager_id || ""))
+  ).length;
+
   const bulkManagerUsers = activeBulkAssignmentUsers.filter((user) => {
     const role = String(user.user_role || user.role || user.userRole || "")
       .toLowerCase()
@@ -6490,6 +6503,32 @@ function CompaniesSection({
           Apply Role Visibility is on, but no CRM user is selected. Select a CRM user to test Sales Manager or Sales Rep visibility.
         </div>
       )}
+
+      <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Coverage Snapshot</p>
+          <p className="mt-2 text-2xl font-black text-slate-900">{companies.length}</p>
+          <p className="mt-1 text-xs text-slate-600">Visible companies in current view</p>
+        </div>
+
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Missing Rep</p>
+          <p className="mt-2 text-2xl font-black text-amber-900">{missingSalespersonCoverageCount}</p>
+          <p className="mt-1 text-xs text-amber-800">No Salesperson / Rep assigned</p>
+        </div>
+
+        <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4">
+          <p className="text-xs font-bold uppercase tracking-wide text-orange-700">Missing Manager</p>
+          <p className="mt-2 text-2xl font-black text-orange-900">{missingSalesManagerCoverageCount}</p>
+          <p className="mt-1 text-xs text-orange-800">No Sales Manager assigned</p>
+        </div>
+
+        <div className="rounded-2xl border border-green-200 bg-green-50 p-4">
+          <p className="text-xs font-bold uppercase tracking-wide text-green-700">Fully Assigned</p>
+          <p className="mt-2 text-2xl font-black text-green-900">{fullyAssignedCoverageCount}</p>
+          <p className="mt-1 text-xs text-green-800">Rep and manager coverage present</p>
+        </div>
+      </div>
 
       <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
         <div className="grid gap-4 lg:grid-cols-4">
