@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.12 - Backup Restore Readiness";
+const APP_VERSION = "Rev 2.13 - Backup Export";
 const REVISION_NOTE =
-  "Added backup and restore readiness requirements before irreversible auth, role, import, or cleanup changes.";
+  "Added an Admin-only backup export workflow that downloads core CRM operational data as a dated JSON backup file.";
 
   
 
@@ -3945,9 +3945,6 @@ function RoleTestingPanel({
             </div>
 
             <div className="mt-3 rounded-lg bg-white p-3 ring-1 ring-orange-100">
-              <p className="font-bold text-orange-950">Future workflow idea: Outlook email drag-and-drop
-
-            <div className="mt-3 rounded-lg bg-white p-3 ring-1 ring-orange-100">
               <p className="font-bold text-orange-950">Backup & Restore Readiness</p>
               <p className="mt-1">
                 Before removing the manual role harness or adding restore workflows, the CRM needs a controlled backup plan for core operational data.
@@ -3961,7 +3958,12 @@ function RoleTestingPanel({
                 <li>Prevent accidental overwrite of production data without a dated backup file and explicit confirmation.</li>
                 <li>Keep manual database backups in Supabase available as the fallback during early restore testing.</li>
               </ol>
-            </div></p>
+            </div>
+
+            <BackupExportPanel />
+
+            <div className="mt-3 rounded-lg bg-white p-3 ring-1 ring-orange-100">
+              <p className="font-bold text-orange-950">Future workflow idea: Outlook email drag-and-drop</p>
               <p className="mt-1">
                 Evaluate whether users can drag Outlook emails or saved message files into the CRM to create activities, notes, or follow-up records. This should be scoped after auth enforcement and backup/restore planning.
               </p>
@@ -4205,6 +4207,84 @@ function LoginRequiredCrmShellGate({ children }: LoginRequiredCrmShellGateProps)
         </section>
       </div>
     </main>
+  );
+}
+
+
+function BackupExportPanel() {
+  const [backupExportBusy, setBackupExportBusy] = useState(false);
+  const [backupExportMessage, setBackupExportMessage] = useState("");
+
+  async function handleBackupExport() {
+    setBackupExportBusy(true);
+    setBackupExportMessage("");
+
+    try {
+      const response = await fetch("/api/backup-export", {
+        method: "GET",
+        headers: {
+          "x-crm-user-role": "admin",
+          "x-crm-user-name": "Backup Export",
+        },
+      });
+
+      if (!response.ok) {
+        const errorPayload = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(errorPayload?.error || "Backup export failed.");
+      }
+
+      const blob = await response.blob();
+      const contentDisposition = response.headers.get("Content-Disposition") || "";
+      const fileNameMatch = contentDisposition.match(/filename="([^"]+)"/);
+      const fileName = fileNameMatch?.[1] || `graymills-crm-backup-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
+
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      setBackupExportMessage(`Backup export downloaded: ${fileName}`);
+    } catch (error) {
+      setBackupExportMessage(error instanceof Error ? error.message : "Could not download backup export.");
+    } finally {
+      setBackupExportBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-4 rounded-xl border border-cyan-200 bg-white p-3 text-xs leading-5 text-cyan-900 ring-1 ring-cyan-100">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="font-bold text-cyan-950">Backup Export</p>
+        <span className="rounded-full bg-cyan-100 px-2 py-1 text-[11px] font-bold text-cyan-800 ring-1 ring-cyan-200">
+          Export only
+        </span>
+      </div>
+
+      <p className="mt-2">
+        Download a dated JSON backup of core CRM operational tables. This does not restore, overwrite, or modify CRM data.
+      </p>
+
+      <button
+        className="mt-3 rounded-lg bg-cyan-700 px-3 py-2 text-sm font-bold text-white shadow-sm hover:bg-cyan-800 disabled:cursor-not-allowed disabled:bg-cyan-300"
+        type="button"
+        onClick={handleBackupExport}
+        disabled={backupExportBusy}
+      >
+        {backupExportBusy ? "Creating backup..." : "Download CRM backup JSON"}
+      </button>
+
+      {backupExportMessage ? (
+        <p className="mt-3 rounded-lg bg-cyan-50 p-2 text-cyan-900 ring-1 ring-cyan-100">{backupExportMessage}</p>
+      ) : null}
+
+      <p className="mt-3 text-cyan-800">
+        Restore remains intentionally disabled until preview, row-count validation, Admin confirmation, and overwrite protections are added.
+      </p>
+    </div>
   );
 }
 
