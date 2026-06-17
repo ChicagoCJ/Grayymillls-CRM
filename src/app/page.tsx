@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.11 - Login Required CRM Shell";
+const APP_VERSION = "Rev 2.12 - Backup Restore Readiness";
 const REVISION_NOTE =
-  "Blocked the CRM shell behind Supabase email/password login so unauthenticated users cannot enter the workspace.";
+  "Added backup and restore readiness requirements before irreversible auth, role, import, or cleanup changes.";
 
   
 
@@ -3945,7 +3945,23 @@ function RoleTestingPanel({
             </div>
 
             <div className="mt-3 rounded-lg bg-white p-3 ring-1 ring-orange-100">
-              <p className="font-bold text-orange-950">Future workflow idea: Outlook email drag-and-drop</p>
+              <p className="font-bold text-orange-950">Future workflow idea: Outlook email drag-and-drop
+
+            <div className="mt-3 rounded-lg bg-white p-3 ring-1 ring-orange-100">
+              <p className="font-bold text-orange-950">Backup & Restore Readiness</p>
+              <p className="mt-1">
+                Before removing the manual role harness or adding restore workflows, the CRM needs a controlled backup plan for core operational data.
+              </p>
+              <ol className="mt-2 list-decimal space-y-1 pl-5">
+                <li>Define which tables must be backed up before production permission cleanup.</li>
+                <li>Export companies, contacts, prospects, activities, tags, funnel stages, CRM users, assignments, and intelligence records.</li>
+                <li>Separate backup export from restore; export should come first and be safer.</li>
+                <li>Require Admin-only access for backup and restore actions.</li>
+                <li>Require restore preview, row counts, and confirmation before any restore writes data.</li>
+                <li>Prevent accidental overwrite of production data without a dated backup file and explicit confirmation.</li>
+                <li>Keep manual database backups in Supabase available as the fallback during early restore testing.</li>
+              </ol>
+            </div></p>
               <p className="mt-1">
                 Evaluate whether users can drag Outlook emails or saved message files into the CRM to create activities, notes, or follow-up records. This should be scoped after auth enforcement and backup/restore planning.
               </p>
