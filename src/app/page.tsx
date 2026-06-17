@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.07 - Supabase Email Password Login Panel";
+const APP_VERSION = "Rev 2.08 - Signed-In CRM User Match";
 const REVISION_NOTE =
-  "Added a Supabase email/password login panel so manually created Supabase Auth users can sign in before CRM role matching is enforced.";
+  "Added an informational signed-in CRM user match panel that compares the Supabase Auth email to CRM Users before permission enforcement.";
 
   
 
@@ -99,6 +99,33 @@ type SignedInSessionStatus = {
   userId: string;
   message: string;
 };
+
+
+
+type SignedInCrmUserMatchStatus = {
+  state: "checking" | "not_configured" | "signed_out" | "matched" | "not_matched" | "error";
+  authEmail: string;
+  authUserId: string;
+  crmUserName: string;
+  crmUserRole: string;
+  crmUserStatus: string;
+  crmUserCoverageType: string;
+  message: string;
+};
+
+type CrmUserMatchRecord = Record<string, unknown>;
+
+function getCrmUserMatchField(user: CrmUserMatchRecord, keys: string[]) {
+  for (const key of keys) {
+    const value = user[key];
+
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return "";
+}
 
 const REQUIRED_FIELDS = ["Company Name"];
 
@@ -3874,6 +3901,8 @@ function RoleTestingPanel({
           <SignedInSessionStatusPanel />
 
           <SupabaseEmailPasswordLoginPanel />
+
+          <SignedInCrmUserMatchPanel />
         </div>
       </div>
 
@@ -4062,6 +4091,246 @@ function SignedInSessionStatusPanel() {
   );
 }
 
+
+
+function SignedInCrmUserMatchPanel() {
+  const [matchStatus, setMatchStatus] = useState<SignedInCrmUserMatchStatus>({
+    state: "checking",
+    authEmail: "",
+    authUserId: "",
+    crmUserName: "",
+    crmUserRole: "",
+    crmUserStatus: "",
+    crmUserCoverageType: "",
+    message: "Checking signed-in Supabase user against CRM Users.",
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSignedInCrmUserMatch() {
+      try {
+        if (!hasBrowserSupabaseConfig()) {
+          if (!cancelled) {
+            setMatchStatus({
+              state: "not_configured",
+              authEmail: "",
+              authUserId: "",
+              crmUserName: "",
+              crmUserRole: "",
+              crmUserStatus: "",
+              crmUserCoverageType: "",
+              message: "Browser Supabase configuration is not available in this environment.",
+            });
+          }
+          return;
+        }
+
+        const supabase = getBrowserSupabaseClient();
+        const { data, error } = await supabase.auth.getSession();
+
+        if (cancelled) {
+          return;
+        }
+
+        if (error) {
+          setMatchStatus({
+            state: "error",
+            authEmail: "",
+            authUserId: "",
+            crmUserName: "",
+            crmUserRole: "",
+            crmUserStatus: "",
+            crmUserCoverageType: "",
+            message: error.message || "Could not read the browser Supabase session.",
+          });
+          return;
+        }
+
+        const authUser = data.session?.user;
+        const authEmail = authUser?.email?.trim().toLowerCase() || "";
+        const authUserId = authUser?.id || "";
+
+        if (!authUser || !authEmail) {
+          setMatchStatus({
+            state: "signed_out",
+            authEmail: "",
+            authUserId: "",
+            crmUserName: "",
+            crmUserRole: "",
+            crmUserStatus: "",
+            crmUserCoverageType: "",
+            message: "No signed-in Supabase Auth user is available to match to CRM Users.",
+          });
+          return;
+        }
+
+        const response = await fetch("/api/crm-users?includeInactive=true");
+        const payload = (await response.json()) as unknown;
+
+        if (!response.ok) {
+          const apiMessage =
+            typeof payload === "object" &&
+            payload !== null &&
+            "error" in payload &&
+            typeof (payload as { error?: unknown }).error === "string"
+              ? (payload as { error: string }).error
+              : "Could not load CRM Users.";
+
+          setMatchStatus({
+            state: "error",
+            authEmail,
+            authUserId,
+            crmUserName: "",
+            crmUserRole: "",
+            crmUserStatus: "",
+            crmUserCoverageType: "",
+            message: apiMessage,
+          });
+          return;
+        }
+
+        const crmUsers =
+          Array.isArray(payload)
+            ? payload
+            : typeof payload === "object" &&
+                payload !== null &&
+                "users" in payload &&
+                Array.isArray((payload as { users?: unknown }).users)
+              ? ((payload as { users: unknown[] }).users)
+              : [];
+
+        const matchedUser = crmUsers.find((candidate) => {
+          if (!candidate || typeof candidate !== "object") {
+            return false;
+          }
+
+          const record = candidate as CrmUserMatchRecord;
+          const crmEmail = getCrmUserMatchField(record, ["email", "user_email", "auth_email"]).toLowerCase();
+
+          return crmEmail === authEmail;
+        });
+
+        if (!matchedUser || typeof matchedUser !== "object") {
+          setMatchStatus({
+            state: "not_matched",
+            authEmail,
+            authUserId,
+            crmUserName: "",
+            crmUserRole: "",
+            crmUserStatus: "",
+            crmUserCoverageType: "",
+            message: "Signed-in Supabase Auth email does not currently match a CRM Users record.",
+          });
+          return;
+        }
+
+        const crmUser = matchedUser as CrmUserMatchRecord;
+        const crmUserName =
+          getCrmUserMatchField(crmUser, ["display_name", "name", "full_name"]) || authEmail;
+        const crmUserRole = getCrmUserMatchField(crmUser, ["role", "crm_role", "user_role"]);
+        const crmUserStatus = getCrmUserMatchField(crmUser, ["status", "user_status"]);
+        const crmUserCoverageType = getCrmUserMatchField(crmUser, ["coverage_type", "coverageType"]);
+
+        setMatchStatus({
+          state: "matched",
+          authEmail,
+          authUserId,
+          crmUserName,
+          crmUserRole,
+          crmUserStatus,
+          crmUserCoverageType,
+          message: "Signed-in Supabase Auth email matches a CRM Users record. This is still informational only.",
+        });
+      } catch (error) {
+        if (!cancelled) {
+          setMatchStatus({
+            state: "error",
+            authEmail: "",
+            authUserId: "",
+            crmUserName: "",
+            crmUserRole: "",
+            crmUserStatus: "",
+            crmUserCoverageType: "",
+            message: error instanceof Error ? error.message : "Could not match signed-in user to CRM Users.",
+          });
+        }
+      }
+    }
+
+    loadSignedInCrmUserMatch();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const statusLabel =
+    matchStatus.state === "matched"
+      ? "Matched"
+      : matchStatus.state === "not_matched"
+        ? "Not matched"
+        : matchStatus.state === "signed_out"
+          ? "Signed out"
+          : matchStatus.state === "not_configured"
+            ? "Not configured"
+            : matchStatus.state === "error"
+              ? "Error"
+              : "Checking";
+
+  const statusClassName =
+    matchStatus.state === "matched"
+      ? "bg-green-100 text-green-800 ring-green-200"
+      : matchStatus.state === "not_matched" || matchStatus.state === "error"
+        ? "bg-red-100 text-red-800 ring-red-200"
+        : matchStatus.state === "not_configured"
+          ? "bg-amber-100 text-amber-800 ring-amber-200"
+          : "bg-slate-100 text-slate-800 ring-slate-200";
+
+  return (
+    <div className="mt-4 rounded-xl border border-emerald-200 bg-white p-3 text-xs leading-5 text-emerald-900 ring-1 ring-emerald-100">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="font-bold text-emerald-950">Signed-In CRM User Match</p>
+        <span className={`rounded-full px-2 py-1 text-[11px] font-bold ring-1 ${statusClassName}`}>
+          {statusLabel}
+        </span>
+      </div>
+
+      <p className="mt-2">{matchStatus.message}</p>
+
+      <dl className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="rounded-lg bg-emerald-50 p-2">
+          <dt className="font-semibold text-emerald-700">Supabase Auth email</dt>
+          <dd className="mt-1 break-all text-slate-900">{matchStatus.authEmail || "None detected"}</dd>
+        </div>
+        <div className="rounded-lg bg-emerald-50 p-2">
+          <dt className="font-semibold text-emerald-700">Supabase auth user id</dt>
+          <dd className="mt-1 break-all text-slate-900">{matchStatus.authUserId || "None detected"}</dd>
+        </div>
+        <div className="rounded-lg bg-emerald-50 p-2">
+          <dt className="font-semibold text-emerald-700">CRM user</dt>
+          <dd className="mt-1 text-slate-900">{matchStatus.crmUserName || "No match"}</dd>
+        </div>
+        <div className="rounded-lg bg-emerald-50 p-2">
+          <dt className="font-semibold text-emerald-700">CRM role</dt>
+          <dd className="mt-1 text-slate-900">{matchStatus.crmUserRole || "No role detected"}</dd>
+        </div>
+        <div className="rounded-lg bg-emerald-50 p-2">
+          <dt className="font-semibold text-emerald-700">CRM status</dt>
+          <dd className="mt-1 text-slate-900">{matchStatus.crmUserStatus || "No status detected"}</dd>
+        </div>
+        <div className="rounded-lg bg-emerald-50 p-2">
+          <dt className="font-semibold text-emerald-700">Coverage type</dt>
+          <dd className="mt-1 text-slate-900">{matchStatus.crmUserCoverageType || "No coverage type detected"}</dd>
+        </div>
+      </dl>
+
+      <p className="mt-3 text-emerald-800">
+        This panel is informational only. Production permissions are not yet driven by the signed-in CRM user.
+      </p>
+    </div>
+  );
+}
 
 function SupabaseEmailPasswordLoginPanel() {
   const [authEmail, setAuthEmail] = useState("");
