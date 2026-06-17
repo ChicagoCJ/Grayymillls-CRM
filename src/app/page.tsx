@@ -85,9 +85,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.04 - Signed-In User Role Inspection";
+const APP_VERSION = "Rev 2.05 - Supabase Auth Foundation";
 const REVISION_NOTE =
-  "Documented that production auth is not yet wired client-side and that manual role testing must remain until signed-in user role enforcement is implemented.";
+  "Added the browser Supabase client foundation needed for future signed-in user session and CRM role enforcement.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -3843,6 +3843,20 @@ function RoleTestingPanel({
               <li>Match signed-in user email or auth id to CRM Users.</li>
               <li>Use CRM User Role and Status as the production source for permissions.</li>
               <li>Only then remove manual role dropdowns, test user selectors, and temporary role visibility controls.</li>
+            </ol>
+          </div>
+
+          <div className="mt-4 rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-xs leading-5 text-indigo-900 ring-1 ring-indigo-100">
+            <p className="font-bold text-indigo-950">Browser Supabase Client Foundation</p>
+            <p className="mt-1">
+              A browser Supabase client foundation has been added so the app can later detect the signed-in user session and map that user to CRM Users.
+            </p>
+            <ol className="mt-2 list-decimal space-y-1 pl-5">
+              <li>This revision does not change production permissions.</li>
+              <li>Manual role testing remains active for QA.</li>
+              <li>The next step is to read the signed-in Supabase session safely on the client.</li>
+              <li>After session detection works, the app can match signed-in email or auth id to CRM Users.</li>
+              <li>Only after that should Apply Role Visibility and manual test controls be removed.</li>
             </ol>
           </div>
         </div>
