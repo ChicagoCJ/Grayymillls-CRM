@@ -85,9 +85,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.98 - Sales Manager Work Queue";
+const APP_VERSION = "Rev 1.99 - CRM User Role Status Cleanup";
 const REVISION_NOTE =
-  "Added a Sales Manager work queue with quick actions for missing rep coverage, missing manager coverage, missing any coverage, and fully assigned accounts.";
+  "Polished CRM user role and status guidance, clarified role responsibilities, and tightened Admin Mode controls for role and coverage fields.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -3393,7 +3393,6 @@ function AdminFunnelStagesSection({
             <label className="text-sm font-semibold text-slate-700">User Role</label>
             <select
               value={form.userRole}
-
               onChange={(event) => setForm({ ...form, userRole: event.target.value })}
               className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
             >
@@ -3407,7 +3406,6 @@ function AdminFunnelStagesSection({
             <label className="text-sm font-semibold text-slate-700">Coverage Type</label>
             <select
               value={form.coverageType}
-
               onChange={(event) => setForm({ ...form, coverageType: event.target.value })}
               className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
             >
@@ -4062,7 +4060,40 @@ function AdminUsersSection() {
               />
               Admin Mode {isAdminMode ? "On" : "Off"}
             </label>
+          </div>        <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 p-4">
+          <p className="text-xs font-bold uppercase tracking-wide text-blue-700">CRM User Role Guide</p>
+          <div className="mt-3 grid gap-3 lg:grid-cols-4">
+            <div className="rounded-xl bg-white p-3 ring-1 ring-blue-100">
+              <p className="text-sm font-bold text-blue-950">Admin</p>
+              <p className="mt-1 text-xs leading-5 text-blue-900">
+                Full CRM access, including users, imports, workflow settings, role testing, and sales coverage assignment.
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-white p-3 ring-1 ring-blue-100">
+              <p className="text-sm font-bold text-blue-950">Sales Manager</p>
+              <p className="mt-1 text-xs leading-5 text-blue-900">
+                Broad sales visibility and coverage management, without Admin settings or CRM user administration.
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-white p-3 ring-1 ring-blue-100">
+              <p className="text-sm font-bold text-blue-950">Sales Rep</p>
+              <p className="mt-1 text-xs leading-5 text-blue-900">
+                Assigned-account visibility when role visibility is applied; companies must have Salesperson / Rep coverage.
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-white p-3 ring-1 ring-blue-100">
+              <p className="text-sm font-bold text-blue-950">Status</p>
+              <p className="mt-1 text-xs leading-5 text-blue-900">
+                Active users appear in assignment controls. Archived users are retained for history but should not receive new coverage.
+              </p>
+            </div>
           </div>
+        </div>
+
+
         </div>
 
         {(userMessage || userError) && (
@@ -4155,8 +4186,9 @@ function AdminUsersSection() {
             <label className="text-sm font-semibold text-slate-700">User Role</label>
             <select
               value={form.userRole}
+              disabled={!isAdminMode}
               onChange={(event) => setForm({ ...form, userRole: event.target.value })}
-              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
+              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm disabled:cursor-not-allowed disabled:bg-slate-100"
             >
               <option value="admin">Admin</option>
               <option value="sales_manager">Sales Manager</option>
@@ -4168,8 +4200,9 @@ function AdminUsersSection() {
             <label className="text-sm font-semibold text-slate-700">Coverage Type</label>
             <select
               value={form.coverageType}
+              disabled={!isAdminMode}
               onChange={(event) => setForm({ ...form, coverageType: event.target.value })}
-              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
+              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm disabled:cursor-not-allowed disabled:bg-slate-100"
             >
               <option value="internal">Internal</option>
               <option value="outside_rep">Outside Rep</option>
