@@ -85,9 +85,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.00 - Production Role Visibility Review";
+const APP_VERSION = "Rev 2.01 - Role Visibility Reminder Cleanup";
 const REVISION_NOTE =
-  "Added a production role visibility review checkpoint confirming Admin, Sales Manager, and Sales Rep behavior before stabilizing the role model.";
+  "Cleaned up duplicate role visibility test reminders while keeping the production review checkpoint intact.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -3667,7 +3667,6 @@ function RoleTestingPanel({
               <li>Use a Sales Rep with known company assignments to confirm scoped rep visibility.</li>
               <li>Turn Apply Role Visibility ON only long enough to compare visible Companies, Contacts, Funnel, and Activities.</li>
               <li>Return Apply Role Visibility to OFF after testing.</li>
-              <li>Turn Apply Role Visibility OFF after each test pass.</li>
             </ol>
           </div>
         </div>
