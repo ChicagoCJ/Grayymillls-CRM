@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.09 - Signed-In CRM Role Preview";
+const APP_VERSION = "Rev 2.10 - Auth Enforcement Readiness Gate";
 const REVISION_NOTE =
-  "Added a signed-in CRM role preview showing which production permissions would be applied after CRM user matching is enforced.";
+  "Added an auth enforcement readiness gate before replacing manual role testing with signed-in CRM user permissions.";
 
   
 
@@ -3905,6 +3905,52 @@ function RoleTestingPanel({
           <SignedInCrmUserMatchPanel />
 
           <SignedInCrmRolePreviewPanel />
+
+          <div className="mt-4 rounded-xl border border-orange-200 bg-orange-50 p-3 text-xs leading-5 text-orange-900 ring-1 ring-orange-100">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="font-bold text-orange-950">Auth Enforcement Readiness Gate</p>
+              <span className="rounded-full bg-orange-100 px-2 py-1 text-[11px] font-bold text-orange-800 ring-1 ring-orange-200">
+                Not enforced yet
+              </span>
+            </div>
+
+            <p className="mt-2">
+              Do not remove Apply Role Visibility or manual role controls until each readiness item below is confirmed in production.
+            </p>
+
+            <ol className="mt-3 list-decimal space-y-1 pl-5">
+              <li>Supabase Email/Password Login successfully signs in manually created Auth users.</li>
+              <li>Signed-In Session Status shows Signed in with the expected Supabase Auth email and user id.</li>
+              <li>Signed-In CRM User Match shows Matched for the same email in CRM Users.</li>
+              <li>Signed-In CRM Role Preview shows Ready for enforcement.</li>
+              <li>CRM user status is Active.</li>
+              <li>CRM role is recognized as Admin, Sales Manager, or Sales Rep.</li>
+              <li>Admin, Sales Manager, and Sales Rep test accounts have each passed role visibility testing.</li>
+              <li>System access is blocked until login; unauthenticated users must not be able to enter the CRM shell.</li>
+              <li>Backup and restore readiness has been reviewed before irreversible permission cleanup.</li>
+            </ol>
+
+            <div className="mt-3 rounded-lg bg-white p-3 ring-1 ring-orange-100">
+              <p className="font-bold text-orange-950">System Access Lock Requirement</p>
+              <p className="mt-1">
+                Before production enforcement is complete, the CRM should require a signed-in Supabase Auth session before showing CRM data, navigation, or workspace controls.
+              </p>
+            </div>
+
+            <div className="mt-3 rounded-lg bg-white p-3 ring-1 ring-orange-100">
+              <p className="font-bold text-orange-950">Next enforcement sequence</p>
+              <p className="mt-1">
+                First add signed-in CRM role as a selectable test source, then compare it against the manual harness, then remove the harness only after parity is confirmed.
+              </p>
+            </div>
+
+            <div className="mt-3 rounded-lg bg-white p-3 ring-1 ring-orange-100">
+              <p className="font-bold text-orange-950">Future workflow idea: Outlook email drag-and-drop</p>
+              <p className="mt-1">
+                Evaluate whether users can drag Outlook emails or saved message files into the CRM to create activities, notes, or follow-up records. This should be scoped after auth enforcement and backup/restore planning.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
