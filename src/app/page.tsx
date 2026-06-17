@@ -85,9 +85,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.96 - Coverage Filter Reset Polish";
+const APP_VERSION = "Rev 1.97 - Assignment Quality Flags";
 const REVISION_NOTE =
-  "Added a clear coverage filters control for Salesperson / Rep, Sales Manager, and Assignment Status filters.";
+  "Added company row coverage quality badges for Missing Rep, Missing Manager, Missing Coverage, and Fully Assigned.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -6821,6 +6821,12 @@ function CompaniesSection({
             <tbody>
               {companies.map((company) => {
                 const prospect = getLatestProspect(company);
+                const companyMissingSalespersonCoverage = !String(company.assigned_salesperson_id || "");
+                const companyMissingSalesManagerCoverage = !String(company.assigned_sales_manager_id || "");
+                const companyFullyAssignedCoverage =
+                  !companyMissingSalespersonCoverage && !companyMissingSalesManagerCoverage;
+                const companyMissingAnyCoverage =
+                  companyMissingSalespersonCoverage || companyMissingSalesManagerCoverage;
 
                 return (
                   <tr key={company.id} className="border-b border-slate-100 align-top">
@@ -6845,6 +6851,28 @@ function CompaniesSection({
                       <p className="text-xs text-slate-500">
                         {company.domain || company.website || "No website"}
                       </p>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {companyMissingSalespersonCoverage && (
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800">
+                            Missing Rep
+                          </span>
+                        )}
+                        {companyMissingSalesManagerCoverage && (
+                          <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[11px] font-bold text-orange-800">
+                            Missing Manager
+                          </span>
+                        )}
+                        {companyMissingAnyCoverage && (
+                          <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-700 ring-1 ring-red-100">
+                            Missing Coverage
+                          </span>
+                        )}
+                        {companyFullyAssignedCoverage && (
+                          <span className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-bold text-green-800">
+                            Fully Assigned
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="max-w-[260px] py-3 pr-4 text-slate-700">
                       {company.industry || "Not provided"}
