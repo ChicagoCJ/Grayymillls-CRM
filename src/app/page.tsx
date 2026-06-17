@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.06 - Signed-In Session Status Panel";
+const APP_VERSION = "Rev 2.07 - Supabase Email Password Login Panel";
 const REVISION_NOTE =
-  "Added a non-permission-changing signed-in Supabase session status panel to prepare for production CRM user role enforcement.";
+  "Added a Supabase email/password login panel so manually created Supabase Auth users can sign in before CRM role matching is enforced.";
 
   
 
@@ -3872,6 +3872,8 @@ function RoleTestingPanel({
           </div>
 
           <SignedInSessionStatusPanel />
+
+          <SupabaseEmailPasswordLoginPanel />
         </div>
       </div>
 
@@ -4056,6 +4058,125 @@ function SignedInSessionStatusPanel() {
       <p className="mt-3 text-slate-600">
         This panel is informational only. Manual role testing remains active until signed-in CRM user role matching is implemented and verified.
       </p>
+    </div>
+  );
+}
+
+
+function SupabaseEmailPasswordLoginPanel() {
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authBusy, setAuthBusy] = useState(false);
+  const [authMessage, setAuthMessage] = useState("");
+
+  async function handleSupabaseEmailPasswordSignIn(event: { preventDefault: () => void }) {
+    event.preventDefault();
+    setAuthBusy(true);
+    setAuthMessage("");
+
+    try {
+      if (!hasBrowserSupabaseConfig()) {
+        setAuthMessage("Browser Supabase configuration is not available in this environment.");
+        return;
+      }
+
+      const supabase = getBrowserSupabaseClient();
+      const { error } = await supabase.auth.signInWithPassword({
+        email: authEmail.trim(),
+        password: authPassword,
+      });
+
+      if (error) {
+        setAuthMessage(error.message || "Could not sign in with Supabase.");
+        return;
+      }
+
+      setAuthMessage("Signed in successfully. Refreshing session status.");
+      window.location.reload();
+    } catch (error) {
+      setAuthMessage(error instanceof Error ? error.message : "Could not sign in with Supabase.");
+    } finally {
+      setAuthBusy(false);
+    }
+  }
+
+  async function handleSupabaseSignOut() {
+    setAuthBusy(true);
+    setAuthMessage("");
+
+    try {
+      if (!hasBrowserSupabaseConfig()) {
+        setAuthMessage("Browser Supabase configuration is not available in this environment.");
+        return;
+      }
+
+      const supabase = getBrowserSupabaseClient();
+      const { error } = await supabase.auth.signOut();
+
+      if (error) {
+        setAuthMessage(error.message || "Could not sign out of Supabase.");
+        return;
+      }
+
+      setAuthMessage("Signed out successfully. Refreshing session status.");
+      window.location.reload();
+    } catch (error) {
+      setAuthMessage(error instanceof Error ? error.message : "Could not sign out of Supabase.");
+    } finally {
+      setAuthBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-4 rounded-xl border border-indigo-200 bg-white p-3 text-xs leading-5 text-indigo-900 ring-1 ring-indigo-100">
+      <p className="font-bold text-indigo-950">Supabase Email/Password Login</p>
+      <p className="mt-1">
+        Use this panel to test manually created Supabase Auth users. Production permissions are still controlled by the manual role test controls until CRM user matching is implemented.
+      </p>
+
+      <form className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto]" onSubmit={handleSupabaseEmailPasswordSignIn}>
+        <input
+          className="rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+          type="email"
+          value={authEmail}
+          onChange={(event) => setAuthEmail(event.target.value)}
+          placeholder="Supabase user email"
+          autoComplete="email"
+        />
+        <input
+          className="rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+          type="password"
+          value={authPassword}
+          onChange={(event) => setAuthPassword(event.target.value)}
+          placeholder="Password"
+          autoComplete="current-password"
+        />
+        <button
+          className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-bold text-white shadow-sm hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-300"
+          type="submit"
+          disabled={authBusy || !authEmail.trim() || !authPassword}
+        >
+          {authBusy ? "Working..." : "Sign in"}
+        </button>
+      </form>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <button
+          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+          type="button"
+          onClick={handleSupabaseSignOut}
+          disabled={authBusy}
+        >
+          Sign out
+        </button>
+        <span className="text-slate-600">
+          Match the Supabase Auth email to the CRM Users email before role enforcement is enabled.
+        </span>
+      </div>
+
+      {authMessage ? (
+        <p className="mt-3 rounded-lg bg-indigo-50 p-2 text-indigo-900 ring-1 ring-indigo-100">{authMessage}</p>
+      ) : null}
     </div>
   );
 }
