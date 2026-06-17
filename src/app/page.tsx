@@ -85,9 +85,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.97 - Assignment Quality Flags";
+const APP_VERSION = "Rev 1.98 - Sales Manager Work Queue";
 const REVISION_NOTE =
-  "Added company row coverage quality badges for Missing Rep, Missing Manager, Missing Coverage, and Fully Assigned.";
+  "Added a Sales Manager work queue with quick actions for missing rep coverage, missing manager coverage, missing any coverage, and fully assigned accounts.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -6427,6 +6427,28 @@ function CompaniesSection({
     setCompanyAssignmentStatusFilter("All");
   }
 
+  function applyCoverageWorkQueue(queue: "missingRep" | "missingManager" | "missingAny" | "fullyAssigned") {
+    setCompanySalespersonFilter("All");
+    setCompanySalesManagerFilter("All");
+
+    if (queue === "missingRep") {
+      setCompanyAssignmentStatusFilter("Unassigned Salesperson");
+      return;
+    }
+
+    if (queue === "missingManager") {
+      setCompanyAssignmentStatusFilter("Unassigned Sales Manager");
+      return;
+    }
+
+    if (queue === "missingAny") {
+      setCompanyAssignmentStatusFilter("Missing Any Coverage");
+      return;
+    }
+
+    setCompanyAssignmentStatusFilter("Fully Assigned");
+  }
+
   const bulkManagerUsers = activeBulkAssignmentUsers.filter((user) => {
     const role = String(user.user_role || user.role || user.userRole || "")
       .toLowerCase()
@@ -6538,6 +6560,49 @@ function CompaniesSection({
           <p className="text-xs font-bold uppercase tracking-wide text-green-700">Fully Assigned</p>
           <p className="mt-2 text-2xl font-black text-green-900">{fullyAssignedCoverageCount}</p>
           <p className="mt-1 text-xs text-green-800">Rep and manager coverage present</p>
+        </div>
+      </div>
+
+      <div className="mt-6 rounded-2xl border border-blue-200 bg-blue-50 p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-blue-700">Sales Manager Work Queue</p>
+            <h3 className="mt-1 text-lg font-bold text-blue-950">Prioritize company coverage cleanup</h3>
+            <p className="mt-1 text-sm leading-6 text-blue-900">
+              Use these shortcuts to isolate companies that need rep assignment, manager assignment, or complete coverage before sales follow-up.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => applyCoverageWorkQueue("missingRep")}
+              className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-amber-700"
+            >
+              Missing Rep Queue
+            </button>
+            <button
+              type="button"
+              onClick={() => applyCoverageWorkQueue("missingManager")}
+              className="rounded-lg bg-orange-600 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-orange-700"
+            >
+              Missing Manager Queue
+            </button>
+            <button
+              type="button"
+              onClick={() => applyCoverageWorkQueue("missingAny")}
+              className="rounded-lg bg-red-600 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-red-700"
+            >
+              Missing Any Coverage
+            </button>
+            <button
+              type="button"
+              onClick={() => applyCoverageWorkQueue("fullyAssigned")}
+              className="rounded-lg bg-green-700 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-green-800"
+            >
+              Fully Assigned
+            </button>
+          </div>
         </div>
       </div>
 
