@@ -85,9 +85,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.03 - Auth Role Source Review";
+const APP_VERSION = "Rev 2.04 - Signed-In User Role Inspection";
 const REVISION_NOTE =
-  "Added an auth and role source review plan for replacing manual role visibility testing with signed-in CRM user permissions.";
+  "Documented that production auth is not yet wired client-side and that manual role testing must remain until signed-in user role enforcement is implemented.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -3829,6 +3829,20 @@ function RoleTestingPanel({
               <li>Use CRM User Status so archived users cannot receive new assignment coverage.</li>
               <li>Replace Apply Role Visibility with always-on production role enforcement.</li>
               <li>Remove manual role dropdowns, test user selectors, and temporary role visibility controls after signed-in role enforcement is verified.</li>
+            </ol>
+          </div>
+
+          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900 ring-1 ring-amber-100">
+            <p className="font-bold text-amber-950">Signed-In User Role Inspection Result</p>
+            <p className="mt-1">
+              Current finding: Supabase data access is implemented through server/API service-role clients. The app does not yet expose a client-side signed-in Supabase user session for production role enforcement.
+            </p>
+            <ol className="mt-2 list-decimal space-y-1 pl-5">
+              <li>Keep Apply Role Visibility and manual role test controls for QA until real auth is added.</li>
+              <li>Add Supabase auth/session detection before removing manual controls.</li>
+              <li>Match signed-in user email or auth id to CRM Users.</li>
+              <li>Use CRM User Role and Status as the production source for permissions.</li>
+              <li>Only then remove manual role dropdowns, test user selectors, and temporary role visibility controls.</li>
             </ol>
           </div>
         </div>
