@@ -85,9 +85,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 1.95 - Coverage KPI Cards";
+const APP_VERSION = "Rev 1.96 - Coverage Filter Reset Polish";
 const REVISION_NOTE =
-  "Added coverage KPI cards for visible companies, missing Salesperson / Rep coverage, missing Sales Manager coverage, and fully assigned accounts.";
+  "Added a clear coverage filters control for Salesperson / Rep, Sales Manager, and Assignment Status filters.";
 
   const REQUIRED_FIELDS = ["Company Name"];
 
@@ -6416,6 +6416,17 @@ function CompaniesSection({
       Boolean(String(company.assigned_sales_manager_id || ""))
   ).length;
 
+  const coverageFiltersAreActive =
+    companySalespersonFilter !== "All" ||
+    companySalesManagerFilter !== "All" ||
+    companyAssignmentStatusFilter !== "All";
+
+  function clearCoverageFilters() {
+    setCompanySalespersonFilter("All");
+    setCompanySalesManagerFilter("All");
+    setCompanyAssignmentStatusFilter("All");
+  }
+
   const bulkManagerUsers = activeBulkAssignmentUsers.filter((user) => {
     const role = String(user.user_role || user.role || user.userRole || "")
       .toLowerCase()
@@ -6643,8 +6654,20 @@ function CompaniesSection({
               </select>
             </div>
 
-<div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs leading-5 text-blue-900 lg:col-span-2 xl:col-span-3">
-              <span className="font-semibold">Coverage filters:</span> Salesperson / Rep identifies direct account coverage. Sales Manager identifies oversight coverage. Assignment Status helps find coverage gaps such as missing rep assignment, missing manager assignment, or fully assigned accounts.
+            <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs leading-5 text-blue-900 lg:col-span-2 xl:col-span-3">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <p>
+                  <span className="font-semibold">Coverage filters:</span> Salesperson / Rep identifies direct account coverage. Sales Manager identifies oversight coverage. Assignment Status helps find coverage gaps such as missing rep assignment, missing manager assignment, or fully assigned accounts.
+                </p>
+                <button
+                  type="button"
+                  onClick={clearCoverageFilters}
+                  disabled={!coverageFiltersAreActive}
+                  className="shrink-0 rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-bold text-blue-800 shadow-sm transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Clear coverage filters
+                </button>
+              </div>
             </div>
             <div>
               <label className="text-sm font-semibold text-slate-700">Primary Industry</label>
