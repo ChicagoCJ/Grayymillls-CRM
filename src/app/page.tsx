@@ -87,7 +87,7 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.15 - AI Company Intelligence Requirements";
+const APP_VERSION = "Rev 2.16 - Account Type Lens";
 const REVISION_NOTE =
   "Added requirements for reviving AI company intelligence with account type, buyer personas, user-entered context, and Graymills catalog grounding.";
 
@@ -696,6 +696,7 @@ export default function Home() {
   const [companySalespersonFilter, setCompanySalespersonFilter] = useState("All");
   const [companySalesManagerFilter, setCompanySalesManagerFilter] = useState("All");
   const [companyAssignmentStatusFilter, setCompanyAssignmentStatusFilter] = useState("All");
+  const [companyAccountTypeFilter, setCompanyAccountTypeFilter] = useState("All");
   const [companyPrimaryIndustryFilter, setCompanyPrimaryIndustryFilter] = useState("All");
   const [companyPrimarySubIndustryFilter, setCompanyPrimarySubIndustryFilter] = useState("All");
   const [companyOwnerOptions, setCompanyOwnerOptions] = useState<CrmUser[]>([]);
@@ -1069,6 +1070,10 @@ export default function Home() {
         (companyAssignmentStatusFilter === "Fully Assigned" &&
           Boolean(assignedSalespersonId) &&
           Boolean(assignedSalesManagerId));
+
+      const companyAccountTypeLens = getCompanyAccountTypeLens(company);
+      const matchesAccountType =
+        companyAccountTypeFilter === "All" || companyAccountTypeLens === companyAccountTypeFilter;
 return (
         matchesSearch &&
         matchesTier &&
@@ -1079,7 +1084,8 @@ return (
         matchesCategoryTag &&
         matchesSalespersonCoverage &&
         matchesSalesManagerCoverage &&
-        matchesAssignmentStatus
+        matchesAssignmentStatus &&
+        matchesAccountType
       );
     });
   }, [
@@ -1092,7 +1098,9 @@ return (
     companySalespersonFilter,
     companySalesManagerFilter,
     companyAssignmentStatusFilter,
-    companyMarketTagFilter,
+    
+    companyAccountTypeFilter,
+companyMarketTagFilter,
     companySectorTagFilter,
     companyCategoryTagFilter,
   ]);
@@ -1105,6 +1113,7 @@ return (
     setCompanySalespersonFilter("All");
     setCompanySalesManagerFilter("All");
     setCompanyAssignmentStatusFilter("All");
+    setCompanyAccountTypeFilter("All");
     setCompanyPrimaryIndustryFilter("All");
     setCompanyPrimarySubIndustryFilter("All");
   }
@@ -2318,6 +2327,8 @@ async function handleAnalyzeProspect() {
             setCompanySalesManagerFilter={setCompanySalesManagerFilter}
             companyAssignmentStatusFilter={companyAssignmentStatusFilter}
             setCompanyAssignmentStatusFilter={setCompanyAssignmentStatusFilter}
+            companyAccountTypeFilter={companyAccountTypeFilter}
+            setCompanyAccountTypeFilter={setCompanyAccountTypeFilter}
             assignmentUserOptions={roleTestUsers}
             companyPrimaryIndustryFilter={companyPrimaryIndustryFilter}
             setCompanyPrimaryIndustryFilter={setCompanyPrimaryIndustryFilter}
@@ -7621,6 +7632,78 @@ function CompanyTagFilterPanel({
   );
 }
 
+
+type CompanyAccountTypeLens = "End Customer" | "Distributor" | "Unknown";
+
+function normalizeAccountTypeLensText(value: unknown) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function getCompanyAccountTypeLens(company: unknown): CompanyAccountTypeLens {
+  const record = company as unknown as Record<string, unknown>;
+
+  const searchable = [
+    "company_name",
+    "website",
+    "domain",
+    "industry",
+    "primary_industry",
+    "primary_sub_industry",
+    "company_type",
+    "source",
+    "notes",
+  ]
+    .map((key) => normalizeAccountTypeLensText(record[key]))
+    .filter(Boolean)
+    .join(" ");
+
+  const distributorSignals = [
+    "distributor",
+    "distribution",
+    "wholesale",
+    "reseller",
+    "dealer",
+    "industrial supply",
+    "mro",
+    "printing supply",
+    "pressroom supply",
+  ];
+
+  if (distributorSignals.some((signal) => searchable.includes(signal))) {
+    return "Distributor";
+  }
+
+  const endCustomerSignals = [
+    "manufacturing",
+    "manufacturer",
+    "machine shop",
+    "fabrication",
+    "fabricator",
+    "metalworking",
+    "aerospace",
+    "automotive",
+    "medical device",
+    "food processing",
+    "printing",
+    "converter",
+    "packaging",
+    "plant",
+    "production",
+  ];
+
+  if (endCustomerSignals.some((signal) => searchable.includes(signal))) {
+    return "End Customer";
+  }
+
+  return "Unknown";
+}
+
+function getCompanyAccountTypeLensClass(value: CompanyAccountTypeLens) {
+  if (value === "End Customer") return "bg-green-100 text-green-800 ring-green-200";
+  if (value === "Distributor") return "bg-blue-100 text-blue-800 ring-blue-200";
+  return "bg-slate-100 text-slate-600 ring-slate-200";
+}
+
 function CompaniesSection({
   companies,
   totalCompanyCount,
@@ -7651,6 +7734,8 @@ function CompaniesSection({
   setCompanySalesManagerFilter = () => {},
   companyAssignmentStatusFilter = "All",
   setCompanyAssignmentStatusFilter = () => {},
+  companyAccountTypeFilter = "All",
+  setCompanyAccountTypeFilter = () => {},
   assignmentUserOptions = [],
   companyPrimaryIndustryFilter = "All",
   setCompanyPrimaryIndustryFilter = () => {},
@@ -7701,6 +7786,8 @@ function CompaniesSection({
   setCompanySalesManagerFilter?: (value: string) => void;
   companyAssignmentStatusFilter?: string;
   setCompanyAssignmentStatusFilter?: (value: string) => void;
+  companyAccountTypeFilter?: string;
+  setCompanyAccountTypeFilter?: (value: string) => void;
   assignmentUserOptions?: CrmUser[];
   companyPrimaryIndustryFilter: string;
   setCompanyPrimaryIndustryFilter: (value: string) => void;
@@ -7745,12 +7832,14 @@ function CompaniesSection({
   const coverageFiltersAreActive =
     companySalespersonFilter !== "All" ||
     companySalesManagerFilter !== "All" ||
-    companyAssignmentStatusFilter !== "All";
+    companyAssignmentStatusFilter !== "All" ||
+    companyAccountTypeFilter !== "All";
 
   function clearCoverageFilters() {
     setCompanySalespersonFilter("All");
     setCompanySalesManagerFilter("All");
     setCompanyAssignmentStatusFilter("All");
+    setCompanyAccountTypeFilter("All");
   }
 
   function applyCoverageWorkQueue(queue: "missingRep" | "missingManager" | "missingAny" | "fullyAssigned") {
@@ -8045,10 +8134,24 @@ function CompaniesSection({
               </select>
             </div>
 
+            <div>
+              <label className="text-sm font-semibold text-slate-700">Account Type Lens</label>
+              <select
+                value={companyAccountTypeFilter}
+                onChange={(event) => setCompanyAccountTypeFilter(event.target.value)}
+                className="mt-2 w-full max-w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              >
+                <option value="All">All</option>
+                <option value="End Customer">End Customer</option>
+                <option value="Distributor">Distributor</option>
+                <option value="Unknown">Unknown</option>
+              </select>
+            </div>
+
             <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs leading-5 text-blue-900 lg:col-span-2 xl:col-span-3">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <p>
-                  <span className="font-semibold">Coverage filters:</span> Salesperson / Rep identifies direct account coverage. Sales Manager identifies oversight coverage. Assignment Status helps find coverage gaps such as missing rep assignment, missing manager assignment, or fully assigned accounts.
+                  <span className="font-semibold">Coverage filters:</span> Salesperson / Rep identifies direct account coverage. Sales Manager identifies oversight coverage. Assignment Status helps find coverage gaps such as missing rep assignment, missing manager assignment, or fully assigned accounts. Account Type Lens is a read-only classification for separating likely end customers from distributors before a database-backed account type field is added.
                 </p>
                 <button
                   type="button"
@@ -8218,6 +8321,7 @@ function CompaniesSection({
                   !companyMissingSalespersonCoverage && !companyMissingSalesManagerCoverage;
                 const companyMissingAnyCoverage =
                   companyMissingSalespersonCoverage || companyMissingSalesManagerCoverage;
+                const rowAccountTypeLens = getCompanyAccountTypeLens(company);
 
                 return (
                   <tr key={company.id} className="border-b border-slate-100 align-top">
@@ -8263,6 +8367,9 @@ function CompaniesSection({
                             Fully Assigned
                           </span>
                         )}
+                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ring-1 ${getCompanyAccountTypeLensClass(rowAccountTypeLens)}`}>
+                          {rowAccountTypeLens}
+                        </span>
                       </div>
                     </td>
                     <td className="max-w-[260px] py-3 pr-4 text-slate-700">
