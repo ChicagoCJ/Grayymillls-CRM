@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.16 - Account Type Lens";
+const APP_VERSION = "Rev 2.17 - Buyer Persona Lens";
 const REVISION_NOTE =
-  "Added requirements for reviving AI company intelligence with account type, buyer personas, user-entered context, and Graymills catalog grounding.";
+  "Added read-only buyer persona badges to help separate end-customer and distributor selling motions without changing CRM records.";
 
   
 
@@ -7704,6 +7704,68 @@ function getCompanyAccountTypeLensClass(value: CompanyAccountTypeLens) {
   return "bg-slate-100 text-slate-600 ring-slate-200";
 }
 
+function getCompanyBuyerPersonaLenses(accountTypeLens: CompanyAccountTypeLens, company: unknown) {
+  const record = company as unknown as Record<string, unknown>;
+  const searchable = [
+    "company_name",
+    "website",
+    "domain",
+    "industry",
+    "primary_industry",
+    "primary_sub_industry",
+    "company_type",
+    "source",
+    "notes",
+  ]
+    .map((key) => normalizeAccountTypeLensText(record[key]))
+    .filter(Boolean)
+    .join(" ");
+
+  if (accountTypeLens === "Distributor") {
+    return ["Principal / Owner", "Outside Sales", "Product Specialist", "Inside Sales"];
+  }
+
+  if (accountTypeLens === "End Customer") {
+    const personas = ["Operations", "Maintenance", "Purchasing"];
+
+    if (
+      searchable.includes("quality") ||
+      searchable.includes("process") ||
+      searchable.includes("aerospace") ||
+      searchable.includes("medical") ||
+      searchable.includes("printing") ||
+      searchable.includes("packaging")
+    ) {
+      personas.push("Quality / Process");
+    }
+
+    if (
+      searchable.includes("safety") ||
+      searchable.includes("ehs") ||
+      searchable.includes("environment") ||
+      searchable.includes("solvent") ||
+      searchable.includes("chemical")
+    ) {
+      personas.push("EHS / Safety");
+    }
+
+    return Array.from(new Set(personas)).slice(0, 5);
+  }
+
+  return ["Discovery Needed"];
+}
+
+function getCompanyBuyerPersonaLensClass(persona: string) {
+  if (persona === "Discovery Needed") return "bg-slate-50 text-slate-600 ring-slate-200";
+  if (persona.includes("Owner") || persona.includes("Outside Sales")) return "bg-blue-50 text-blue-800 ring-blue-200";
+  if (persona.includes("Product") || persona.includes("Inside Sales")) return "bg-cyan-50 text-cyan-800 ring-cyan-200";
+  if (persona.includes("Operations")) return "bg-green-50 text-green-800 ring-green-200";
+  if (persona.includes("Maintenance")) return "bg-amber-50 text-amber-800 ring-amber-200";
+  if (persona.includes("Quality")) return "bg-purple-50 text-purple-800 ring-purple-200";
+  if (persona.includes("EHS")) return "bg-red-50 text-red-800 ring-red-200";
+  return "bg-slate-50 text-slate-700 ring-slate-200";
+}
+
 function CompaniesSection({
   companies,
   totalCompanyCount,
@@ -8151,7 +8213,7 @@ function CompaniesSection({
             <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs leading-5 text-blue-900 lg:col-span-2 xl:col-span-3">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <p>
-                  <span className="font-semibold">Coverage filters:</span> Salesperson / Rep identifies direct account coverage. Sales Manager identifies oversight coverage. Assignment Status helps find coverage gaps such as missing rep assignment, missing manager assignment, or fully assigned accounts. Account Type Lens is a read-only classification for separating likely end customers from distributors before a database-backed account type field is added.
+                  <span className="font-semibold">Coverage filters:</span> Salesperson / Rep identifies direct account coverage. Sales Manager identifies oversight coverage. Assignment Status helps find coverage gaps such as missing rep assignment, missing manager assignment, or fully assigned accounts. Account Type Lens is a read-only classification for separating likely end customers from distributors before a database-backed account type field is added. Buyer Persona Lens adds read-only persona badges to clarify the likely selling motion for each account.
                 </p>
                 <button
                   type="button"
@@ -8322,6 +8384,7 @@ function CompaniesSection({
                 const companyMissingAnyCoverage =
                   companyMissingSalespersonCoverage || companyMissingSalesManagerCoverage;
                 const rowAccountTypeLens = getCompanyAccountTypeLens(company);
+                const rowBuyerPersonas = getCompanyBuyerPersonaLenses(rowAccountTypeLens, company);
 
                 return (
                   <tr key={company.id} className="border-b border-slate-100 align-top">
@@ -8370,6 +8433,14 @@ function CompaniesSection({
                         <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ring-1 ${getCompanyAccountTypeLensClass(rowAccountTypeLens)}`}>
                           {rowAccountTypeLens}
                         </span>
+                        {rowBuyerPersonas.map((persona) => (
+                          <span
+                            key={persona}
+                            className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${getCompanyBuyerPersonaLensClass(persona)}`}
+                          >
+                            {persona}
+                          </span>
+                        ))}
                       </div>
                     </td>
                     <td className="max-w-[260px] py-3 pr-4 text-slate-700">
