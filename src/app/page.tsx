@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.14 - Browser Tab Title";
+const APP_VERSION = "Rev 2.15 - AI Company Intelligence Requirements";
 const REVISION_NOTE =
-  "Changed the browser tab title from the default Next.js title to Graymills CRM.";
+  "Added requirements for reviving AI company intelligence with account type, buyer personas, user-entered context, and Graymills catalog grounding.";
 
   
 
@@ -3967,6 +3967,70 @@ function RoleTestingPanel({
               <p className="mt-1">
                 Evaluate whether users can drag Outlook emails or saved message files into the CRM to create activities, notes, or follow-up records. This should be scoped after auth enforcement and backup/restore planning.
               </p>
+            </div>
+
+            <div className="mt-3 rounded-lg bg-white p-3 ring-1 ring-purple-100">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="font-bold text-purple-950">AI Company Intelligence Requirements</p>
+                <span className="rounded-full bg-purple-100 px-2 py-1 text-[11px] font-bold text-purple-800 ring-1 ring-purple-200">
+                  Requirements only
+                </span>
+              </div>
+
+              <p className="mt-2">
+                Revive the AI company intelligence workflow so company listings and detail pages can use user-entered context, account type, buyer personas, and Graymills source material to guide better sales action.
+              </p>
+
+              <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                <div className="rounded-lg bg-purple-50 p-3 ring-1 ring-purple-100">
+                  <p className="font-bold text-purple-950">User-entered context</p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">
+                    <li>Use notes, activity history, manually entered pains, application clues, tags, industry, and contact roles.</li>
+                    <li>Separate user-entered observations from imported data so sales reps can see what drove the AI recommendation.</li>
+                    <li>Flag missing information instead of guessing.</li>
+                  </ul>
+                </div>
+
+                <div className="rounded-lg bg-purple-50 p-3 ring-1 ring-purple-100">
+                  <p className="font-bold text-purple-950">Account type split</p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">
+                    <li>Classify each account as End Customer, Distributor, or Unknown.</li>
+                    <li>End customers need application fit, uptime, cleaning consistency, safety, labor reduction, workflow, and payback logic.</li>
+                    <li>Distributors need line-card fit, resale opportunity, margin logic, territory fit, quote support, and technical support clarity.</li>
+                  </ul>
+                </div>
+
+                <div className="rounded-lg bg-purple-50 p-3 ring-1 ring-purple-100">
+                  <p className="font-bold text-purple-950">Buyer personas</p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">
+                    <li>Identify likely stakeholders such as Operations, Maintenance, Quality / Process Engineering, EHS, Procurement, and Owner / Executive.</li>
+                    <li>For distributors, identify Principal / Owner, Outside Sales, Product Specialist / Application Engineer, and Inside Sales.</li>
+                    <li>Translate each persona into practical discovery questions and sales angles.</li>
+                  </ul>
+                </div>
+
+                <div className="rounded-lg bg-purple-50 p-3 ring-1 ring-purple-100">
+                  <p className="font-bold text-purple-950">Graymills catalog grounding</p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">
+                    <li>Ground recommendations in Graymills catalogs, sell sheets, and approved product materials.</li>
+                    <li>Cover parts washers, pumps / metalworking fluid systems, inking systems, cleaning fluids, Tempest spray washers, and OEM / custom paths.</li>
+                    <li>Do not invent specifications, certifications, dimensions, capacities, compatibility claims, or regulatory statements.</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="mt-3 rounded-lg bg-white p-3 ring-1 ring-purple-100">
+                <p className="font-bold text-purple-950">Target AI output structure</p>
+                <ol className="mt-2 list-decimal space-y-1 pl-5">
+                  <li>Account Type: End Customer, Distributor, or Unknown.</li>
+                  <li>Likely Buyer Personas and what each persona likely cares about.</li>
+                  <li>Application Clues from user-entered context and CRM data.</li>
+                  <li>Likely Graymills Fit by product family, with uncertainty clearly flagged.</li>
+                  <li>Recommended Discovery Questions based on account type and persona.</li>
+                  <li>Sales Angle focused on operating value, risk reduction, channel fit, or lifecycle value.</li>
+                  <li>Source Guardrails: no invented specs; verify uncertain fit with Graymills.</li>
+                </ol>
+              </div>
             </div>
           </div>
         </div>
