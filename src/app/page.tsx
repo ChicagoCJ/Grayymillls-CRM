@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.17 - Buyer Persona Lens";
+const APP_VERSION = "Rev 2.18 - Editable Account Type Lens";
 const REVISION_NOTE =
-  "Added read-only buyer persona badges to help separate end-customer and distributor selling motions without changing CRM records.";
+  "Added session-only editable account type overrides so sales users can test End Customer, Distributor, and Unknown classification before database-backed account type storage.";
 
   
 
@@ -697,6 +697,7 @@ export default function Home() {
   const [companySalesManagerFilter, setCompanySalesManagerFilter] = useState("All");
   const [companyAssignmentStatusFilter, setCompanyAssignmentStatusFilter] = useState("All");
   const [companyAccountTypeFilter, setCompanyAccountTypeFilter] = useState("All");
+  const [companyAccountTypeOverrides, setCompanyAccountTypeOverrides] = useState<Record<string, CompanyAccountTypeLens>>({});
   const [companyPrimaryIndustryFilter, setCompanyPrimaryIndustryFilter] = useState("All");
   const [companyPrimarySubIndustryFilter, setCompanyPrimarySubIndustryFilter] = useState("All");
   const [companyOwnerOptions, setCompanyOwnerOptions] = useState<CrmUser[]>([]);
@@ -1071,7 +1072,7 @@ export default function Home() {
           Boolean(assignedSalespersonId) &&
           Boolean(assignedSalesManagerId));
 
-      const companyAccountTypeLens = getCompanyAccountTypeLens(company);
+      const companyAccountTypeLens = getCompanyEffectiveAccountTypeLens(company, companyAccountTypeOverrides);
       const matchesAccountType =
         companyAccountTypeFilter === "All" || companyAccountTypeLens === companyAccountTypeFilter;
 return (
@@ -2329,6 +2330,8 @@ async function handleAnalyzeProspect() {
             setCompanyAssignmentStatusFilter={setCompanyAssignmentStatusFilter}
             companyAccountTypeFilter={companyAccountTypeFilter}
             setCompanyAccountTypeFilter={setCompanyAccountTypeFilter}
+            companyAccountTypeOverrides={companyAccountTypeOverrides}
+            setCompanyAccountTypeOverrides={setCompanyAccountTypeOverrides}
             assignmentUserOptions={roleTestUsers}
             companyPrimaryIndustryFilter={companyPrimaryIndustryFilter}
             setCompanyPrimaryIndustryFilter={setCompanyPrimaryIndustryFilter}
@@ -7704,6 +7707,29 @@ function getCompanyAccountTypeLensClass(value: CompanyAccountTypeLens) {
   return "bg-slate-100 text-slate-600 ring-slate-200";
 }
 
+function isCompanyAccountTypeLens(value: unknown): value is CompanyAccountTypeLens {
+  return value === "End Customer" || value === "Distributor" || value === "Unknown";
+}
+
+function getCompanyRecordKey(company: unknown) {
+  const record = company as unknown as Record<string, unknown>;
+  return String(record.id || record.company_id || record.company_name || "").trim();
+}
+
+function getCompanyEffectiveAccountTypeLens(
+  company: unknown,
+  overrides: Record<string, CompanyAccountTypeLens> = {}
+): CompanyAccountTypeLens {
+  const key = getCompanyRecordKey(company);
+  const overrideValue = key ? overrides[key] : undefined;
+
+  if (isCompanyAccountTypeLens(overrideValue)) {
+    return overrideValue;
+  }
+
+  return getCompanyAccountTypeLens(company);
+}
+
 function getCompanyBuyerPersonaLenses(accountTypeLens: CompanyAccountTypeLens, company: unknown) {
   const record = company as unknown as Record<string, unknown>;
   const searchable = [
@@ -7798,6 +7824,8 @@ function CompaniesSection({
   setCompanyAssignmentStatusFilter = () => {},
   companyAccountTypeFilter = "All",
   setCompanyAccountTypeFilter = () => {},
+  companyAccountTypeOverrides = {},
+  setCompanyAccountTypeOverrides = () => {},
   assignmentUserOptions = [],
   companyPrimaryIndustryFilter = "All",
   setCompanyPrimaryIndustryFilter = () => {},
@@ -7850,6 +7878,12 @@ function CompaniesSection({
   setCompanyAssignmentStatusFilter?: (value: string) => void;
   companyAccountTypeFilter?: string;
   setCompanyAccountTypeFilter?: (value: string) => void;
+  companyAccountTypeOverrides?: Record<string, CompanyAccountTypeLens>;
+  setCompanyAccountTypeOverrides?: (
+    value:
+      | Record<string, CompanyAccountTypeLens>
+      | ((current: Record<string, CompanyAccountTypeLens>) => Record<string, CompanyAccountTypeLens>)
+  ) => void;
   assignmentUserOptions?: CrmUser[];
   companyPrimaryIndustryFilter: string;
   setCompanyPrimaryIndustryFilter: (value: string) => void;
@@ -8213,7 +8247,7 @@ function CompaniesSection({
             <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs leading-5 text-blue-900 lg:col-span-2 xl:col-span-3">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <p>
-                  <span className="font-semibold">Coverage filters:</span> Salesperson / Rep identifies direct account coverage. Sales Manager identifies oversight coverage. Assignment Status helps find coverage gaps such as missing rep assignment, missing manager assignment, or fully assigned accounts. Account Type Lens is a read-only classification for separating likely end customers from distributors before a database-backed account type field is added. Buyer Persona Lens adds read-only persona badges to clarify the likely selling motion for each account.
+                  <span className="font-semibold">Coverage filters:</span> Salesperson / Rep identifies direct account coverage. Sales Manager identifies oversight coverage. Assignment Status helps find coverage gaps such as missing rep assignment, missing manager assignment, or fully assigned accounts. Account Type Lens is a read-only classification for separating likely end customers from distributors before a database-backed account type field is added. Buyer Persona Lens adds read-only persona badges to clarify the likely selling motion for each account. Account Type can now be changed with a session-only override; database-backed storage should be added in a later revision.
                 </p>
                 <button
                   type="button"
@@ -8383,7 +8417,8 @@ function CompaniesSection({
                   !companyMissingSalespersonCoverage && !companyMissingSalesManagerCoverage;
                 const companyMissingAnyCoverage =
                   companyMissingSalespersonCoverage || companyMissingSalesManagerCoverage;
-                const rowAccountTypeLens = getCompanyAccountTypeLens(company);
+                const rowCompanyKey = getCompanyRecordKey(company);
+                const rowAccountTypeLens = getCompanyEffectiveAccountTypeLens(company, companyAccountTypeOverrides);
                 const rowBuyerPersonas = getCompanyBuyerPersonaLenses(rowAccountTypeLens, company);
 
                 return (
@@ -8433,6 +8468,25 @@ function CompaniesSection({
                         <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ring-1 ${getCompanyAccountTypeLensClass(rowAccountTypeLens)}`}>
                           {rowAccountTypeLens}
                         </span>
+                        <select
+                          value={rowAccountTypeLens}
+                          onChange={(event) => {
+                            if (!rowCompanyKey) return;
+                            const nextValue = event.target.value;
+                            if (!isCompanyAccountTypeLens(nextValue)) return;
+
+                            setCompanyAccountTypeOverrides((current) => ({
+                              ...current,
+                              [rowCompanyKey]: nextValue,
+                            }));
+                          }}
+                          className="rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-700 shadow-sm"
+                          title="Session-only Account Type override"
+                        >
+                          <option value="End Customer">Set End Customer</option>
+                          <option value="Distributor">Set Distributor</option>
+                          <option value="Unknown">Set Unknown</option>
+                        </select>
                         {rowBuyerPersonas.map((persona) => (
                           <span
                             key={persona}
