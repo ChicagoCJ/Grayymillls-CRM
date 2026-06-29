@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.13 - Backup Export";
+const APP_VERSION = "Rev 2.14 - Browser Tab Title";
 const REVISION_NOTE =
-  "Added an Admin-only backup export workflow that downloads core CRM operational data as a dated JSON backup file.";
+  "Changed the browser tab title from the default Next.js title to Graymills CRM.";
 
   
 
