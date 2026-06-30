@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.20.1 - Buyer Persona Save and Layout Fix";
+const APP_VERSION = "Rev 2.20.2 - Buyer Persona Save Route Repair";
 const REVISION_NOTE =
-  "Fixed saved Buyer Personas persistence and repaired company-row badge layout so persona badges size to their own labels instead of stretching with the editor panel.";
+  "Repaired Buyer Persona saving by using the companies.id key directly and improving the browser save-failure message.";
 
   
 
@@ -8633,8 +8633,9 @@ function CompaniesSection({
                                         }
                                       } catch (error) {
                                         console.error("Failed to save Buyer Personas:", error);
+                                        const message = error instanceof Error ? error.message : "Unknown save error.";
                                         window.alert(
-                                          "Buyer Personas changed on screen, but they did not save to the database. Please refresh and try again."
+                                          `Buyer Personas changed on screen, but they did not save to the database. Save error: ${message}`
                                         );
                                       }
                                     }}

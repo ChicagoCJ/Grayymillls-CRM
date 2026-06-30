@@ -63,9 +63,8 @@ export async function POST(request: Request) {
     const { data, error } = await supabase
       .from("companies")
       .update({ buyer_personas: normalizedBuyerPersonas })
-      .or(`id.eq.${companyId},company_id.eq.${companyId}`)
+      .eq("id", companyId)
       .select("id, buyer_personas")
-      .limit(1)
       .maybeSingle();
 
     if (error) {
