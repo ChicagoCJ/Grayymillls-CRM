@@ -27,6 +27,8 @@ export async function GET() {
         `
         id,
         company_name,
+        account_type,
+        buyer_personas,
         assigned_salesperson_id,
         assigned_sales_manager_id,
         website,

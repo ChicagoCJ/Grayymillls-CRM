@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.20.2 - Buyer Persona Save Route Repair";
+const APP_VERSION = "Rev 2.20.3 - Load Saved Buyer Personas";
 const REVISION_NOTE =
-  "Repaired Buyer Persona saving by using the companies.id key directly and improving the browser save-failure message.";
+  "Loaded saved Account Type and Buyer Personas in the CRM summary feed so company-row persona edits persist after refresh.";
 
   
 
