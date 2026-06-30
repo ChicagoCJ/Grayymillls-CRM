@@ -63,12 +63,17 @@ export async function POST(request: Request) {
     const { data, error } = await supabase
       .from("companies")
       .update({ buyer_personas: normalizedBuyerPersonas })
-      .eq("id", companyId)
+      .or(`id.eq.${companyId},company_id.eq.${companyId}`)
       .select("id, buyer_personas")
-      .single();
+      .limit(1)
+      .maybeSingle();
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    if (!data) {
+      return NextResponse.json({ error: "Company not found." }, { status: 404 });
     }
 
     return NextResponse.json({ company: data });

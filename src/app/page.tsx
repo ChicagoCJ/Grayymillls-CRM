@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.20 - Saved Buyer Personas";
+const APP_VERSION = "Rev 2.20.1 - Buyer Persona Save and Layout Fix";
 const REVISION_NOTE =
-  "Saved editable buyer personas to the companies table so account-specific selling stakeholders persist after refresh and deployment.";
+  "Fixed saved Buyer Personas persistence and repaired company-row badge layout so persona badges size to their own labels instead of stretching with the editor panel.";
 
   
 
@@ -8581,12 +8581,12 @@ function CompaniesSection({
                         {rowBuyerPersonas.map((persona) => (
                           <span
                             key={persona}
-                            className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${getCompanyBuyerPersonaLensClass(persona)}`}
+                            className={`inline-flex items-center self-start rounded-full px-2 py-0.5 text-[11px] font-semibold leading-none ring-1 ${getCompanyBuyerPersonaLensClass(persona)}`}
                           >
                             {persona}
                           </span>
                         ))}
-                        <details className="rounded-xl border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-700 shadow-sm">
+                        <details className="self-start rounded-xl border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-700 shadow-sm">
                           <summary className="cursor-pointer font-bold text-slate-800">Edit Personas</summary>
                           <div className="mt-2 grid gap-1">
                             {COMPANY_BUYER_PERSONA_OPTIONS.map((personaOption) => {
