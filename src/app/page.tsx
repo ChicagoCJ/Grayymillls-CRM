@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.19 - Saved Account Type";
+const APP_VERSION = "Rev 2.20 - Saved Buyer Personas";
 const REVISION_NOTE =
-  "Saved Account Type to the companies table so End Customer, Distributor, and Unknown classifications persist after refresh and deployment.";
+  "Saved editable buyer personas to the companies table so account-specific selling stakeholders persist after refresh and deployment.";
 
   
 
@@ -698,6 +698,7 @@ export default function Home() {
   const [companyAssignmentStatusFilter, setCompanyAssignmentStatusFilter] = useState("All");
   const [companyAccountTypeFilter, setCompanyAccountTypeFilter] = useState("All");
   const [companyAccountTypeOverrides, setCompanyAccountTypeOverrides] = useState<Record<string, CompanyAccountTypeLens>>({});
+  const [companyBuyerPersonaOverrides, setCompanyBuyerPersonaOverrides] = useState<Record<string, string[]>>({});
   const [companyPrimaryIndustryFilter, setCompanyPrimaryIndustryFilter] = useState("All");
   const [companyPrimarySubIndustryFilter, setCompanyPrimarySubIndustryFilter] = useState("All");
   const [companyOwnerOptions, setCompanyOwnerOptions] = useState<CrmUser[]>([]);
@@ -2332,6 +2333,8 @@ async function handleAnalyzeProspect() {
             setCompanyAccountTypeFilter={setCompanyAccountTypeFilter}
             companyAccountTypeOverrides={companyAccountTypeOverrides}
             setCompanyAccountTypeOverrides={setCompanyAccountTypeOverrides}
+            companyBuyerPersonaOverrides={companyBuyerPersonaOverrides}
+            setCompanyBuyerPersonaOverrides={setCompanyBuyerPersonaOverrides}
             assignmentUserOptions={roleTestUsers}
             companyPrimaryIndustryFilter={companyPrimaryIndustryFilter}
             setCompanyPrimaryIndustryFilter={setCompanyPrimaryIndustryFilter}
@@ -7786,6 +7789,53 @@ function getCompanyBuyerPersonaLenses(accountTypeLens: CompanyAccountTypeLens, c
   return ["Discovery Needed"];
 }
 
+const COMPANY_BUYER_PERSONA_OPTIONS = [
+  "Operations",
+  "Maintenance",
+  "Purchasing",
+  "Quality / Process",
+  "EHS / Safety",
+  "Principal / Owner",
+  "Outside Sales",
+  "Product Specialist",
+  "Inside Sales",
+  "Discovery Needed",
+];
+
+function getCompanySavedBuyerPersonas(company: unknown) {
+  const record = company as unknown as Record<string, unknown>;
+  const value = record.buyer_personas;
+
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => String(item || "").trim())
+    .filter((item) => COMPANY_BUYER_PERSONA_OPTIONS.includes(item));
+}
+
+function getCompanyEffectiveBuyerPersonas(
+  accountTypeLens: CompanyAccountTypeLens,
+  company: unknown,
+  overrides: Record<string, string[]> = {}
+) {
+  const key = getCompanyRecordKey(company);
+  const overrideValue = key ? overrides[key] : undefined;
+
+  if (Array.isArray(overrideValue) && overrideValue.length > 0) {
+    return overrideValue;
+  }
+
+  const savedPersonas = getCompanySavedBuyerPersonas(company);
+
+  if (savedPersonas.length > 0) {
+    return savedPersonas;
+  }
+
+  return getCompanyBuyerPersonaLenses(accountTypeLens, company);
+}
+
 function getCompanyBuyerPersonaLensClass(persona: string) {
   if (persona === "Discovery Needed") return "bg-slate-50 text-slate-600 ring-slate-200";
   if (persona.includes("Owner") || persona.includes("Outside Sales")) return "bg-blue-50 text-blue-800 ring-blue-200";
@@ -7831,6 +7881,8 @@ function CompaniesSection({
   setCompanyAccountTypeFilter = () => {},
   companyAccountTypeOverrides = {},
   setCompanyAccountTypeOverrides = () => {},
+  companyBuyerPersonaOverrides = {},
+  setCompanyBuyerPersonaOverrides = () => {},
   assignmentUserOptions = [],
   companyPrimaryIndustryFilter = "All",
   setCompanyPrimaryIndustryFilter = () => {},
@@ -7888,6 +7940,10 @@ function CompaniesSection({
     value:
       | Record<string, CompanyAccountTypeLens>
       | ((current: Record<string, CompanyAccountTypeLens>) => Record<string, CompanyAccountTypeLens>)
+  ) => void;
+  companyBuyerPersonaOverrides?: Record<string, string[]>;
+  setCompanyBuyerPersonaOverrides?: (
+    value: Record<string, string[]> | ((current: Record<string, string[]>) => Record<string, string[]>)
   ) => void;
   assignmentUserOptions?: CrmUser[];
   companyPrimaryIndustryFilter: string;
@@ -8252,7 +8308,7 @@ function CompaniesSection({
             <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs leading-5 text-blue-900 lg:col-span-2 xl:col-span-3">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <p>
-                  <span className="font-semibold">Coverage filters:</span> Salesperson / Rep identifies direct account coverage. Sales Manager identifies oversight coverage. Assignment Status helps find coverage gaps such as missing rep assignment, missing manager assignment, or fully assigned accounts. Account Type Lens is a read-only classification for separating likely end customers from distributors before a database-backed account type field is added. Buyer Persona Lens adds read-only persona badges to clarify the likely selling motion for each account. Account Type can now be changed with the visible Edit Account Type control in each company row. Rev 2.19 saves that value to the companies table, then uses the saved value before falling back to the calculated lens.
+                  <span className="font-semibold">Coverage filters:</span> Salesperson / Rep identifies direct account coverage. Sales Manager identifies oversight coverage. Assignment Status helps find coverage gaps such as missing rep assignment, missing manager assignment, or fully assigned accounts. Account Type Lens is a read-only classification for separating likely end customers from distributors before a database-backed account type field is added. Buyer Persona Lens adds read-only persona badges to clarify the likely selling motion for each account. Account Type can now be changed with the visible Edit Account Type control in each company row. Rev 2.19 saves Account Type to the companies table. Rev 2.20 saves editable Buyer Personas to the companies table while still falling back to calculated personas when no saved personas exist.
                 </p>
                 <button
                   type="button"
@@ -8424,7 +8480,7 @@ function CompaniesSection({
                   companyMissingSalespersonCoverage || companyMissingSalesManagerCoverage;
                 const rowCompanyKey = getCompanyRecordKey(company);
                 const rowAccountTypeLens = getCompanyEffectiveAccountTypeLens(company, companyAccountTypeOverrides);
-                const rowBuyerPersonas = getCompanyBuyerPersonaLenses(rowAccountTypeLens, company);
+                const rowBuyerPersonas = getCompanyEffectiveBuyerPersonas(rowAccountTypeLens, company, companyBuyerPersonaOverrides);
 
                 return (
                   <tr key={company.id} className="border-b border-slate-100 align-top">
@@ -8530,6 +8586,65 @@ function CompaniesSection({
                             {persona}
                           </span>
                         ))}
+                        <details className="rounded-xl border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-700 shadow-sm">
+                          <summary className="cursor-pointer font-bold text-slate-800">Edit Personas</summary>
+                          <div className="mt-2 grid gap-1">
+                            {COMPANY_BUYER_PERSONA_OPTIONS.map((personaOption) => {
+                              const checked = rowBuyerPersonas.includes(personaOption);
+
+                              return (
+                                <label key={personaOption} className="flex items-center gap-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={async (event) => {
+                                      if (!rowCompanyKey) return;
+
+                                      const nextPersonas = event.target.checked
+                                        ? Array.from(new Set([...rowBuyerPersonas.filter((item) => item !== "Discovery Needed"), personaOption]))
+                                        : rowBuyerPersonas.filter((item) => item !== personaOption);
+
+                                      const normalizedPersonas = nextPersonas.length ? nextPersonas : ["Discovery Needed"];
+
+                                      setCompanyBuyerPersonaOverrides((current) => ({
+                                        ...current,
+                                        [rowCompanyKey]: normalizedPersonas,
+                                      }));
+
+                                      try {
+                                        const response = await fetch("/api/company-buyer-personas", {
+                                          method: "POST",
+                                          headers: {
+                                            "Content-Type": "application/json",
+                                          },
+                                          body: JSON.stringify({
+                                            companyId: rowCompanyKey,
+                                            buyerPersonas: normalizedPersonas,
+                                          }),
+                                        });
+
+                                        if (!response.ok) {
+                                          const payload = await response.json().catch(() => null);
+                                          throw new Error(
+                                            payload && typeof payload.error === "string"
+                                              ? payload.error
+                                              : "Failed to save Buyer Personas."
+                                          );
+                                        }
+                                      } catch (error) {
+                                        console.error("Failed to save Buyer Personas:", error);
+                                        window.alert(
+                                          "Buyer Personas changed on screen, but they did not save to the database. Please refresh and try again."
+                                        );
+                                      }
+                                    }}
+                                  />
+                                  <span>{personaOption}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </details>
                       </div>
                     </td>
                     <td className="max-w-[260px] py-3 pr-4 text-slate-700">
