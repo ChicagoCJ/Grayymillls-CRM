@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.18.1 - Visible Account Type Editor";
+const APP_VERSION = "Rev 2.19 - Saved Account Type";
 const REVISION_NOTE =
-  "Made the session-only Account Type editor more visible in company rows so users can clearly test End Customer, Distributor, and Unknown overrides.";
+  "Saved Account Type to the companies table so End Customer, Distributor, and Unknown classifications persist after refresh and deployment.";
 
   
 
@@ -7720,11 +7720,16 @@ function getCompanyEffectiveAccountTypeLens(
   company: unknown,
   overrides: Record<string, CompanyAccountTypeLens> = {}
 ): CompanyAccountTypeLens {
+  const record = company as unknown as Record<string, unknown>;
   const key = getCompanyRecordKey(company);
   const overrideValue = key ? overrides[key] : undefined;
 
   if (isCompanyAccountTypeLens(overrideValue)) {
     return overrideValue;
+  }
+
+  if (isCompanyAccountTypeLens(record.account_type)) {
+    return record.account_type;
   }
 
   return getCompanyAccountTypeLens(company);
@@ -8247,7 +8252,7 @@ function CompaniesSection({
             <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs leading-5 text-blue-900 lg:col-span-2 xl:col-span-3">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <p>
-                  <span className="font-semibold">Coverage filters:</span> Salesperson / Rep identifies direct account coverage. Sales Manager identifies oversight coverage. Assignment Status helps find coverage gaps such as missing rep assignment, missing manager assignment, or fully assigned accounts. Account Type Lens is a read-only classification for separating likely end customers from distributors before a database-backed account type field is added. Buyer Persona Lens adds read-only persona badges to clarify the likely selling motion for each account. Account Type can now be changed with the visible Edit Account Type control in each company row; this remains a session-only override until database-backed storage is added in a later revision.
+                  <span className="font-semibold">Coverage filters:</span> Salesperson / Rep identifies direct account coverage. Sales Manager identifies oversight coverage. Assignment Status helps find coverage gaps such as missing rep assignment, missing manager assignment, or fully assigned accounts. Account Type Lens is a read-only classification for separating likely end customers from distributors before a database-backed account type field is added. Buyer Persona Lens adds read-only persona badges to clarify the likely selling motion for each account. Account Type can now be changed with the visible Edit Account Type control in each company row. Rev 2.19 saves that value to the companies table, then uses the saved value before falling back to the calculated lens.
                 </p>
                 <button
                   type="button"
@@ -8472,7 +8477,7 @@ function CompaniesSection({
                           <span>Edit Account Type</span>
                           <select
                             value={rowAccountTypeLens}
-                            onChange={(event) => {
+                            onChange={async (event) => {
                               if (!rowCompanyKey) return;
                               const nextValue = event.target.value;
                               if (!isCompanyAccountTypeLens(nextValue)) return;
@@ -8481,6 +8486,33 @@ function CompaniesSection({
                                 ...current,
                                 [rowCompanyKey]: nextValue,
                               }));
+
+                              try {
+                                const response = await fetch("/api/company-account-type", {
+                                  method: "POST",
+                                  headers: {
+                                    "Content-Type": "application/json",
+                                  },
+                                  body: JSON.stringify({
+                                    companyId: rowCompanyKey,
+                                    accountType: nextValue,
+                                  }),
+                                });
+
+                                if (!response.ok) {
+                                  const payload = await response.json().catch(() => null);
+                                  throw new Error(
+                                    payload && typeof payload.error === "string"
+                                      ? payload.error
+                                      : "Failed to save Account Type."
+                                  );
+                                }
+                              } catch (error) {
+                                console.error("Failed to save Account Type:", error);
+                                window.alert(
+                                  "Account Type changed on screen, but it did not save to the database. Please refresh and try again."
+                                );
+                              }
                             }}
                             className="rounded-md border border-blue-200 bg-white px-1 py-0.5 text-[11px] font-semibold text-blue-900 shadow-sm"
                             title="Session-only Account Type override"
