@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.18 - Editable Account Type Lens";
+const APP_VERSION = "Rev 2.18.1 - Visible Account Type Editor";
 const REVISION_NOTE =
-  "Added session-only editable account type overrides so sales users can test End Customer, Distributor, and Unknown classification before database-backed account type storage.";
+  "Made the session-only Account Type editor more visible in company rows so users can clearly test End Customer, Distributor, and Unknown overrides.";
 
   
 
@@ -8247,7 +8247,7 @@ function CompaniesSection({
             <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs leading-5 text-blue-900 lg:col-span-2 xl:col-span-3">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <p>
-                  <span className="font-semibold">Coverage filters:</span> Salesperson / Rep identifies direct account coverage. Sales Manager identifies oversight coverage. Assignment Status helps find coverage gaps such as missing rep assignment, missing manager assignment, or fully assigned accounts. Account Type Lens is a read-only classification for separating likely end customers from distributors before a database-backed account type field is added. Buyer Persona Lens adds read-only persona badges to clarify the likely selling motion for each account. Account Type can now be changed with a session-only override; database-backed storage should be added in a later revision.
+                  <span className="font-semibold">Coverage filters:</span> Salesperson / Rep identifies direct account coverage. Sales Manager identifies oversight coverage. Assignment Status helps find coverage gaps such as missing rep assignment, missing manager assignment, or fully assigned accounts. Account Type Lens is a read-only classification for separating likely end customers from distributors before a database-backed account type field is added. Buyer Persona Lens adds read-only persona badges to clarify the likely selling motion for each account. Account Type can now be changed with the visible Edit Account Type control in each company row; this remains a session-only override until database-backed storage is added in a later revision.
                 </p>
                 <button
                   type="button"
@@ -8468,25 +8468,28 @@ function CompaniesSection({
                         <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ring-1 ${getCompanyAccountTypeLensClass(rowAccountTypeLens)}`}>
                           {rowAccountTypeLens}
                         </span>
-                        <select
-                          value={rowAccountTypeLens}
-                          onChange={(event) => {
-                            if (!rowCompanyKey) return;
-                            const nextValue = event.target.value;
-                            if (!isCompanyAccountTypeLens(nextValue)) return;
+                        <label className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-900 ring-1 ring-blue-100">
+                          <span>Edit Account Type</span>
+                          <select
+                            value={rowAccountTypeLens}
+                            onChange={(event) => {
+                              if (!rowCompanyKey) return;
+                              const nextValue = event.target.value;
+                              if (!isCompanyAccountTypeLens(nextValue)) return;
 
-                            setCompanyAccountTypeOverrides((current) => ({
-                              ...current,
-                              [rowCompanyKey]: nextValue,
-                            }));
-                          }}
-                          className="rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-700 shadow-sm"
-                          title="Session-only Account Type override"
-                        >
-                          <option value="End Customer">Set End Customer</option>
-                          <option value="Distributor">Set Distributor</option>
-                          <option value="Unknown">Set Unknown</option>
-                        </select>
+                              setCompanyAccountTypeOverrides((current) => ({
+                                ...current,
+                                [rowCompanyKey]: nextValue,
+                              }));
+                            }}
+                            className="rounded-md border border-blue-200 bg-white px-1 py-0.5 text-[11px] font-semibold text-blue-900 shadow-sm"
+                            title="Session-only Account Type override"
+                          >
+                            <option value="End Customer">End Customer</option>
+                            <option value="Distributor">Distributor</option>
+                            <option value="Unknown">Unknown</option>
+                          </select>
+                        </label>
                         {rowBuyerPersonas.map((persona) => (
                           <span
                             key={persona}
