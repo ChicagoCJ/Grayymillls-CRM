@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.21 - Admin Testing Mode Toggle";
+const APP_VERSION = "Rev 2.21.1 - Hide Role Testing Panel";
 const REVISION_NOTE =
-  "Added an Admin Testing Mode toggle so role visibility testing remains available but defaults off for normal CRM use.";
+  "Hid the Role Testing Mode panel unless Admin Testing Mode is turned on, reducing normal-user scrolling while preserving the full QA harness.";
 
   
 
@@ -1841,6 +1841,7 @@ async function handleAnalyzeProspect() {
               />
             </div>
 
+            {testingModeEnabled && (
             <RoleTestingPanel
           currentUserRole={currentUserRole}
           currentUserId={currentUserId}
@@ -1873,6 +1874,7 @@ async function handleAnalyzeProspect() {
           }}
           permissions={currentPermissions}
         />
+          )}
 
         <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm">
               <p className="font-semibold text-blue-900">{APP_VERSION}</p>
