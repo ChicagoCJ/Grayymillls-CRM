@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.26 - Saved Filters and View Preferences";
+const APP_VERSION = "Rev 2.27 - Buyer Persona UX Upgrade";
 const REVISION_NOTE =
-  "Added client-side saved view preferences for tabs, company filters, and contact filters with a reset control."; 
+  "Added a Companies Buyer Persona filter, improved persona badge readability, and included persona filters in saved view preferences."; 
 
   
 
@@ -905,6 +905,7 @@ export default function Home() {
   const [companyAccountTypeFilter, setCompanyAccountTypeFilter] = useState("All");
   const [companyAccountTypeOverrides, setCompanyAccountTypeOverrides] = useState<Record<string, CompanyAccountTypeLens>>({});
   const [companyBuyerPersonaOverrides, setCompanyBuyerPersonaOverrides] = useState<Record<string, string[]>>({});
+  const [companyBuyerPersonaFilter, setCompanyBuyerPersonaFilter] = useState("All");
   const [companyPrimaryIndustryFilter, setCompanyPrimaryIndustryFilter] = useState("All");
   const [companyPrimarySubIndustryFilter, setCompanyPrimarySubIndustryFilter] = useState("All");
   const [companyOwnerOptions, setCompanyOwnerOptions] = useState<CrmUser[]>([]);
@@ -1280,7 +1281,15 @@ export default function Home() {
       const companyAccountTypeLens = getCompanyEffectiveAccountTypeLens(company, companyAccountTypeOverrides);
       const matchesAccountType =
         companyAccountTypeFilter === "All" || companyAccountTypeLens === companyAccountTypeFilter;
-return (
+const companyBuyerPersonas = getCompanyEffectiveBuyerPersonas(
+        companyAccountTypeLens,
+        company,
+        companyBuyerPersonaOverrides
+      );
+      const matchesBuyerPersona =
+        companyBuyerPersonaFilter === "All" || companyBuyerPersonas.includes(companyBuyerPersonaFilter);
+
+      return (
         matchesSearch &&
         matchesTier &&
         matchesStatus &&
@@ -1291,7 +1300,8 @@ return (
         matchesSalespersonCoverage &&
         matchesSalesManagerCoverage &&
         matchesAssignmentStatus &&
-        matchesAccountType
+        matchesAccountType &&
+        matchesBuyerPersona
       );
     });
   }, [
@@ -1306,7 +1316,11 @@ return (
     companyAssignmentStatusFilter,
     
     companyAccountTypeFilter,
-companyMarketTagFilter,
+
+    companyBuyerPersonaFilter,
+    companyAccountTypeOverrides,
+    companyBuyerPersonaOverrides,
+    companyMarketTagFilter,
     companySectorTagFilter,
     companyCategoryTagFilter,
   ]);
@@ -1320,6 +1334,7 @@ companyMarketTagFilter,
     setCompanySalesManagerFilter("All");
     setCompanyAssignmentStatusFilter("All");
     setCompanyAccountTypeFilter("All");
+    setCompanyBuyerPersonaFilter("All");
     setCompanyPrimaryIndustryFilter("All");
     setCompanyPrimarySubIndustryFilter("All");
   }
@@ -1350,6 +1365,7 @@ companyMarketTagFilter,
       if (typeof preferences.companySalesManagerFilter === "string") setCompanySalesManagerFilter(preferences.companySalesManagerFilter);
       if (typeof preferences.companyAssignmentStatusFilter === "string") setCompanyAssignmentStatusFilter(preferences.companyAssignmentStatusFilter);
       if (typeof preferences.companyAccountTypeFilter === "string") setCompanyAccountTypeFilter(preferences.companyAccountTypeFilter);
+      if (typeof preferences.companyBuyerPersonaFilter === "string") setCompanyBuyerPersonaFilter(preferences.companyBuyerPersonaFilter);
       if (typeof preferences.companyPrimaryIndustryFilter === "string") setCompanyPrimaryIndustryFilter(preferences.companyPrimaryIndustryFilter);
       if (typeof preferences.companyPrimarySubIndustryFilter === "string") setCompanyPrimarySubIndustryFilter(preferences.companyPrimarySubIndustryFilter);
       if (typeof preferences.companyMarketTagFilter === "string") setCompanyMarketTagFilter(preferences.companyMarketTagFilter);
@@ -1378,6 +1394,7 @@ companyMarketTagFilter,
         companySalesManagerFilter,
         companyAssignmentStatusFilter,
         companyAccountTypeFilter,
+        companyBuyerPersonaFilter,
         companyPrimaryIndustryFilter,
         companyPrimarySubIndustryFilter,
         companyMarketTagFilter,
@@ -1404,6 +1421,7 @@ companyMarketTagFilter,
     companySalesManagerFilter,
     companyAssignmentStatusFilter,
     companyAccountTypeFilter,
+    companyBuyerPersonaFilter,
     companyPrimaryIndustryFilter,
     companyPrimarySubIndustryFilter,
     companyMarketTagFilter,
@@ -1433,6 +1451,7 @@ companyMarketTagFilter,
     setCompanySalesManagerFilter("All");
     setCompanyAssignmentStatusFilter("All");
     setCompanyAccountTypeFilter("All");
+    setCompanyBuyerPersonaFilter("All");
     setCompanyPrimaryIndustryFilter("All");
     setCompanyPrimarySubIndustryFilter("All");
     setCompanyMarketTagFilter("All");
@@ -2698,6 +2717,8 @@ async function handleAnalyzeProspect() {
             setCompanyAssignmentStatusFilter={setCompanyAssignmentStatusFilter}
             companyAccountTypeFilter={companyAccountTypeFilter}
             setCompanyAccountTypeFilter={setCompanyAccountTypeFilter}
+            companyBuyerPersonaFilter={companyBuyerPersonaFilter}
+            setCompanyBuyerPersonaFilter={setCompanyBuyerPersonaFilter}
             companyAccountTypeOverrides={companyAccountTypeOverrides}
             setCompanyAccountTypeOverrides={setCompanyAccountTypeOverrides}
             companyBuyerPersonaOverrides={companyBuyerPersonaOverrides}
@@ -8295,6 +8316,8 @@ function CompaniesSection({
   setCompanyAssignmentStatusFilter = () => {},
   companyAccountTypeFilter = "All",
   setCompanyAccountTypeFilter = () => {},
+  companyBuyerPersonaFilter = "All",
+  setCompanyBuyerPersonaFilter = () => {},
   companyAccountTypeOverrides = {},
   setCompanyAccountTypeOverrides = () => {},
   companyBuyerPersonaOverrides = {},
@@ -8351,6 +8374,8 @@ function CompaniesSection({
   setCompanyAssignmentStatusFilter?: (value: string) => void;
   companyAccountTypeFilter?: string;
   setCompanyAccountTypeFilter?: (value: string) => void;
+  companyBuyerPersonaFilter?: string;
+  setCompanyBuyerPersonaFilter?: (value: string) => void;
   companyAccountTypeOverrides?: Record<string, CompanyAccountTypeLens>;
   setCompanyAccountTypeOverrides?: (
     value:
@@ -8406,13 +8431,15 @@ function CompaniesSection({
     companySalespersonFilter !== "All" ||
     companySalesManagerFilter !== "All" ||
     companyAssignmentStatusFilter !== "All" ||
-    companyAccountTypeFilter !== "All";
+    companyAccountTypeFilter !== "All" ||
+    companyBuyerPersonaFilter !== "All";
 
   function clearCoverageFilters() {
     setCompanySalespersonFilter("All");
     setCompanySalesManagerFilter("All");
     setCompanyAssignmentStatusFilter("All");
     setCompanyAccountTypeFilter("All");
+    setCompanyBuyerPersonaFilter("All");
   }
 
   function applyCoverageWorkQueue(queue: "missingRep" | "missingManager" | "missingAny" | "fullyAssigned") {
@@ -8721,6 +8748,22 @@ function CompaniesSection({
               </select>
             </div>
 
+            <div>
+              <label className="text-sm font-semibold text-slate-700">Buyer Persona</label>
+              <select
+                value={companyBuyerPersonaFilter}
+                onChange={(event) => setCompanyBuyerPersonaFilter(event.target.value)}
+                className="mt-2 w-full max-w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              >
+                <option value="All">All</option>
+                {COMPANY_BUYER_PERSONA_OPTIONS.map((personaOption) => (
+                  <option key={personaOption} value={personaOption}>
+                    {personaOption}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs leading-5 text-blue-900 lg:col-span-2 xl:col-span-3">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <p>
@@ -8997,7 +9040,7 @@ function CompaniesSection({
                         {rowBuyerPersonas.map((persona) => (
                           <span
                             key={persona}
-                            className={`inline-flex items-center self-start rounded-full px-2 py-0.5 text-[11px] font-semibold leading-none ring-1 ${getCompanyBuyerPersonaLensClass(persona)}`}
+                            className={`inline-flex items-center self-start rounded-full px-2.5 py-1 text-xs font-bold leading-none ring-1 ${getCompanyBuyerPersonaLensClass(persona)}`}
                           >
                             {persona}
                           </span>
