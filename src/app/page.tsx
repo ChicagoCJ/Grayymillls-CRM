@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.21.2 - Admin Testing Mode Polish";
+const APP_VERSION = "Rev 2.22 - Signed-In CRM User Enforcement Readiness";
 const REVISION_NOTE =
-  "Cleaned up Admin Testing Mode JSX/layout formatting so the header and Admin QA controls read clearly without changing permissions behavior.";
+  "Promoted the signed-in Supabase session, CRM Users matching, and role preview panels as the readiness step before production role enforcement.";
 
   
 
@@ -3940,9 +3940,9 @@ function RoleTestingPanel({
             <ol className="mt-2 list-decimal space-y-1 pl-5">
               <li>This revision does not change production permissions.</li>
               <li>Manual role testing remains active for QA.</li>
-              <li>The next step is to read the signed-in Supabase session safely on the client.</li>
-              <li>After session detection works, the app can match signed-in email or auth id to CRM Users.</li>
-              <li>Only after that should Apply Role Visibility and manual test controls be removed.</li>
+              <li>Signed-in Supabase session detection is now available for Admin readiness testing.</li>
+              <li>The app can match signed-in email or auth id to CRM Users for readiness review.</li>
+              <li>Only after production verification should Apply Role Visibility and manual test controls be removed.</li>
             </ol>
           </div>
 
@@ -5123,7 +5123,7 @@ function SupabaseEmailPasswordLoginPanel() {
     <div className="mt-4 rounded-xl border border-indigo-200 bg-white p-3 text-xs leading-5 text-indigo-900 ring-1 ring-indigo-100">
       <p className="font-bold text-indigo-950">Supabase Email/Password Login</p>
       <p className="mt-1">
-        Use this panel to test manually created Supabase Auth users. Production permissions are still controlled by the manual role test controls until CRM user matching is implemented.
+        Use this panel to test manually created Supabase Auth users. Production permissions are still controlled by the manual role test controls until signed-in CRM role enforcement is verified and enabled.
       </p>
 
       <form className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto]" onSubmit={handleSupabaseEmailPasswordSignIn}>
