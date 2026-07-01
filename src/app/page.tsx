@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.24 - API Guardrails";
+const APP_VERSION = "Rev 2.25 - Admin User Management Security Cleanup";
 const REVISION_NOTE =
-  "Added shared server-side API guardrail helpers and applied them to sensitive write routes for imports, sales coverage, CRM users, and funnel stages."; 
+  "Replaced temporary Admin Mode with signed-in Admin permission checks for CRM user management and tightened Admin API write headers."; 
 
   
 
@@ -1685,7 +1685,7 @@ async function handleAnalyzeProspect() {
   function apiPermissionHeaders() {
     return {
       "x-crm-user-id": String(currentUserId || ""),
-      "x-crm-user-role": String(currentUserRole || "admin"),
+      "x-crm-user-role": String(currentUserRole || "sales_rep"),
       "x-crm-user-name": String(currentUserDisplayName || "Manual Role Test"),
     };
   }
@@ -2656,12 +2656,17 @@ async function handleAnalyzeProspect() {
             <AdminUsersSection
               testingModeEnabled={testingModeEnabled}
               setTestingModeEnabled={setTestingModeEnabled}
+              canManageAdminUsers={currentPermissions.canManageAdminSettings}
+              apiPermissionHeaders={apiPermissionHeaders}
             />
             <AdminFunnelStagesSection
               canManageFunnelStages={currentPermissions.canManageFunnelStages}
               apiPermissionHeaders={apiPermissionHeaders}
             />
-            <AdminTagsSection />
+            <AdminTagsSection
+              canManageTags={currentPermissions.canManageAdminSettings}
+              apiPermissionHeaders={apiPermissionHeaders}
+            />
           </section>
         )}
 
@@ -5391,12 +5396,16 @@ function SupabaseEmailPasswordLoginPanel() {
 function AdminUsersSection({
   testingModeEnabled = false,
   setTestingModeEnabled = () => {},
+  canManageAdminUsers = false,
+  apiPermissionHeaders = () => ({}),
 }: {
   testingModeEnabled?: boolean;
   setTestingModeEnabled?: (value: boolean) => void;
+  canManageAdminUsers?: boolean;
+  apiPermissionHeaders?: any;
 }) {
   const [users, setUsers] = useState<CrmUser[]>([]);
-  const [isAdminMode, setIsAdminMode] = useState(false);
+  const canEditCrmUsers = canManageAdminUsers;
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [isSavingUser, setIsSavingUser] = useState(false);
   const [userMessage, setUserMessage] = useState("");
@@ -5466,16 +5475,16 @@ function AdminUsersSection({
     });
   }
 
-  function requireAdminMode() {
-    if (isAdminMode) return true;
+  function requireAdminPermission() {
+    if (canEditCrmUsers) return true;
 
     setUserMessage("");
-    setUserError("CRM user editing is restricted to Admin Mode. Turn on Admin Mode to create, edit, archive, or reactivate CRM users.");
+    setUserError("CRM user editing is restricted to signed-in Admin users.");
     return false;
   }
 
   function startEditingUser(user: CrmUser) {
-    if (!requireAdminMode()) return;
+    if (!requireAdminPermission()) return;
 
     setEditingUserId(user.id);
     setForm({
@@ -5492,7 +5501,7 @@ function AdminUsersSection({
   }
 
   async function saveUser() {
-    if (!requireAdminMode()) return;
+    if (!requireAdminPermission()) return;
 
     setIsSavingUser(true);
     setUserMessage("");
@@ -5539,7 +5548,7 @@ function AdminUsersSection({
   }
 
   async function updateUserStatus(user: CrmUser, status: "active" | "archived") {
-    if (!requireAdminMode()) return;
+    if (!requireAdminPermission()) return;
 
     setIsSavingUser(true);
     setUserMessage("");
@@ -5572,7 +5581,7 @@ function AdminUsersSection({
     }
   }
 
-  const ownerControlsDisabled = !isAdminMode || isSavingUser;
+  const ownerControlsDisabled = !canEditCrmUsers || isSavingUser;
 
   return (
     <section className="grid gap-6">
@@ -5584,7 +5593,7 @@ function AdminUsersSection({
             </p>
             <h2 className="mt-2 text-2xl font-bold">Manage CRM Users</h2>
             <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-600">
-              Everyone can view CRM users. Creating, editing, archiving, and reactivating CRM users is restricted to Admin Mode until formal login-based permissions are added.
+              Everyone can view CRM users. Creating, editing, archiving, and reactivating CRM users is restricted to signed-in Admin users and backed by server-side API guardrails.
             </p>
           </div>
 
@@ -5597,31 +5606,22 @@ function AdminUsersSection({
           </button>
         </div>
 
-        <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+        <div className="mt-5 rounded-2xl border border-green-200 bg-green-50 p-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="font-semibold text-amber-950">Temporary Admin Mode</p>
-              <p className="mt-1 text-sm leading-6 text-amber-900">
-                This is a temporary UI gate. Later, true permissions should come from the signed-in user account.
+              <p className="font-semibold text-green-950">Signed-In Admin Permission</p>
+              <p className="mt-1 text-sm leading-6 text-green-900">
+                CRM user editing now depends on the signed-in CRM role. Admin users can create, edit, archive, and reactivate CRM users. Non-admin roles can view users but cannot edit them.
               </p>
             </div>
 
-            <label className="flex w-fit cursor-pointer items-center gap-3 rounded-xl bg-white px-4 py-3 text-sm font-semibold text-slate-800 shadow-sm ring-1 ring-amber-200">
-              <input
-                type="checkbox"
-                checked={isAdminMode}
-                onChange={(event) => {
-                  setIsAdminMode(event.target.checked);
-                  setUserMessage("");
-                  setUserError("");
-                  if (!event.target.checked) {
-                    resetUserForm();
-                  }
-                }}
-                className="h-4 w-4 rounded border-slate-300 text-blue-700 focus:ring-blue-600"
-              />
-              Admin Mode {isAdminMode ? "On" : "Off"}
-            </label>
+            <span className={`w-fit rounded-full px-3 py-1 text-xs font-bold ring-1 ${
+              canEditCrmUsers
+                ? "bg-green-100 text-green-800 ring-green-200"
+                : "bg-slate-100 text-slate-600 ring-slate-200"
+            }`}>
+              {canEditCrmUsers ? "Admin permission active" : "View only"}
+            </span>
           </div>
 
           <div className={`mt-5 rounded-2xl border p-4 text-sm ${
@@ -5710,7 +5710,7 @@ function AdminUsersSection({
         className={
           editingUserId
             ? "fixed inset-y-0 right-0 z-50 w-full max-w-3xl overflow-y-auto bg-white p-6 shadow-2xl ring-1 ring-slate-200"
-            : `scroll-mt-24 rounded-2xl bg-white p-6 shadow-sm ${!isAdminMode ? "opacity-75" : ""}`
+            : `scroll-mt-24 rounded-2xl bg-white p-6 shadow-sm ${!canEditCrmUsers ? "opacity-75" : ""}`
         }
       >
         <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
@@ -5721,9 +5721,9 @@ function AdminUsersSection({
                 Editing opens in this drawer. Save or cancel to return to the CRM user list.
               </p>
             )}
-            {!isAdminMode && (
+            {!canEditCrmUsers && (
               <p className="mt-2 text-sm text-slate-600">
-                Turn on Admin Mode to create or edit CRM users.
+                Signed-in Admin permission is required to create or edit CRM users.
               </p>
             )}
           </div>
@@ -5745,7 +5745,7 @@ function AdminUsersSection({
             <input
               type="text"
               value={form.displayName}
-              disabled={!isAdminMode}
+              disabled={!canEditCrmUsers}
               onChange={(event) => setForm({ ...form, displayName: event.target.value })}
               className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm disabled:cursor-not-allowed disabled:bg-slate-100"
               placeholder="Example: Jane Smith"
@@ -5757,7 +5757,7 @@ function AdminUsersSection({
             <input
               type="text"
               value={form.roleName}
-              disabled={!isAdminMode}
+              disabled={!canEditCrmUsers}
               onChange={(event) => setForm({ ...form, roleName: event.target.value })}
               className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm disabled:cursor-not-allowed disabled:bg-slate-100"
               placeholder="Sales"
@@ -5769,7 +5769,7 @@ function AdminUsersSection({
             <input
               type="number"
               value={form.sortOrder}
-              disabled={!isAdminMode}
+              disabled={!canEditCrmUsers}
               onChange={(event) => setForm({ ...form, sortOrder: event.target.value })}
               className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm disabled:cursor-not-allowed disabled:bg-slate-100"
             />
@@ -5779,7 +5779,7 @@ function AdminUsersSection({
             <label className="text-sm font-semibold text-slate-700">User Role</label>
             <select
               value={form.userRole}
-              disabled={!isAdminMode}
+              disabled={!canEditCrmUsers}
               onChange={(event) => setForm({ ...form, userRole: event.target.value })}
               className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm disabled:cursor-not-allowed disabled:bg-slate-100"
             >
@@ -5793,7 +5793,7 @@ function AdminUsersSection({
             <label className="text-sm font-semibold text-slate-700">Coverage Type</label>
             <select
               value={form.coverageType}
-              disabled={!isAdminMode}
+              disabled={!canEditCrmUsers}
               onChange={(event) => setForm({ ...form, coverageType: event.target.value })}
               className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm disabled:cursor-not-allowed disabled:bg-slate-100"
             >
@@ -5806,7 +5806,7 @@ function AdminUsersSection({
             <label className="text-sm font-semibold text-slate-700">Status</label>
             <select
               value={form.status}
-              disabled={!isAdminMode}
+              disabled={!canEditCrmUsers}
               onChange={(event) => setForm({ ...form, status: event.target.value })}
               className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm disabled:cursor-not-allowed disabled:bg-slate-100"
             >
@@ -5820,7 +5820,7 @@ function AdminUsersSection({
             <input
               type="email"
               value={form.email}
-              disabled={!isAdminMode}
+              disabled={!canEditCrmUsers}
               onChange={(event) => setForm({ ...form, email: event.target.value })}
               className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm disabled:cursor-not-allowed disabled:bg-slate-100"
             />
@@ -5831,7 +5831,7 @@ function AdminUsersSection({
             <input
               type="text"
               value={form.phone}
-              disabled={!isAdminMode}
+              disabled={!canEditCrmUsers}
               onChange={(event) => setForm({ ...form, phone: event.target.value })}
               className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm disabled:cursor-not-allowed disabled:bg-slate-100"
             />
@@ -5842,7 +5842,7 @@ function AdminUsersSection({
             <textarea
               rows={3}
               value={form.notes}
-              disabled={!isAdminMode}
+              disabled={!canEditCrmUsers}
               onChange={(event) => setForm({ ...form, notes: event.target.value })}
               className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm disabled:cursor-not-allowed disabled:bg-slate-100"
               placeholder="User notes, territory, routing rules, or assignment guidance."
@@ -5862,7 +5862,7 @@ function AdminUsersSection({
           {editingUserId && (
             <button
               onClick={resetUserForm}
-              disabled={!isAdminMode}
+              disabled={!canEditCrmUsers}
               className="rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
             >
               Cancel Edit
@@ -5960,7 +5960,13 @@ function AdminUsersSection({
   );
 }
 
-function AdminTagsSection() {
+function AdminTagsSection({
+  canManageTags = false,
+  apiPermissionHeaders = () => ({}),
+}: {
+  canManageTags?: boolean;
+  apiPermissionHeaders?: any;
+}) {
   const [tags, setTags] = useState<CrmTag[]>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [isLoadingTags, setIsLoadingTags] = useState(false);

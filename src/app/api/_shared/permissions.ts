@@ -17,9 +17,10 @@ export type ApiPermissionAction =
   | "manage_admin_settings";
 
 export function normalizeApiUserRole(value: unknown): ApiUserRole {
+  if (value === "admin") return "admin";
   if (value === "sales_manager") return "sales_manager";
   if (value === "sales_rep") return "sales_rep";
-  return "admin";
+  return "sales_rep";
 }
 
 export function getPermissionContext(request: Request): ApiPermissionContext {
