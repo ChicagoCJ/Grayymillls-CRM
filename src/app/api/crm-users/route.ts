@@ -1,6 +1,6 @@
 ﻿import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
-import { canManageAdminSettings, getPermissionContext, logSoftPermissionCheck } from "../_shared/permissions";
+import { enforceApiPermission } from "../_shared/permissions";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -92,28 +92,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const permissionContext = getPermissionContext(request);
-    const userCreateAllowed = canManageAdminSettings(permissionContext.userRole);
-
-    logSoftPermissionCheck(
-      "manage_crm_users",
-      permissionContext,
-      userCreateAllowed
-    );
-
-    if (!userCreateAllowed) {
-      return NextResponse.json(
-        {
-          error: "Your current role cannot create or edit CRM users.",
-          permission: {
-            action: "manage_crm_users",
-            userRole: permissionContext.userRole,
-            softMode: false,
-          },
-        },
-        { status: 403 }
-      );
-    }
+    const permission = enforceApiPermission(request, "manage_crm_users");
+    if (permission.response) return permission.response;
 
     const supabase = getSupabaseAdmin();
     const payload = (await request.json()) as CrmUserPayload;
@@ -158,28 +138,8 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const permissionContext = getPermissionContext(request);
-    const userUpdateAllowed = canManageAdminSettings(permissionContext.userRole);
-
-    logSoftPermissionCheck(
-      "manage_crm_users",
-      permissionContext,
-      userUpdateAllowed
-    );
-
-    if (!userUpdateAllowed) {
-      return NextResponse.json(
-        {
-          error: "Your current role cannot create, edit, archive, or reactivate CRM users.",
-          permission: {
-            action: "manage_crm_users",
-            userRole: permissionContext.userRole,
-            softMode: false,
-          },
-        },
-        { status: 403 }
-      );
-    }
+    const permission = enforceApiPermission(request, "manage_crm_users");
+    if (permission.response) return permission.response;
 
     const supabase = getSupabaseAdmin();
     const payload = (await request.json()) as CrmUserPayload;

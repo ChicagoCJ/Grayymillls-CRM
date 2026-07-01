@@ -1,6 +1,6 @@
 ﻿import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
-import { canManageFunnelStageDefinitions, getPermissionContext, logSoftPermissionCheck } from "../_shared/permissions";
+import { enforceApiPermission } from "../_shared/permissions";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -92,28 +92,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const permissionContext = getPermissionContext(request);
-    const funnelStageCreateAllowed = canManageFunnelStageDefinitions(permissionContext.userRole);
-
-    logSoftPermissionCheck(
-      "manage_funnel_stage_definition",
-      permissionContext,
-      funnelStageCreateAllowed
-    );
-
-    if (!funnelStageCreateAllowed) {
-      return NextResponse.json(
-        {
-          error: "Your current role cannot create or edit funnel stage definitions.",
-          permission: {
-            action: "manage_funnel_stage_definition",
-            userRole: permissionContext.userRole,
-            softMode: false,
-          },
-        },
-        { status: 403 }
-      );
-    }
+    const permission = enforceApiPermission(request, "manage_funnel_stage_definition");
+    if (permission.response) return permission.response;
 
     const supabase = getSupabaseAdmin();
     const payload = (await request.json()) as FunnelStagePayload;
@@ -164,28 +144,8 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const permissionContext = getPermissionContext(request);
-    const funnelStageUpdateAllowed = canManageFunnelStageDefinitions(permissionContext.userRole);
-
-    logSoftPermissionCheck(
-      "manage_funnel_stage_definition",
-      permissionContext,
-      funnelStageUpdateAllowed
-    );
-
-    if (!funnelStageUpdateAllowed) {
-      return NextResponse.json(
-        {
-          error: "Your current role cannot create, edit, archive, or reactivate funnel stage definitions.",
-          permission: {
-            action: "manage_funnel_stage_definition",
-            userRole: permissionContext.userRole,
-            softMode: false,
-          },
-        },
-        { status: 403 }
-      );
-    }
+    const permission = enforceApiPermission(request, "manage_funnel_stage_definition");
+    if (permission.response) return permission.response;
 
     const supabase = getSupabaseAdmin();
     const payload = (await request.json()) as FunnelStagePayload;

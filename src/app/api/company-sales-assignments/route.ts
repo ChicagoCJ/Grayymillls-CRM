@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
-import { canAssignSalesCoverage, getPermissionContext, logSoftPermissionCheck } from "../_shared/permissions";
+import { enforceApiPermission } from "../_shared/permissions";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -75,28 +75,8 @@ export async function GET(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const permissionContext = getPermissionContext(request);
-    const assignmentAllowed = canAssignSalesCoverage(permissionContext.userRole);
-
-    logSoftPermissionCheck(
-      "assign_sales_coverage",
-      permissionContext,
-      assignmentAllowed
-    );
-
-    if (!assignmentAllowed) {
-      return NextResponse.json(
-        {
-          error: "Your current role cannot edit sales coverage assignments.",
-          permission: {
-            action: "assign_sales_coverage",
-            userRole: permissionContext.userRole,
-            softMode: false,
-          },
-        },
-        { status: 403 }
-      );
-    }
+    const permission = enforceApiPermission(request, "assign_sales_coverage");
+    if (permission.response) return permission.response;
 
     const supabase = getSupabaseAdmin();
     const payload = await request.json();

@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.23 - Production Role Enforcement Phase 1";
+const APP_VERSION = "Rev 2.24 - API Guardrails";
 const REVISION_NOTE =
-  "Turned on signed-in CRM user role awareness for UI navigation and record visibility while keeping API guardrails for the next revision.";
+  "Added shared server-side API guardrail helpers and applied them to sensitive write routes for imports, sales coverage, CRM users, and funnel stages."; 
 
   
 

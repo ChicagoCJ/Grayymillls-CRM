@@ -1,6 +1,6 @@
 ﻿import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
-import { canImportCsv, getPermissionContext, logSoftPermissionCheck } from "../_shared/permissions";
+import { enforceApiPermission } from "../_shared/permissions";
 
 type ImportPayload = {
   fileName: string;
@@ -725,14 +725,10 @@ function collectSelectedImportTagIds(payload: any) {
 
 export async function POST(request: Request) {
   try {
-    const permissionContext = getPermissionContext(request);
-    logSoftPermissionCheck(
-      "import_zoominfo",
-      permissionContext,
-      canImportCsv(permissionContext.userRole)
-    );
+    const permission = enforceApiPermission(request, "import_csv");
+    if (permission.response) return permission.response;
 
-    const payload = (await request.json()) as ImportPayload;
+const payload = (await request.json()) as ImportPayload;
     const selectedImportTagIds = collectSelectedImportTagIds(payload);
 
     if (!payload.fileName || !Array.isArray(payload.rows) || payload.rows.length === 0) {
