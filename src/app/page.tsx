@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 
 import { getBrowserSupabaseClient, hasBrowserSupabaseConfig } from "../lib/supabase-browser";
@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.21.1 - Hide Role Testing Panel";
+const APP_VERSION = "Rev 2.21.2 - Admin Testing Mode Polish";
 const REVISION_NOTE =
-  "Hid the Role Testing Mode panel unless Admin Testing Mode is turned on, reducing normal-user scrolling while preserving the full QA harness.";
+  "Cleaned up Admin Testing Mode JSX/layout formatting so the header and Admin QA controls read clearly without changing permissions behavior.";
 
   
 
@@ -1495,8 +1495,8 @@ async function handleAnalyzeProspect() {
     { key: "companies", label: "Companies" },
     { key: "contacts", label: "Contacts" },
     { key: "funnel", label: "Funnel" },
-    { key: "import", label: "Import ZoomInfo" },    { key: "admin", label: "Admin" },
-
+    { key: "import", label: "Import ZoomInfo" },
+    { key: "admin", label: "Admin" },
     { key: "releaseNotes", label: "Release Notes" },
   ];
 
@@ -1842,41 +1842,41 @@ async function handleAnalyzeProspect() {
             </div>
 
             {testingModeEnabled && (
-            <RoleTestingPanel
-          currentUserRole={currentUserRole}
-          currentUserId={currentUserId}
-          currentUserDisplayName={currentUserDisplayName}
-          currentCoverageType={currentCoverageType}
-          applyRoleVisibility={applyRoleVisibility}
-          setApplyRoleVisibility={setApplyRoleVisibility}
-          testingModeEnabled={testingModeEnabled}
-          roleVisibilityNeedsUser={roleVisibilityNeedsUser}
-          roleTotalCompanyCount={crmSummary.companies.length}
-          roleVisibleCompanyCount={getRoleVisibleCompanies(crmSummary.companies).length}
-          roleAssignedCompanyCount={currentUserAssignedCompanyCount}
-          roleUnassignedCompanyCount={unassignedSalespersonCompanyCount}
-          roleTestUsers={roleTestUsers}
-          isLoadingRoleUsers={isLoadingRoleUsers}
-          roleUserError={roleUserError}
-          onSelectUser={applyRoleTestUser}
-          setCurrentUserRole={(role) => {
-            const nextPermissions = getRolePermissions(role);
+              <RoleTestingPanel
+                currentUserRole={currentUserRole}
+                currentUserId={currentUserId}
+                currentUserDisplayName={currentUserDisplayName}
+                currentCoverageType={currentCoverageType}
+                applyRoleVisibility={applyRoleVisibility}
+                setApplyRoleVisibility={setApplyRoleVisibility}
+                testingModeEnabled={testingModeEnabled}
+                roleVisibilityNeedsUser={roleVisibilityNeedsUser}
+                roleTotalCompanyCount={crmSummary.companies.length}
+                roleVisibleCompanyCount={getRoleVisibleCompanies(crmSummary.companies).length}
+                roleAssignedCompanyCount={currentUserAssignedCompanyCount}
+                roleUnassignedCompanyCount={unassignedSalespersonCompanyCount}
+                roleTestUsers={roleTestUsers}
+                isLoadingRoleUsers={isLoadingRoleUsers}
+                roleUserError={roleUserError}
+                onSelectUser={applyRoleTestUser}
+                setCurrentUserRole={(role) => {
+                  const nextPermissions = getRolePermissions(role);
 
-            setCurrentUserRole(role);
+                  setCurrentUserRole(role);
 
-            if (activeTab === "admin" && !nextPermissions.canManageAdminSettings) {
-              setActiveTab("dashboard");
-            }
+                  if (activeTab === "admin" && !nextPermissions.canManageAdminSettings) {
+                    setActiveTab("dashboard");
+                  }
 
-            if (activeTab === "import" && !nextPermissions.canImportCsv) {
-              setActiveTab("dashboard");
-            }
-          }}
-          permissions={currentPermissions}
-        />
-          )}
+                  if (activeTab === "import" && !nextPermissions.canImportCsv) {
+                    setActiveTab("dashboard");
+                  }
+                }}
+                permissions={currentPermissions}
+              />
+            )}
 
-        <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm">
+            <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm">
               <p className="font-semibold text-blue-900">{APP_VERSION}</p>
               <p className="mt-1 text-blue-700">{REVISION_NOTE}</p>
             </div>
@@ -5436,7 +5436,9 @@ function AdminUsersSection({
             <p className="mt-3 text-xs leading-5">
               When Testing Mode is Off, Apply Role Visibility is automatically turned off. Turn Testing Mode On to use the manual role visibility test harness.
             </p>
-          </div>        <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 p-4">
+          </div>
+
+          <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 p-4">
           <p className="text-xs font-bold uppercase tracking-wide text-blue-700">CRM User Role Guide</p>
           <div className="mt-3 grid gap-3 lg:grid-cols-4">
             <div className="rounded-xl bg-white p-3 ring-1 ring-blue-100">
@@ -12026,6 +12028,8 @@ function ReadableListItem({
     </div>
   );
 }
+
+
 
 
 
