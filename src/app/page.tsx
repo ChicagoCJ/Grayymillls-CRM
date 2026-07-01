@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.22 - Signed-In CRM User Enforcement Readiness";
+const APP_VERSION = "Rev 2.23 - Production Role Enforcement Phase 1";
 const REVISION_NOTE =
-  "Promoted the signed-in Supabase session, CRM Users matching, and role preview panels as the readiness step before production role enforcement.";
+  "Turned on signed-in CRM user role awareness for UI navigation and record visibility while keeping API guardrails for the next revision.";
 
   
 
@@ -653,6 +653,17 @@ export default function Home() {
   const [currentCoverageType, setCurrentCoverageType] = useState("internal");
   const [applyRoleVisibility, setApplyRoleVisibility] = useState(false);
   const [testingModeEnabled, setTestingModeEnabled] = useState(false);
+  const [signedInProductionUser, setSignedInProductionUser] = useState({
+    state: "checking",
+    crmUserId: "",
+    displayName: "Checking signed-in CRM user",
+    role: "sales_rep" as AppUserRole,
+    status: "",
+    coverageType: "internal",
+    authEmail: "",
+    authUserId: "",
+    message: "Checking signed-in CRM user role.",
+  });
 
   useEffect(() => {
     try {
@@ -674,6 +685,167 @@ export default function Home() {
       setApplyRoleVisibility(false);
     }
   }, [testingModeEnabled]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    function applyLimitedFallback(message: string, authEmail = "", authUserId = "") {
+      if (cancelled) return;
+
+      setSignedInProductionUser({
+        state: "restricted",
+        crmUserId: "__no_crm_user_match__",
+        displayName: "No matched CRM user",
+        role: "sales_rep",
+        status: "restricted",
+        coverageType: "internal",
+        authEmail,
+        authUserId,
+        message,
+      });
+
+      if (!testingModeEnabled) {
+        setCurrentUserRole("sales_rep");
+        setCurrentUserId("__no_crm_user_match__");
+        setCurrentUserDisplayName("No matched CRM user");
+        setCurrentCoverageType("internal");
+      }
+    }
+
+    async function loadSignedInProductionUser() {
+      try {
+        if (!hasBrowserSupabaseConfig()) {
+          applyLimitedFallback("Browser Supabase configuration is not available. UI access is restricted.");
+          return;
+        }
+
+        const supabase = getBrowserSupabaseClient();
+        const { data, error } = await supabase.auth.getSession();
+
+        if (cancelled) return;
+
+        if (error) {
+          applyLimitedFallback(error.message || "Could not read signed-in Supabase session.");
+          return;
+        }
+
+        const authUser = data.session?.user;
+
+        if (!authUser) {
+          setSignedInProductionUser({
+            state: "signed_out",
+            crmUserId: "",
+            displayName: "Signed out",
+            role: "sales_rep",
+            status: "",
+            coverageType: "internal",
+            authEmail: "",
+            authUserId: "",
+            message: "No signed-in Supabase Auth user session detected.",
+          });
+
+          return;
+        }
+
+        const authEmail = String(authUser.email || "").trim().toLowerCase();
+        const authUserId = String(authUser.id || "").trim();
+
+        const usersResponse = await fetch("/api/crm-users?includeInactive=true");
+        const usersData = await usersResponse.json();
+
+        if (cancelled) return;
+
+        if (!usersResponse.ok) {
+          applyLimitedFallback(usersData.error || "Could not load CRM Users for production role matching.", authEmail, authUserId);
+          return;
+        }
+
+        const users: CrmUser[] = Array.isArray(usersData.users) ? usersData.users : [];
+        const matchedUser = users.find((candidate: CrmUser) => {
+          const candidateEmail = String(candidate.email || "").trim().toLowerCase();
+          const candidateAuthId = String(
+            candidate.auth_user_id ||
+              candidate.supabase_auth_user_id ||
+              candidate.supabase_user_id ||
+              ""
+          ).trim();
+
+          return (
+            (authEmail && candidateEmail === authEmail) ||
+            (authUserId && candidateAuthId === authUserId)
+          );
+        });
+
+        if (!matchedUser) {
+          applyLimitedFallback("Signed-in Supabase Auth user was detected, but no matching CRM Users record was found.", authEmail, authUserId);
+          return;
+        }
+
+        const matchedRole = String(matchedUser.user_role || matchedUser.role || "sales_rep").trim();
+        const normalizedRole: AppUserRole =
+          matchedRole === "admin" || matchedRole === "sales_manager" || matchedRole === "sales_rep"
+            ? matchedRole
+            : "sales_rep";
+
+        const matchedStatus = String(matchedUser.status || "active").trim();
+        const matchedUserId = String(matchedUser.id || "").trim();
+        const matchedDisplayName = String(
+          matchedUser.display_name ||
+            matchedUser.full_name ||
+            matchedUser.name ||
+            matchedUser.email ||
+            "Signed-in CRM user"
+        ).trim();
+        const matchedCoverageType = String(matchedUser.coverage_type || "internal").trim();
+
+        if (matchedStatus && matchedStatus !== "active") {
+          applyLimitedFallback("Matched CRM user is not active. UI access is restricted.", authEmail, authUserId);
+          return;
+        }
+
+        setSignedInProductionUser({
+          state: "ready",
+          crmUserId: matchedUserId,
+          displayName: matchedDisplayName,
+          role: normalizedRole,
+          status: matchedStatus || "active",
+          coverageType: matchedCoverageType,
+          authEmail,
+          authUserId,
+          message: "Signed-in CRM user role is active and is controlling UI permissions.",
+        });
+
+        if (!testingModeEnabled) {
+          setCurrentUserRole(normalizedRole);
+          setCurrentUserId(matchedUserId);
+          setCurrentUserDisplayName(matchedDisplayName);
+          setCurrentCoverageType(matchedCoverageType);
+
+          const nextPermissions = getRolePermissions(normalizedRole);
+
+          if (activeTab === "admin" && !nextPermissions.canManageAdminSettings) {
+            setActiveTab("dashboard");
+          }
+
+          if (activeTab === "import" && !nextPermissions.canImportCsv) {
+            setActiveTab("dashboard");
+          }
+        }
+      } catch (error) {
+        applyLimitedFallback(
+          error instanceof Error
+            ? error.message
+            : "Could not load signed-in CRM user role for UI enforcement."
+        );
+      }
+    }
+
+    loadSignedInProductionUser();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [testingModeEnabled, activeTab]);
   const [importAssignedSalespersonId, setImportAssignedSalespersonId] = useState("");
   const [importAssignedSalesManagerId, setImportAssignedSalesManagerId] = useState("");
   const [selectedCompanyIds, setSelectedCompanyIds] = useState<string[]>([]);
@@ -690,6 +862,18 @@ export default function Home() {
     () => getRolePermissions(currentUserRole),
     [currentUserRole]
   );
+
+  const productionRoleEnforcementEnabled =
+    !testingModeEnabled &&
+    signedInProductionUser.state !== "checking" &&
+    signedInProductionUser.state !== "signed_out";
+
+  const roleVisibilityEnabled = testingModeEnabled
+    ? applyRoleVisibility
+    : productionRoleEnforcementEnabled;
+
+  const navigationRole: AppUserRole =
+    testingModeEnabled && applyRoleVisibility ? "admin" : currentUserRole;
   const [csvData, setCsvData] = useState<ParsedCsv | null>(null);
   const [manualMapping, setManualMapping] = useState<Record<string, string>>({});
   const [errorMessage, setErrorMessage] = useState("");
@@ -863,7 +1047,7 @@ export default function Home() {
     ];
   }, [allCrmTags]);
   function contactMatchesRoleVisibility(contact: ContactSummary) {
-    if (!applyRoleVisibility) return true;
+    if (!roleVisibilityEnabled) return true;
     if (currentUserRole === "admin") return true;
     if (currentUserRole === "sales_manager") return true;
     if (!currentUserId) return true;
@@ -995,12 +1179,10 @@ export default function Home() {
     currentUserRole,
   ]);
   const roleVisibilityNeedsUser =
-    applyRoleVisibility && currentUserRole !== "admin" && !currentUserId;
-
-  const navigationRole: AppUserRole = applyRoleVisibility ? "admin" : currentUserRole;
+    roleVisibilityEnabled && currentUserRole !== "admin" && !currentUserId;
 
   function companyMatchesRoleVisibility(company: CompanySummary) {
-    if (!applyRoleVisibility) return true;
+    if (!roleVisibilityEnabled) return true;
     if (currentUserRole === "admin") return true;
     if (!currentUserId) return true;
 
@@ -1674,7 +1856,7 @@ async function handleAnalyzeProspect() {
   }
 
   function activityRecordMatchesRoleVisibility(activity: ActivityRecord) {
-    if (!applyRoleVisibility) return true;
+    if (!roleVisibilityEnabled) return true;
     if (currentUserRole === "admin") return true;
     if (currentUserRole === "sales_manager") return true;
     if (!currentUserId) return true;
@@ -1920,6 +2102,39 @@ async function handleAnalyzeProspect() {
             {isLoadingSummary ? "Refreshing CRM..." : "Refresh CRM"}
           </button>
         </nav>
+
+
+        {productionRoleEnforcementEnabled && (
+          <section className="rounded-2xl border border-green-200 bg-green-50 p-4 shadow-sm">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-green-700">
+                  Production Role Enforcement Phase 1
+                </p>
+                <h2 className="mt-1 text-lg font-bold text-green-950">
+                  Signed-in CRM user is controlling UI permissions
+                </h2>
+                <p className="mt-1 text-sm leading-6 text-green-900">
+                  Current user: <span className="font-semibold">{currentUserDisplayName}</span>
+                  {" "}· Role: <span className="font-semibold">{formatAppUserRole(currentUserRole)}</span>
+                  {" "}· Status: <span className="font-semibold">{signedInProductionUser.status || "Not detected"}</span>
+                </p>
+                <p className="mt-1 text-xs leading-5 text-green-800">
+                  {signedInProductionUser.message}
+                </p>
+              </div>
+
+              <div className="rounded-xl bg-white p-3 text-sm text-green-950 ring-1 ring-green-100 md:max-w-xl">
+                <p className="font-bold">UI enforcement only in Rev 2.23</p>
+                <p className="mt-1 leading-5">
+                  Navigation, Admin tools, Import access, and client-side record visibility now follow the signed-in CRM role. Server-side API guardrails come next in Rev 2.24.
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
+
+
 
         {testingModeEnabled && applyRoleVisibility && (
           <section className="rounded-2xl border border-blue-200 bg-blue-50 p-4 shadow-sm">
@@ -12028,6 +12243,8 @@ function ReadableListItem({
     </div>
   );
 }
+
+
 
 
 
