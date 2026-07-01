@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.20.3 - Load Saved Buyer Personas";
+const APP_VERSION = "Rev 2.21 - Admin Testing Mode Toggle";
 const REVISION_NOTE =
-  "Loaded saved Account Type and Buyer Personas in the CRM summary feed so company-row persona edits persist after refresh.";
+  "Added an Admin Testing Mode toggle so role visibility testing remains available but defaults off for normal CRM use.";
 
   
 
@@ -652,6 +652,28 @@ export default function Home() {
   const [currentUserDisplayName, setCurrentUserDisplayName] = useState("Manual Role Test");
   const [currentCoverageType, setCurrentCoverageType] = useState("internal");
   const [applyRoleVisibility, setApplyRoleVisibility] = useState(false);
+  const [testingModeEnabled, setTestingModeEnabled] = useState(false);
+
+  useEffect(() => {
+    try {
+      const storedTestingMode = window.localStorage.getItem("graymills-crm-testing-mode");
+      setTestingModeEnabled(storedTestingMode === "on");
+    } catch {
+      setTestingModeEnabled(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("graymills-crm-testing-mode", testingModeEnabled ? "on" : "off");
+    } catch {
+      // Ignore local storage issues.
+    }
+
+    if (!testingModeEnabled) {
+      setApplyRoleVisibility(false);
+    }
+  }, [testingModeEnabled]);
   const [importAssignedSalespersonId, setImportAssignedSalespersonId] = useState("");
   const [importAssignedSalesManagerId, setImportAssignedSalesManagerId] = useState("");
   const [selectedCompanyIds, setSelectedCompanyIds] = useState<string[]>([]);
@@ -1826,6 +1848,7 @@ async function handleAnalyzeProspect() {
           currentCoverageType={currentCoverageType}
           applyRoleVisibility={applyRoleVisibility}
           setApplyRoleVisibility={setApplyRoleVisibility}
+          testingModeEnabled={testingModeEnabled}
           roleVisibilityNeedsUser={roleVisibilityNeedsUser}
           roleTotalCompanyCount={crmSummary.companies.length}
           roleVisibleCompanyCount={getRoleVisibleCompanies(crmSummary.companies).length}
@@ -1896,7 +1919,7 @@ async function handleAnalyzeProspect() {
           </button>
         </nav>
 
-        {applyRoleVisibility && (
+        {testingModeEnabled && applyRoleVisibility && (
           <section className="rounded-2xl border border-blue-200 bg-blue-50 p-4 shadow-sm">
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div>
@@ -2413,7 +2436,10 @@ async function handleAnalyzeProspect() {
         )}        {activeTab === "admin" && (
           <section className="grid max-w-full gap-6 overflow-hidden">
             <UserRolePermissionsReference />
-            <AdminUsersSection />
+            <AdminUsersSection
+              testingModeEnabled={testingModeEnabled}
+              setTestingModeEnabled={setTestingModeEnabled}
+            />
             <AdminFunnelStagesSection
               canManageFunnelStages={currentPermissions.canManageFunnelStages}
               apiPermissionHeaders={apiPermissionHeaders}
@@ -3622,6 +3648,7 @@ function RoleTestingPanel({
   currentCoverageType,
   applyRoleVisibility,
   setApplyRoleVisibility,
+  testingModeEnabled = false,
   roleVisibilityNeedsUser,
   roleTotalCompanyCount,
   roleVisibleCompanyCount,
@@ -3640,6 +3667,7 @@ function RoleTestingPanel({
   currentCoverageType: string;
   applyRoleVisibility: boolean;
   setApplyRoleVisibility: (value: boolean) => void;
+  testingModeEnabled?: boolean;
   roleVisibilityNeedsUser: boolean;
   roleTotalCompanyCount: number;
   roleVisibleCompanyCount: number;
@@ -3717,11 +3745,11 @@ function RoleTestingPanel({
             )}
 
             <ol className="mt-3 list-decimal space-y-1 pl-5 text-xs leading-5 text-slate-600">
-              <li>Keep Apply Role Visibility OFF while selecting and checking test users.</li>
+              <li>Keep Testing Mode OFF during normal CRM use. Turn it ON only while checking test users.</li>
               <li>Use a Sales Manager to confirm broad assignment-management visibility.</li>
               <li>Use a Sales Rep with known company assignments to confirm scoped rep visibility.</li>
-              <li>Turn Apply Role Visibility ON only long enough to compare visible Companies, Contacts, Funnel, and Activities.</li>
-              <li>Return Apply Role Visibility to OFF after testing.</li>
+              <li>Turn Testing Mode ON, then turn Apply Role Visibility ON only long enough to compare visible Companies, Contacts, Funnel, and Activities.</li>
+              <li>Return Testing Mode and Apply Role Visibility to OFF after testing.</li>
             </ol>
           </div>
         </div>
@@ -3797,14 +3825,15 @@ function RoleTestingPanel({
           <label className="flex items-start gap-3 text-sm font-semibold text-slate-800">
             <input
               type="checkbox"
-              checked={applyRoleVisibility}
-              onChange={(event) => setApplyRoleVisibility(event.target.checked)}
+              checked={testingModeEnabled && applyRoleVisibility}
+              onChange={(event) => setApplyRoleVisibility(testingModeEnabled && event.target.checked)}
+              disabled={!testingModeEnabled}
               className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-700 focus:ring-blue-500"
             />
             <span>
               Apply Role Visibility
               <span className="mt-1 block text-xs font-normal leading-5 text-slate-600">
-                When enabled, the UI applies the selected CRM user's visibility scope.
+                When Testing Mode is On, the UI applies the selected CRM user's visibility scope.
                 Admins and Sales Managers see all records. Sales Reps see records tied to companies where they are assigned as Salesperson / Rep. Sales Reps see companies
                 where they are assigned as Salesperson / Rep. Contacts, Funnel, and Activities inherit related company visibility.
               </span>
@@ -3817,7 +3846,7 @@ function RoleTestingPanel({
             </p>
           )}
 
-          {applyRoleVisibility && !roleVisibilityNeedsUser && (
+          {testingModeEnabled && applyRoleVisibility && !roleVisibilityNeedsUser && (
             <p className="mt-3 rounded-lg border border-green-200 bg-green-50 p-2 text-xs font-semibold text-green-800">
               Role visibility is active for Companies, Contacts, Funnel, and Activities.
             </p>
@@ -5142,7 +5171,13 @@ function SupabaseEmailPasswordLoginPanel() {
   );
 }
 
-function AdminUsersSection() {
+function AdminUsersSection({
+  testingModeEnabled = false,
+  setTestingModeEnabled = () => {},
+}: {
+  testingModeEnabled?: boolean;
+  setTestingModeEnabled?: (value: boolean) => void;
+}) {
   const [users, setUsers] = useState<CrmUser[]>([]);
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
@@ -5370,6 +5405,35 @@ function AdminUsersSection() {
               />
               Admin Mode {isAdminMode ? "On" : "Off"}
             </label>
+          </div>
+
+          <div className={`mt-5 rounded-2xl border p-4 text-sm ${
+            testingModeEnabled
+              ? "border-blue-200 bg-blue-50 text-blue-900"
+              : "border-slate-200 bg-slate-50 text-slate-700"
+          }`}>
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="font-semibold text-slate-950">Testing Mode</p>
+                <p className="mt-1 text-sm leading-6">
+                  Keeps role visibility testing available without leaving it active during normal CRM use.
+                </p>
+              </div>
+
+              <label className="flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-bold shadow-sm ring-1 ring-slate-200">
+                <input
+                  type="checkbox"
+                  checked={testingModeEnabled}
+                  onChange={(event) => setTestingModeEnabled(event.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-blue-700 focus:ring-blue-600"
+                />
+                Testing Mode {testingModeEnabled ? "On" : "Off"}
+              </label>
+            </div>
+
+            <p className="mt-3 text-xs leading-5">
+              When Testing Mode is Off, Apply Role Visibility is automatically turned off. Turn Testing Mode On to use the manual role visibility test harness.
+            </p>
           </div>        <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 p-4">
           <p className="text-xs font-bold uppercase tracking-wide text-blue-700">CRM User Role Guide</p>
           <div className="mt-3 grid gap-3 lg:grid-cols-4">
