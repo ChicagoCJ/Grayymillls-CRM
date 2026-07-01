@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.25 - Admin User Management Security Cleanup";
+const APP_VERSION = "Rev 2.26 - Saved Filters and View Preferences";
 const REVISION_NOTE =
-  "Replaced temporary Admin Mode with signed-in Admin permission checks for CRM user management and tightened Admin API write headers."; 
+  "Added client-side saved view preferences for tabs, company filters, and contact filters with a reset control."; 
 
   
 
@@ -1330,7 +1330,127 @@ companyMarketTagFilter,
     setContactSectorTagFilter("All");
     setContactCategoryTagFilter("All");
   }
-  async function loadCompanyOwnerFilterData() {
+  
+  useEffect(() => {
+    try {
+      const savedPreferences = window.localStorage.getItem("graymills-crm-view-preferences");
+
+      if (!savedPreferences) return;
+
+      const preferences = JSON.parse(savedPreferences);
+
+      if (typeof preferences.activeTab === "string") setActiveTab(preferences.activeTab);
+
+      if (typeof preferences.companySearchTerm === "string") setCompanySearchTerm(preferences.companySearchTerm);
+      if (typeof preferences.companyTierFilter === "string") setCompanyTierFilter(preferences.companyTierFilter);
+      if (typeof preferences.companyStatusFilter === "string") setCompanyStatusFilter(preferences.companyStatusFilter);
+      if (typeof preferences.companyProductPathFilter === "string") setCompanyProductPathFilter(preferences.companyProductPathFilter);
+      if (typeof preferences.companyOwnerFilter === "string") setCompanyOwnerFilter(preferences.companyOwnerFilter);
+      if (typeof preferences.companySalespersonFilter === "string") setCompanySalespersonFilter(preferences.companySalespersonFilter);
+      if (typeof preferences.companySalesManagerFilter === "string") setCompanySalesManagerFilter(preferences.companySalesManagerFilter);
+      if (typeof preferences.companyAssignmentStatusFilter === "string") setCompanyAssignmentStatusFilter(preferences.companyAssignmentStatusFilter);
+      if (typeof preferences.companyAccountTypeFilter === "string") setCompanyAccountTypeFilter(preferences.companyAccountTypeFilter);
+      if (typeof preferences.companyPrimaryIndustryFilter === "string") setCompanyPrimaryIndustryFilter(preferences.companyPrimaryIndustryFilter);
+      if (typeof preferences.companyPrimarySubIndustryFilter === "string") setCompanyPrimarySubIndustryFilter(preferences.companyPrimarySubIndustryFilter);
+      if (typeof preferences.companyMarketTagFilter === "string") setCompanyMarketTagFilter(preferences.companyMarketTagFilter);
+      if (typeof preferences.companySectorTagFilter === "string") setCompanySectorTagFilter(preferences.companySectorTagFilter);
+      if (typeof preferences.companyCategoryTagFilter === "string") setCompanyCategoryTagFilter(preferences.companyCategoryTagFilter);
+
+      if (typeof preferences.contactSearchTerm === "string") setContactSearchTerm(preferences.contactSearchTerm);
+      if (typeof preferences.contactMarketTagFilter === "string") setContactMarketTagFilter(preferences.contactMarketTagFilter);
+      if (typeof preferences.contactSectorTagFilter === "string") setContactSectorTagFilter(preferences.contactSectorTagFilter);
+      if (typeof preferences.contactCategoryTagFilter === "string") setContactCategoryTagFilter(preferences.contactCategoryTagFilter);
+    } catch {
+      // Ignore malformed saved preferences.
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      const preferences = {
+        activeTab,
+        companySearchTerm,
+        companyTierFilter,
+        companyStatusFilter,
+        companyProductPathFilter,
+        companyOwnerFilter,
+        companySalespersonFilter,
+        companySalesManagerFilter,
+        companyAssignmentStatusFilter,
+        companyAccountTypeFilter,
+        companyPrimaryIndustryFilter,
+        companyPrimarySubIndustryFilter,
+        companyMarketTagFilter,
+        companySectorTagFilter,
+        companyCategoryTagFilter,
+        contactSearchTerm,
+        contactMarketTagFilter,
+        contactSectorTagFilter,
+        contactCategoryTagFilter,
+      };
+
+      window.localStorage.setItem("graymills-crm-view-preferences", JSON.stringify(preferences));
+    } catch {
+      // Ignore local storage issues.
+    }
+  }, [
+    activeTab,
+    companySearchTerm,
+    companyTierFilter,
+    companyStatusFilter,
+    companyProductPathFilter,
+    companyOwnerFilter,
+    companySalespersonFilter,
+    companySalesManagerFilter,
+    companyAssignmentStatusFilter,
+    companyAccountTypeFilter,
+    companyPrimaryIndustryFilter,
+    companyPrimarySubIndustryFilter,
+    companyMarketTagFilter,
+    companySectorTagFilter,
+    companyCategoryTagFilter,
+    contactSearchTerm,
+    contactMarketTagFilter,
+    contactSectorTagFilter,
+    contactCategoryTagFilter,
+  ]);
+
+  function resetSavedViewPreferences() {
+    try {
+      window.localStorage.removeItem("graymills-crm-view-preferences");
+    } catch {
+      // Ignore local storage issues.
+    }
+
+    setActiveTab("dashboard");
+
+    setCompanySearchTerm("");
+    setCompanyTierFilter("All");
+    setCompanyStatusFilter("All");
+    setCompanyProductPathFilter("All");
+    setCompanyOwnerFilter("All");
+    setCompanySalespersonFilter("All");
+    setCompanySalesManagerFilter("All");
+    setCompanyAssignmentStatusFilter("All");
+    setCompanyAccountTypeFilter("All");
+    setCompanyPrimaryIndustryFilter("All");
+    setCompanyPrimarySubIndustryFilter("All");
+    setCompanyMarketTagFilter("All");
+    setCompanySectorTagFilter("All");
+    setCompanyCategoryTagFilter("All");
+
+    setContactSearchTerm("");
+    setContactMarketTagFilter("All");
+    setContactSectorTagFilter("All");
+    setContactCategoryTagFilter("All");
+
+    setSelectedCompanyIds([]);
+    setBulkAssignedSalespersonId("");
+    setBulkAssignedSalesManagerId("");
+    setBulkCompanyAssignmentMessage("");
+  }
+
+async function loadCompanyOwnerFilterData() {
     try {
       const usersResponse = await fetch("/api/crm-users");
       const usersData = await usersResponse.json();
@@ -2062,6 +2182,13 @@ async function handleAnalyzeProspect() {
               <p className="font-semibold text-blue-900">{APP_VERSION}</p>
               <p className="mt-1 text-blue-700">{REVISION_NOTE}</p>
             </div>
+            <button
+              type="button"
+              onClick={resetSavedViewPreferences}
+              className="w-fit rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+            >
+              Reset saved view preferences
+            </button>
           </div>
         </header>
 
