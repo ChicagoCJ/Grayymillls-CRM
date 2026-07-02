@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.36 - Activity History Polish";
+const APP_VERSION = "Rev 2.37 - Company Detail Jump Offset Fix";
 const REVISION_NOTE =
-  "Added Company Detail activity history counts and filters for faster follow-up review."; 
+  "Adjusted Company Detail jump-button scroll offsets so sections land below the sticky header."; 
 
   
 
@@ -9546,7 +9546,7 @@ function CompanyDetailSection({
         </div>
       </div>
 
-      <div id="company-detail-snapshot" className="scroll-mt-48"></div>
+      <div id="company-detail-snapshot" className="scroll-mt-80"></div>
       <div className="grid gap-6 lg:grid-cols-3">
         <DetailCard title="Company Snapshot">
           <DetailRow label="Website" value={company.website} />
@@ -9615,7 +9615,7 @@ function CompanyDetailSection({
         </DetailCard>
       </div>      <CompanyIndustryEnrichmentPanel company={detail.company} />
 
-      <div id="company-detail-sales-coverage" className="scroll-mt-48"></div>
+      <div id="company-detail-sales-coverage" className="scroll-mt-80"></div>
       <CompanySalesAssignmentPanel
         companyId={String(detail.company.id)}
         canEditSalesCoverage={salesCoverageCanEdit}
@@ -9624,7 +9624,7 @@ function CompanyDetailSection({
 
       <CompanyTagManager companyId={String(detail.company.id)} />
 
-      <div id="company-detail-funnel" className="scroll-mt-48"></div>
+      <div id="company-detail-funnel" className="scroll-mt-80"></div>
       <CompanyOpportunityPanel
         canMoveOpportunityStages={canMoveOpportunityStages}
         companyId={String(detail.company.id)}
@@ -9637,7 +9637,7 @@ function CompanyDetailSection({
 
 
       <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
-        <div id="company-detail-activity" className="scroll-mt-48"></div>
+        <div id="company-detail-activity" className="scroll-mt-80"></div>
         <h3 className="text-xl font-bold">Add Activity / Follow-Up</h3>
         <p className="mt-2 text-sm text-slate-600">
           Save notes, calls, emails, meetings, tasks, and quote follow-ups directly to this company record.
