@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.32 - Compact Company Detail Header";
+const APP_VERSION = "Rev 2.33 - Company Detail Activity Presets";
 const REVISION_NOTE =
-  "Reduced the sticky Company Detail header height while keeping action and jump buttons available."; 
+  "Added one-click activity presets to speed up common Company Detail follow-up entries."; 
 
   
 
@@ -9383,6 +9383,20 @@ function CompanyDetailSection({
     });
   }
 
+  function applyCompanyActivityPreset(
+    activityType: ActivityForm["activityType"],
+    subject: string,
+    notes: string,
+    dueDate = activityForm.dueDate
+  ) {
+    setActivityForm({
+      activityType,
+      subject,
+      notes,
+      dueDate,
+    });
+  }
+
 
 
   const company = detail.company;
@@ -9601,6 +9615,96 @@ function CompanyDetailSection({
         <p className="mt-2 text-sm text-slate-600">
           Save notes, calls, emails, meetings, tasks, and quote follow-ups directly to this company record.
         </p>
+
+        <div className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+          <p className="text-xs font-bold uppercase tracking-wide text-emerald-800">Activity presets</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                applyCompanyActivityPreset(
+                  "call",
+                  "Left voicemail",
+                  "Left voicemail. Follow up with a short email and try again if there is no response.",
+                  companyActivityDateOffset(2)
+                )
+              }
+              className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-emerald-800 shadow-sm ring-1 ring-emerald-100 hover:bg-emerald-100"
+            >
+              Left voicemail
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                applyCompanyActivityPreset(
+                  "email",
+                  "Sent intro email",
+                  "Sent introductory email. Follow up on fit, current cleaning or fluid handling needs, and whether there is an active project.",
+                  companyActivityDateOffset(5)
+                )
+              }
+              className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-emerald-800 shadow-sm ring-1 ring-emerald-100 hover:bg-emerald-100"
+            >
+              Sent intro email
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                applyCompanyActivityPreset(
+                  "quote_followup",
+                  "Quote follow-up",
+                  "Follow up on open quote, timing, decision process, technical questions, and any support needed to move forward.",
+                  companyActivityDateOffset(3)
+                )
+              }
+              className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-emerald-800 shadow-sm ring-1 ring-emerald-100 hover:bg-emerald-100"
+            >
+              Quote follow-up
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                applyCompanyActivityPreset(
+                  "task",
+                  "Distributor review needed",
+                  "Review whether this account should be handled directly, through a distributor, or coordinated with an outside rep.",
+                  companyActivityDateOffset(7)
+                )
+              }
+              className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-emerald-800 shadow-sm ring-1 ring-emerald-100 hover:bg-emerald-100"
+            >
+              Distributor review
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                applyCompanyActivityPreset(
+                  "meeting",
+                  "Schedule discovery call",
+                  "Schedule discovery call. Confirm application, current process, pain points, timing, budget, and decision makers.",
+                  companyActivityDateOffset(7)
+                )
+              }
+              className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-emerald-800 shadow-sm ring-1 ring-emerald-100 hover:bg-emerald-100"
+            >
+              Schedule discovery
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                applyCompanyActivityPreset(
+                  "task",
+                  "Check back in 30 days",
+                  "Check back on timing, current need, and whether there is an active parts washing, cleaning, ink handling, or pump project.",
+                  companyActivityDateOffset(30)
+                )
+              }
+              className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-emerald-800 shadow-sm ring-1 ring-emerald-100 hover:bg-emerald-100"
+            >
+              Check back 30 days
+            </button>
+          </div>
+        </div>
 
         <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 p-3">
           <p className="text-xs font-bold uppercase tracking-wide text-blue-800">Quick activity type</p>
