@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.38.1 - Visible Activity Save Guard";
+const APP_VERSION = "Rev 2.39 - Company Activity Field Polish";
 const REVISION_NOTE =
-  "Made the Company Detail activity save guard visible near the form and disabled blank saves."; 
+  "Clarified that Company Detail activity saves require either a subject or notes."; 
 
   
 
@@ -9743,7 +9743,11 @@ function CompanyDetailSection({
           </div>
         </div>
 
-        <div className="mt-4 grid gap-4 lg:grid-cols-4">
+                <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+          Enter a subject, notes, or both. Activity type and due date are optional context.
+        </div>
+
+<div className="mt-4 grid gap-4 lg:grid-cols-4">
           <div>
             <label className="text-sm font-semibold text-slate-700">Activity Type</label>
             <select
@@ -9811,7 +9815,7 @@ function CompanyDetailSection({
           </div>
 
           <div className="lg:col-span-2">
-            <label className="text-sm font-semibold text-slate-700">Subject</label>
+            <label className="text-sm font-semibold text-slate-700">Subject <span className="text-slate-500">(or notes required)</span></label>
             <input
               type="text"
               value={activityForm.subject}
@@ -9824,7 +9828,7 @@ function CompanyDetailSection({
           </div>
 
           <div className="lg:col-span-4">
-            <label className="text-sm font-semibold text-slate-700">Notes</label>
+            <label className="text-sm font-semibold text-slate-700">Notes <span className="text-slate-500">(or subject required)</span></label>
             <textarea
               value={activityForm.notes}
               onChange={(event) =>
