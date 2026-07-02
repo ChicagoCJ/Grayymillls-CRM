@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.27 - Buyer Persona UX Upgrade";
+const APP_VERSION = "Rev 2.28 - Company Detail Sales Action Snapshot";
 const REVISION_NOTE =
-  "Added a Companies Buyer Persona filter, improved persona badge readability, and included persona filters in saved view preferences."; 
+  "Added a Company Detail Sales Action Snapshot and fixed Company Detail sales coverage editing for Admin and Sales Manager roles."; 
 
   
 
@@ -2795,8 +2795,15 @@ async function handleAnalyzeProspect() {
             onCompleteActivity={handleCompleteActivity}
             onAnalyzeProspect={handleAnalyzeProspect}
             onBack={returnFromCompanyDetail}
-            salesCoverageCanEdit={currentPermissions.canAssignSalesCoverage}
-            canMoveOpportunityStages={currentPermissions.canMoveOpportunityStages}
+            salesCoverageCanEdit={
+              currentPermissions.canAssignSalesCoverage ||
+              String(currentUserRole).toLowerCase() === "admin" ||
+              String(currentUserRole).toLowerCase() === "sales_manager" ||
+              String(signedInProductionUser.role).toLowerCase() === "admin" ||
+              String(signedInProductionUser.role).toLowerCase() === "sales_manager"
+            }
+                        apiPermissionHeaders={apiPermissionHeaders}
+canMoveOpportunityStages={currentPermissions.canMoveOpportunityStages}
 />  
         )}        {activeTab === "admin" && (
           <section className="grid max-w-full gap-6 overflow-hidden">
@@ -9323,6 +9330,7 @@ function CompanyDetailSection({
   onBack,
   salesCoverageCanEdit = true,
   canMoveOpportunityStages = true,
+  apiPermissionHeaders = () => ({}),
 }: {
   detail: CompanyDetail | null;
   activityForm: ActivityForm;
@@ -9336,6 +9344,7 @@ function CompanyDetailSection({
   onBack: () => void;
   salesCoverageCanEdit?: boolean;
   canMoveOpportunityStages?: boolean;
+  apiPermissionHeaders?: any;
 }) {
   if (!detail) {
     return (
@@ -9368,6 +9377,30 @@ function CompanyDetailSection({
   const likelyObjections = hasAiAnalysis
     ? parseJsonArray(intelligence?.likely_objections)
     : [];
+
+  const detailAccountTypeLens = getCompanyEffectiveAccountTypeLens(company);
+  const detailBuyerPersonas = getCompanyEffectiveBuyerPersonas(detailAccountTypeLens, company);
+  const detailAssignedSalespersonId = String(company.assigned_salesperson_id || "");
+  const detailAssignedSalesManagerId = String(company.assigned_sales_manager_id || "");
+  const detailSalesCoverageStatus =
+    detailAssignedSalespersonId && detailAssignedSalesManagerId
+      ? "Salesperson and Sales Manager assigned"
+      : detailAssignedSalespersonId
+        ? "Salesperson assigned; Sales Manager missing"
+        : detailAssignedSalesManagerId
+          ? "Sales Manager assigned; Salesperson missing"
+          : "Sales coverage missing";
+
+  const detailRecommendedNextStep =
+    !detailAssignedSalespersonId
+      ? "Assign a Salesperson / Rep before relying on role visibility or rep follow-up."
+      : detailAccountTypeLens === "Unknown"
+        ? "Confirm whether this account is an end customer, distributor, or unknown before choosing the selling motion."
+        : detailBuyerPersonas.includes("Discovery Needed")
+          ? "Confirm likely buyer personas and update the persona badges so discovery questions match the real stakeholders."
+          : hasAiAnalysis && primaryProspect?.next_best_action
+            ? String(primaryProspect.next_best_action)
+            : "Open discovery with the listed buyer personas and confirm the most likely Graymills application before quoting.";
 
   return (
     <section className="grid gap-6">
@@ -9446,6 +9479,32 @@ function CompanyDetailSection({
           <DetailRow label="Status" value={company.status} />
         </DetailCard>
 
+        <DetailCard title="Sales Action Snapshot">
+          <DetailRow label="Account Type" value={detailAccountTypeLens} />
+          <DetailRow label="Sales Coverage" value={detailSalesCoverageStatus} />
+          <DetailRow label="Primary Industry" value={company.primary_industry} />
+          <DetailRow label="Primary Sub-Industry" value={company.primary_sub_industry} />
+
+          <div className="border-b border-slate-100 py-2 text-sm">
+            <p className="font-semibold text-slate-700">Buyer Personas</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {detailBuyerPersonas.map((persona) => (
+                <span
+                  key={persona}
+                  className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${getCompanyBuyerPersonaLensClass(persona)}`}
+                >
+                  {persona}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="py-2 text-sm">
+            <p className="font-semibold text-slate-700">Recommended Next Step</p>
+            <p className="mt-1 text-slate-600">{detailRecommendedNextStep}</p>
+          </div>
+        </DetailCard>
+
         <DetailCard title="Prospect Summary">
           {hasAiAnalysis ? (
             <>
@@ -9478,6 +9537,7 @@ function CompanyDetailSection({
       <CompanySalesAssignmentPanel
         companyId={String(detail.company.id)}
         canEditSalesCoverage={salesCoverageCanEdit}
+        apiPermissionHeaders={apiPermissionHeaders}
       />
 
       <CompanyTagManager companyId={String(detail.company.id)} />
@@ -9884,9 +9944,11 @@ function CompanyIndustryEnrichmentPanel({
 function CompanySalesAssignmentPanel({
   companyId,
   canEditSalesCoverage = true,
+  apiPermissionHeaders = () => ({}),
 }: {
   companyId: string;
   canEditSalesCoverage?: boolean;
+  apiPermissionHeaders?: any;
 }) {
   const [users, setUsers] = useState<any[]>([]);
   const [assignedSalespersonId, setAssignedSalespersonId] = useState("Unassigned");
@@ -9938,6 +10000,7 @@ function CompanySalesAssignmentPanel({
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
+          ...apiPermissionHeaders(),
         },
         body: JSON.stringify({
           companyId,
