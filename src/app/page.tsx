@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.39 - Company Activity Field Polish";
+const APP_VERSION = "Rev 2.40 - Activity History Sort";
 const REVISION_NOTE =
-  "Clarified that Company Detail activity saves require either a subject or notes."; 
+  "Added Company Detail activity history sorting for newest, due-date, and open-first views."; 
 
   
 
@@ -9354,6 +9354,9 @@ function CompanyDetailSection({
   const [companyActivityHistoryFilter, setCompanyActivityHistoryFilter] = useState<
     "All" | "Open" | "Overdue" | "Due Today" | "Completed"
   >("All");
+  const [companyActivityHistorySort, setCompanyActivityHistorySort] = useState<
+    "Newest first" | "Due date first" | "Open first"
+  >("Newest first");
 
   if (!detail) {
     return (
@@ -9433,6 +9436,23 @@ function CompanyDetailSection({
     }
     if (companyActivityHistoryFilter === "Completed") return Boolean(activity.completed_at);
     return true;
+  });
+  const sortedCompanyActivities = [...filteredCompanyActivities].sort((a: any, b: any) => {
+    if (companyActivityHistorySort === "Open first") {
+      const aOpen = a.completed_at ? 1 : 0;
+      const bOpen = b.completed_at ? 1 : 0;
+      if (aOpen !== bOpen) return aOpen - bOpen;
+    }
+
+    if (companyActivityHistorySort === "Due date first") {
+      const aDue = a.due_date || "9999-12-31";
+      const bDue = b.due_date || "9999-12-31";
+      if (aDue !== bDue) return aDue.localeCompare(bDue);
+    }
+
+    const aCreated = a.created_at || "";
+    const bCreated = b.created_at || "";
+    return bCreated.localeCompare(aCreated);
   });
   const primaryProspect = detail.primaryProspect;
   const intelligence = detail.intelligence;
@@ -9874,21 +9894,39 @@ function CompanyDetailSection({
               Review saved follow-ups, filter by status, and complete open items from this company record.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {(["All", "Open", "Overdue", "Due Today", "Completed"] as const).map((filter) => (
-              <button
-                key={filter}
-                type="button"
-                onClick={() => setCompanyActivityHistoryFilter(filter)}
-                className={
-                  companyActivityHistoryFilter === filter
-                    ? "rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white shadow-sm"
-                    : "rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+          <div className="flex flex-col gap-2 md:items-end">
+            <div className="flex flex-wrap gap-2">
+              {(["All", "Open", "Overdue", "Due Today", "Completed"] as const).map((filter) => (
+                <button
+                  key={filter}
+                  type="button"
+                  onClick={() => setCompanyActivityHistoryFilter(filter)}
+                  className={
+                    companyActivityHistoryFilter === filter
+                      ? "rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white shadow-sm"
+                      : "rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+                  }
+                >
+                  {filter}
+                </button>
+              ))}
+            </div>
+            <label className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+              Sort
+              <select
+                value={companyActivityHistorySort}
+                onChange={(event) =>
+                  setCompanyActivityHistorySort(
+                    event.target.value as "Newest first" | "Due date first" | "Open first"
+                  )
                 }
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm"
               >
-                {filter}
-              </button>
-            ))}
+                <option value="Newest first">Newest first</option>
+                <option value="Due date first">Due date first</option>
+                <option value="Open first">Open first</option>
+              </select>
+            </label>
           </div>
         </div>
 
@@ -9913,13 +9951,13 @@ function CompanyDetailSection({
 
         {companyActivities.length === 0 ? (
           <p className="mt-4 text-sm text-slate-600">No activities saved yet.</p>
-        ) : filteredCompanyActivities.length === 0 ? (
+        ) : sortedCompanyActivities.length === 0 ? (
           <p className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
             No activities match the selected filter.
           </p>
         ) : (
           <div className="mt-4 grid gap-3">
-            {filteredCompanyActivities.map((activity: any) => (
+            {sortedCompanyActivities.map((activity: any) => (
               <div
                 key={activity.id}
                 className={`rounded-xl border p-4 ${
