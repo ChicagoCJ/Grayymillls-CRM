@@ -2213,7 +2213,7 @@ async function handleAnalyzeProspect() {
 
         
 
-        <nav aria-label="Primary CRM navigation" className="sticky top-2 z-40 flex flex-nowrap gap-2 overflow-x-auto rounded-2xl border border-slate-300 bg-white/95 p-2 shadow-md backdrop-blur supports-[backdrop-filter]:bg-white/80">
+        <nav aria-label="Primary CRM navigation" className="sticky top-2 z-40 flex flex-nowrap gap-2 overflow-x-auto rounded-2xl border border-slate-300 bg-slate-100/95 p-2 shadow-md backdrop-blur supports-[backdrop-filter]:bg-slate-100/85">
           {tabs
               .filter((tab) => {
                 if (tab.key === "admin") return navigationRole === "admin";
@@ -9428,7 +9428,7 @@ function CompanyDetailSection({
     <section className="grid gap-6">
       <div
         data-testid="company-detail-sticky-header"
-        className="sticky top-20 z-30 max-w-full overflow-hidden rounded-2xl border border-slate-200 bg-white/95 p-6 shadow-md backdrop-blur supports-[backdrop-filter]:bg-white/90"
+        className="sticky top-20 z-30 max-w-full overflow-hidden rounded-2xl border border-slate-300 bg-slate-100/95 p-6 shadow-md backdrop-blur supports-[backdrop-filter]:bg-slate-100/90"
       >
         <div className="flex flex-wrap gap-3">
           <button
