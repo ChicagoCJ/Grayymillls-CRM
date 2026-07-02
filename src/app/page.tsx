@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.31 - Company Detail Jump Buttons";
+const APP_VERSION = "Rev 2.32 - Compact Company Detail Header";
 const REVISION_NOTE =
-  "Added jump buttons to the sticky Company Detail header for faster movement through long records."; 
+  "Reduced the sticky Company Detail header height while keeping action and jump buttons available."; 
 
   
 
@@ -2844,7 +2844,7 @@ canMoveOpportunityStages={currentPermissions.canMoveOpportunityStages}
               <div className="flex flex-col gap-4">
                 <div>
                   <h2 className="text-xl font-bold">Import ZoomInfo CSV</h2>
-                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                  <p className="mt-1 max-w-3xl text-sm leading-5 text-slate-600">
                     Upload a ZoomInfo CSV, review and adjust field mapping, then save the
                     data into the Graymills CRM.
                   </p>
@@ -9428,7 +9428,7 @@ function CompanyDetailSection({
     <section className="grid gap-6">
       <div
         data-testid="company-detail-sticky-header"
-        className="sticky top-20 z-30 max-w-full overflow-hidden rounded-2xl border border-slate-300 bg-slate-100/95 p-6 shadow-md backdrop-blur supports-[backdrop-filter]:bg-slate-100/90"
+        className="sticky top-20 z-30 max-w-full overflow-hidden rounded-2xl border border-slate-300 bg-slate-100/95 p-4 shadow-md backdrop-blur supports-[backdrop-filter]:bg-slate-100/90"
       >
         <div className="flex flex-wrap gap-3">
           <button
@@ -9459,18 +9459,18 @@ function CompanyDetailSection({
           </button>
         </div>
 
-        <div className="mt-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
               Company Detail
             </p>
-            <h2 className="mt-2 text-3xl font-bold">{displayValue(company.company_name)}</h2>
+            <h2 className="mt-1 text-2xl font-bold">{displayValue(company.company_name)}</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
               {displayValue(company.industry)}
             </p>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-2 sm:grid-cols-3">
             <SmallScoreCard
               label="Priority"
               value={
@@ -9489,7 +9489,7 @@ function CompanyDetailSection({
             />
           </div>
         </div>
-        <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-300 pt-4">
+        <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-300 pt-3">
           <a href="#company-detail-snapshot" className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">
             Snapshot
           </a>
