@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.35 - Activity Preset Polish";
+const APP_VERSION = "Rev 2.36 - Activity History Polish";
 const REVISION_NOTE =
-  "Polished Company Detail activity presets with clearer guidance and a one-click clear form action."; 
+  "Added Company Detail activity history counts and filters for faster follow-up review."; 
 
   
 
@@ -9346,6 +9346,10 @@ function CompanyDetailSection({
   canMoveOpportunityStages?: boolean;
   apiPermissionHeaders?: any;
 }) {
+  const [companyActivityHistoryFilter, setCompanyActivityHistoryFilter] = useState<
+    "All" | "Open" | "Overdue" | "Due Today" | "Completed"
+  >("All");
+
   if (!detail) {
     return (
       <section className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
@@ -9401,6 +9405,28 @@ function CompanyDetailSection({
 
 
   const company = detail.company;
+
+  const companyActivityToday = new Date().toISOString().slice(0, 10);
+  const companyActivities = detail.activities ?? [];
+  const companyOpenActivities = companyActivities.filter((activity: any) => !activity.completed_at);
+  const companyOverdueActivities = companyActivities.filter(
+    (activity: any) => !activity.completed_at && activity.due_date && activity.due_date < companyActivityToday
+  );
+  const companyDueTodayActivities = companyActivities.filter(
+    (activity: any) => !activity.completed_at && activity.due_date === companyActivityToday
+  );
+  const companyCompletedActivities = companyActivities.filter((activity: any) => activity.completed_at);
+  const filteredCompanyActivities = companyActivities.filter((activity: any) => {
+    if (companyActivityHistoryFilter === "Open") return !activity.completed_at;
+    if (companyActivityHistoryFilter === "Overdue") {
+      return !activity.completed_at && activity.due_date && activity.due_date < companyActivityToday;
+    }
+    if (companyActivityHistoryFilter === "Due Today") {
+      return !activity.completed_at && activity.due_date === companyActivityToday;
+    }
+    if (companyActivityHistoryFilter === "Completed") return Boolean(activity.completed_at);
+    return true;
+  });
   const primaryProspect = detail.primaryProspect;
   const intelligence = detail.intelligence;
   const hasAiAnalysis = hasMeaningfulAnalysis(intelligence);
@@ -9824,13 +9850,59 @@ function CompanyDetailSection({
       </div>
 
       <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
-        <h3 className="text-xl font-bold">Activity History</h3>
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <h3 className="text-xl font-bold">Activity History</h3>
+            <p className="mt-2 text-sm text-slate-600">
+              Review saved follow-ups, filter by status, and complete open items from this company record.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {(["All", "Open", "Overdue", "Due Today", "Completed"] as const).map((filter) => (
+              <button
+                key={filter}
+                type="button"
+                onClick={() => setCompanyActivityHistoryFilter(filter)}
+                className={
+                  companyActivityHistoryFilter === filter
+                    ? "rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white shadow-sm"
+                    : "rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+                }
+              >
+                {filter}
+              </button>
+            ))}
+          </div>
+        </div>
 
-        {detail.activities.length === 0 ? (
-          <p className="mt-3 text-sm text-slate-600">No activities saved yet.</p>
+        <div className="mt-4 grid gap-3 md:grid-cols-4">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Open</p>
+            <p className="mt-1 text-2xl font-bold text-slate-900">{companyOpenActivities.length}</p>
+          </div>
+          <div className="rounded-xl border border-red-200 bg-red-50 p-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-red-700">Overdue</p>
+            <p className="mt-1 text-2xl font-bold text-red-800">{companyOverdueActivities.length}</p>
+          </div>
+          <div className="rounded-xl border border-yellow-200 bg-yellow-50 p-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-yellow-700">Due Today</p>
+            <p className="mt-1 text-2xl font-bold text-yellow-800">{companyDueTodayActivities.length}</p>
+          </div>
+          <div className="rounded-xl border border-green-200 bg-green-50 p-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-green-700">Completed</p>
+            <p className="mt-1 text-2xl font-bold text-green-800">{companyCompletedActivities.length}</p>
+          </div>
+        </div>
+
+        {companyActivities.length === 0 ? (
+          <p className="mt-4 text-sm text-slate-600">No activities saved yet.</p>
+        ) : filteredCompanyActivities.length === 0 ? (
+          <p className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+            No activities match the selected filter.
+          </p>
         ) : (
           <div className="mt-4 grid gap-3">
-            {detail.activities.map((activity: any) => (
+            {filteredCompanyActivities.map((activity: any) => (
               <div
                 key={activity.id}
                 className={`rounded-xl border p-4 ${
