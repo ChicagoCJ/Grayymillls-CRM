@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.33 - Company Detail Activity Presets";
+const APP_VERSION = "Rev 2.34 - Simplified Activity Entry";
 const REVISION_NOTE =
-  "Added one-click activity presets to speed up common Company Detail follow-up entries."; 
+  "Removed the redundant quick activity type panel so Company Detail activity entry is cleaner."; 
 
   
 
@@ -9702,40 +9702,6 @@ function CompanyDetailSection({
               className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-emerald-800 shadow-sm ring-1 ring-emerald-100 hover:bg-emerald-100"
             >
               Check back 30 days
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 p-3">
-          <p className="text-xs font-bold uppercase tracking-wide text-blue-800">Quick activity type</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setCompanyActivityType("call", "Call follow-up")}
-              className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-blue-800 shadow-sm ring-1 ring-blue-100 hover:bg-blue-100"
-            >
-              Call
-            </button>
-            <button
-              type="button"
-              onClick={() => setCompanyActivityType("email", "Email follow-up")}
-              className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-blue-800 shadow-sm ring-1 ring-blue-100 hover:bg-blue-100"
-            >
-              Email
-            </button>
-            <button
-              type="button"
-              onClick={() => setCompanyActivityType("note", "Account note")}
-              className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-blue-800 shadow-sm ring-1 ring-blue-100 hover:bg-blue-100"
-            >
-              Note
-            </button>
-            <button
-              type="button"
-              onClick={() => setCompanyActivityType("quote_followup", "Quote follow-up")}
-              className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-blue-800 shadow-sm ring-1 ring-blue-100 hover:bg-blue-100"
-            >
-              Follow-up
             </button>
           </div>
         </div>
