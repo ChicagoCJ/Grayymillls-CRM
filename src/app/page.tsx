@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.30 - Sticky Company Detail Header";
+const APP_VERSION = "Rev 2.31 - Company Detail Jump Buttons";
 const REVISION_NOTE =
-  "Made the Company Detail hero and action header sticky while scrolling through long company records."; 
+  "Added jump buttons to the sticky Company Detail header for faster movement through long records."; 
 
   
 
@@ -9489,8 +9489,23 @@ function CompanyDetailSection({
             />
           </div>
         </div>
+        <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-300 pt-4">
+          <a href="#company-detail-snapshot" className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">
+            Snapshot
+          </a>
+          <a href="#company-detail-sales-coverage" className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">
+            Coverage
+          </a>
+          <a href="#company-detail-funnel" className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">
+            Funnel
+          </a>
+          <a href="#company-detail-activity" className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">
+            Activity
+          </a>
+        </div>
       </div>
 
+      <div id="company-detail-snapshot" className="scroll-mt-48"></div>
       <div className="grid gap-6 lg:grid-cols-3">
         <DetailCard title="Company Snapshot">
           <DetailRow label="Website" value={company.website} />
@@ -9559,6 +9574,7 @@ function CompanyDetailSection({
         </DetailCard>
       </div>      <CompanyIndustryEnrichmentPanel company={detail.company} />
 
+      <div id="company-detail-sales-coverage" className="scroll-mt-48"></div>
       <CompanySalesAssignmentPanel
         companyId={String(detail.company.id)}
         canEditSalesCoverage={salesCoverageCanEdit}
@@ -9567,6 +9583,7 @@ function CompanyDetailSection({
 
       <CompanyTagManager companyId={String(detail.company.id)} />
 
+      <div id="company-detail-funnel" className="scroll-mt-48"></div>
       <CompanyOpportunityPanel
         canMoveOpportunityStages={canMoveOpportunityStages}
         companyId={String(detail.company.id)}
@@ -9579,6 +9596,7 @@ function CompanyDetailSection({
 
 
       <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+        <div id="company-detail-activity" className="scroll-mt-48"></div>
         <h3 className="text-xl font-bold">Add Activity / Follow-Up</h3>
         <p className="mt-2 text-sm text-slate-600">
           Save notes, calls, emails, meetings, tasks, and quote follow-ups directly to this company record.
