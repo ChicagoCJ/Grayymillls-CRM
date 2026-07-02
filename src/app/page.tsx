@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.41 - Activity History Refresh";
+const APP_VERSION = "Rev 2.42 - Activity History Compact Cards";
 const REVISION_NOTE =
-  "Added a Company Detail activity history refresh button that reloads the current account record."; 
+  "Made Company Detail activity history cards easier to scan with compact note previews."; 
 
   
 
@@ -10004,9 +10004,14 @@ function CompanyDetailSection({
                     </div>
 
                     <p className="mt-3 font-semibold">{activity.subject || "No subject"}</p>
-                    <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+                    <p className="mt-2 whitespace-pre-wrap line-clamp-3 text-sm leading-6 text-slate-700">
                       {activity.notes || "No notes"}
                     </p>
+                    {activity.notes && String(activity.notes).length > 180 && (
+                      <p className="mt-1 text-xs font-semibold text-slate-500">
+                        Long note preview shown.
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex flex-col gap-2 text-sm text-slate-500 md:items-end md:text-right">
