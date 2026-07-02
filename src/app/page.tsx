@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.29 - Company Detail Activity UX Polish";
+const APP_VERSION = "Rev 2.30 - Sticky Company Detail Header";
 const REVISION_NOTE =
-  "Added quick activity-type and due-date controls to Company Detail follow-up entry."; 
+  "Made the Company Detail hero and action header sticky while scrolling through long company records."; 
 
   
 
@@ -9426,7 +9426,10 @@ function CompanyDetailSection({
 
   return (
     <section className="grid gap-6">
-      <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+      <div
+        data-testid="company-detail-sticky-header"
+        className="sticky top-20 z-30 max-w-full overflow-hidden rounded-2xl border border-slate-200 bg-white/95 p-6 shadow-md backdrop-blur supports-[backdrop-filter]:bg-white/90"
+      >
         <div className="flex flex-wrap gap-3">
           <button
             type="button"
