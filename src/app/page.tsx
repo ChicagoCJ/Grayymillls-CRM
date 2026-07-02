@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.37 - Company Detail Jump Offset Fix";
+const APP_VERSION = "Rev 2.38.1 - Visible Activity Save Guard";
 const REVISION_NOTE =
-  "Adjusted Company Detail jump-button scroll offsets so sections land below the sticky header."; 
+  "Made the Company Detail activity save guard visible near the form and disabled blank saves."; 
 
   
 
@@ -1768,6 +1768,11 @@ async function handleAnalyzeProspect() {
     setImportMessage("");
 
     try {
+      if (!activityForm.subject.trim() && !activityForm.notes.trim()) {
+        throw new Error("Enter a subject or note before saving.");
+      }
+
+
       const primaryContact = selectedCompanyDetail.contacts?.[0];
       const primaryProspect = selectedCompanyDetail.primaryProspect;
 
@@ -9416,6 +9421,8 @@ function CompanyDetailSection({
     (activity: any) => !activity.completed_at && activity.due_date === companyActivityToday
   );
   const companyCompletedActivities = companyActivities.filter((activity: any) => activity.completed_at);
+  const canSaveCompanyActivity =
+    Boolean(activityForm.subject.trim()) || Boolean(activityForm.notes.trim());
   const filteredCompanyActivities = companyActivities.filter((activity: any) => {
     if (companyActivityHistoryFilter === "Open") return !activity.completed_at;
     if (companyActivityHistoryFilter === "Overdue") {
@@ -9830,10 +9837,16 @@ function CompanyDetailSection({
           </div>
         </div>
 
+        {!canSaveCompanyActivity && (
+          <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
+            Enter a subject or note before saving.
+          </p>
+        )}
+
         <div className="mt-4 flex flex-wrap justify-start gap-2">
           <button
             onClick={onSaveActivity}
-            disabled={isSavingActivity}
+            disabled={isSavingActivity || !canSaveCompanyActivity}
             className="rounded-xl bg-green-700 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-green-800 disabled:cursor-not-allowed disabled:bg-slate-300"
           >
             {isSavingActivity ? "Saving..." : "Save Activity"}
