@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.28 - Company Detail Sales Action Snapshot";
+const APP_VERSION = "Rev 2.29 - Company Detail Activity UX Polish";
 const REVISION_NOTE =
-  "Added a Company Detail Sales Action Snapshot and fixed Company Detail sales coverage editing for Admin and Sales Manager roles."; 
+  "Added quick activity-type and due-date controls to Company Detail follow-up entry."; 
 
   
 
@@ -9362,6 +9362,28 @@ function CompanyDetailSection({
       </section>
     );
   }
+  function companyActivityDateOffset(days: number) {
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    return date.toISOString().slice(0, 10);
+  }
+
+  function setCompanyActivityType(activityType: ActivityForm["activityType"], defaultSubject: string) {
+    setActivityForm({
+      ...activityForm,
+      activityType,
+      subject: activityForm.subject || defaultSubject,
+    });
+  }
+
+  function setCompanyActivityDueDate(dueDate: string) {
+    setActivityForm({
+      ...activityForm,
+      dueDate,
+    });
+  }
+
+
 
   const company = detail.company;
   const primaryProspect = detail.primaryProspect;
@@ -9559,6 +9581,40 @@ function CompanyDetailSection({
           Save notes, calls, emails, meetings, tasks, and quote follow-ups directly to this company record.
         </p>
 
+        <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 p-3">
+          <p className="text-xs font-bold uppercase tracking-wide text-blue-800">Quick activity type</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setCompanyActivityType("call", "Call follow-up")}
+              className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-blue-800 shadow-sm ring-1 ring-blue-100 hover:bg-blue-100"
+            >
+              Call
+            </button>
+            <button
+              type="button"
+              onClick={() => setCompanyActivityType("email", "Email follow-up")}
+              className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-blue-800 shadow-sm ring-1 ring-blue-100 hover:bg-blue-100"
+            >
+              Email
+            </button>
+            <button
+              type="button"
+              onClick={() => setCompanyActivityType("note", "Account note")}
+              className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-blue-800 shadow-sm ring-1 ring-blue-100 hover:bg-blue-100"
+            >
+              Note
+            </button>
+            <button
+              type="button"
+              onClick={() => setCompanyActivityType("quote_followup", "Quote follow-up")}
+              className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-blue-800 shadow-sm ring-1 ring-blue-100 hover:bg-blue-100"
+            >
+              Follow-up
+            </button>
+          </div>
+        </div>
+
         <div className="mt-4 grid gap-4 lg:grid-cols-4">
           <div>
             <label className="text-sm font-semibold text-slate-700">Activity Type</label>
@@ -9591,6 +9647,39 @@ function CompanyDetailSection({
               }
               className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
             />
+            <div className="mt-2">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Quick due date</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCompanyActivityDueDate(companyActivityDateOffset(0))}
+                  className="rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-200"
+                >
+                  Today
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCompanyActivityDueDate(companyActivityDateOffset(1))}
+                  className="rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-200"
+                >
+                  Tomorrow
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCompanyActivityDueDate(companyActivityDateOffset(7))}
+                  className="rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-200"
+                >
+                  Next week
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCompanyActivityDueDate("")}
+                  className="rounded-md bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
           </div>
 
           <div className="lg:col-span-2">
