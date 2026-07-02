@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.34 - Simplified Activity Entry";
+const APP_VERSION = "Rev 2.35 - Activity Preset Polish";
 const REVISION_NOTE =
-  "Removed the redundant quick activity type panel so Company Detail activity entry is cleaner."; 
+  "Polished Company Detail activity presets with clearer guidance and a one-click clear form action."; 
 
   
 
@@ -9368,18 +9368,19 @@ function CompanyDetailSection({
     return date.toISOString().slice(0, 10);
   }
 
-  function setCompanyActivityType(activityType: ActivityForm["activityType"], defaultSubject: string) {
-    setActivityForm({
-      ...activityForm,
-      activityType,
-      subject: activityForm.subject || defaultSubject,
-    });
-  }
-
   function setCompanyActivityDueDate(dueDate: string) {
     setActivityForm({
       ...activityForm,
       dueDate,
+    });
+  }
+
+  function clearCompanyActivityForm() {
+    setActivityForm({
+      activityType: "note",
+      subject: "",
+      notes: "",
+      dueDate: "",
     });
   }
 
@@ -9617,7 +9618,10 @@ function CompanyDetailSection({
         </p>
 
         <div className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50 p-3">
-          <p className="text-xs font-bold uppercase tracking-wide text-emerald-800">Activity presets</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-emerald-800">Common follow-up presets</p>
+          <p className="mt-1 text-xs leading-5 text-emerald-800">
+            Choose a preset to prefill type, due date, subject, and notes. You can edit before saving.
+          </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <button
               type="button"
@@ -9800,13 +9804,21 @@ function CompanyDetailSection({
           </div>
         </div>
 
-        <div className="mt-4 flex justify-start">
+        <div className="mt-4 flex flex-wrap justify-start gap-2">
           <button
             onClick={onSaveActivity}
             disabled={isSavingActivity}
             className="rounded-xl bg-green-700 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-green-800 disabled:cursor-not-allowed disabled:bg-slate-300"
           >
             {isSavingActivity ? "Saving..." : "Save Activity"}
+          </button>
+          <button
+            type="button"
+            onClick={clearCompanyActivityForm}
+            disabled={isSavingActivity}
+            className="rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
+          >
+            Clear form
           </button>
         </div>
       </div>
