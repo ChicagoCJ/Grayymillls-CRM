@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.43 - Activity History Search";
+const APP_VERSION = "Rev 2.44 - Activity History Quick Filters";
 const REVISION_NOTE =
-  "Added Company Detail activity history search across type, subject, and notes."; 
+  "Added Company Detail activity history type quick filters and clear controls."; 
 
   
 
@@ -9364,6 +9364,7 @@ function CompanyDetailSection({
     "Newest first" | "Due date first" | "Open first"
   >("Newest first");
   const [companyActivityHistorySearchTerm, setCompanyActivityHistorySearchTerm] = useState("");
+  const [companyActivityHistoryTypeFilter, setCompanyActivityHistoryTypeFilter] = useState("All Types");
 
   if (!detail) {
     return (
@@ -9433,6 +9434,22 @@ function CompanyDetailSection({
   const companyCompletedActivities = companyActivities.filter((activity: any) => activity.completed_at);
   const canSaveCompanyActivity =
     Boolean(activityForm.subject.trim()) || Boolean(activityForm.notes.trim());
+  const companyActivityHistoryTypeFilters = [
+    { label: "All Types", value: "All Types" },
+    { label: "Notes", value: "note" },
+    { label: "Calls", value: "call" },
+    { label: "Emails", value: "email" },
+    { label: "Meetings", value: "meeting" },
+    { label: "Tasks", value: "task" },
+    { label: "Quote Follow-Ups", value: "quote_followup" },
+  ];
+
+  function clearCompanyActivityHistoryControls() {
+    setCompanyActivityHistorySearchTerm("");
+    setCompanyActivityHistoryTypeFilter("All Types");
+    setCompanyActivityHistoryFilter("All");
+    setCompanyActivityHistorySort("Newest first");
+  }
   const normalizedCompanyActivitySearch = normalizeForSearch(companyActivityHistorySearchTerm);
   const filteredCompanyActivities = companyActivities.filter((activity: any) => {
     const matchesStatusFilter =
@@ -9457,7 +9474,11 @@ function CompanyDetailSection({
     const matchesSearch =
       !normalizedCompanyActivitySearch || searchableText.includes(normalizedCompanyActivitySearch);
 
-    return matchesStatusFilter && matchesSearch;
+    const matchesTypeFilter =
+      companyActivityHistoryTypeFilter === "All Types" ||
+      activity.activity_type === companyActivityHistoryTypeFilter;
+
+    return matchesStatusFilter && matchesSearch && matchesTypeFilter;
   });
   const sortedCompanyActivities = [...filteredCompanyActivities].sort((a: any, b: any) => {
     if (companyActivityHistorySort === "Open first") {
@@ -9935,6 +9956,32 @@ function CompanyDetailSection({
                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm"
               />
             </label>
+            <button
+              type="button"
+              onClick={clearCompanyActivityHistoryControls}
+              className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+            >
+              Clear Controls
+            </button>
+            <div className="flex w-full max-w-xl flex-col gap-1 md:items-end">
+              <p className="text-xs font-semibold text-slate-600">Type quick filters</p>
+              <div className="flex flex-wrap gap-2 md:justify-end">
+                {companyActivityHistoryTypeFilters.map((typeFilter) => (
+                  <button
+                    key={typeFilter.value}
+                    type="button"
+                    onClick={() => setCompanyActivityHistoryTypeFilter(typeFilter.value)}
+                    className={
+                      companyActivityHistoryTypeFilter === typeFilter.value
+                        ? "rounded-lg bg-blue-700 px-3 py-2 text-xs font-semibold text-white shadow-sm"
+                        : "rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+                    }
+                  >
+                    {typeFilter.label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="flex flex-wrap gap-2">
               {(["All", "Open", "Overdue", "Due Today", "Completed"] as const).map((filter) => (
                 <button
