@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.45 - Activity History Result Summary";
+const APP_VERSION = "Rev 2.46 - Activity History Empty Message Polish";
 const REVISION_NOTE =
-  "Added a Company Detail activity history result summary for active filters and search."; 
+  "Improved Company Detail activity history empty-state guidance for active search and filters."; 
 
   
 
@@ -10062,9 +10062,14 @@ function CompanyDetailSection({
         {companyActivities.length === 0 ? (
           <p className="mt-4 text-sm text-slate-600">No activities saved yet.</p>
         ) : sortedCompanyActivities.length === 0 ? (
-          <p className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-            No activities match the selected filter.
-          </p>
+          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+            <p className="font-semibold text-slate-900">
+              No activities match the current search or filters.
+            </p>
+            <p className="mt-1">
+              Use Clear Controls to reset search, type, status, and sort.
+            </p>
+          </div>
         ) : (
           <div className="mt-4 grid gap-3">
             {sortedCompanyActivities.map((activity: any) => (
