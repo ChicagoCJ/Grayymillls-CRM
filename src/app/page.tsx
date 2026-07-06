@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.49 - Activity History Status Count Badges";
+const APP_VERSION = "Rev 2.50 - Activity History Date Polish";
 const REVISION_NOTE =
-  "Added Company Detail activity history status filter count badges."; 
+  "Polished Company Detail activity history card dates and due-status badges."; 
 
   
 
@@ -10142,6 +10142,10 @@ function CompanyDetailSection({
                         <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-800">
                           Overdue
                         </span>
+                      ) : activity.due_date === companyActivityToday ? (
+                        <span className="rounded-full bg-yellow-100 px-2.5 py-1 text-xs font-semibold text-yellow-800">
+                          Due Today
+                        </span>
                       ) : (
                         <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
                           Open
@@ -10160,10 +10164,33 @@ function CompanyDetailSection({
                     )}
                   </div>
 
-                  <div className="flex flex-col gap-2 text-sm text-slate-500 md:items-end md:text-right">
-                    <p>Created: {formatDate(activity.created_at)}</p>
-                    <p>Due: {formatDate(activity.due_date)}</p>
-                    {activity.completed_at && <p>Completed: {formatDate(activity.completed_at)}</p>}
+                  <div className="flex flex-col gap-3 text-sm md:items-end md:text-right">
+                    <div className="grid gap-2 rounded-xl bg-slate-50 p-3 text-xs text-slate-600 ring-1 ring-slate-200 md:min-w-48">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="font-semibold uppercase tracking-wide text-slate-500">Created</span>
+                        <span className="font-bold text-slate-900">{formatDate(activity.created_at)}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="font-semibold uppercase tracking-wide text-slate-500">Due</span>
+                        <span
+                          className={
+                            isOverdue(activity)
+                              ? "font-bold text-red-700"
+                              : activity.due_date === companyActivityToday
+                                ? "font-bold text-yellow-700"
+                                : "font-bold text-slate-900"
+                          }
+                        >
+                          {activity.due_date ? formatDate(activity.due_date) : "No due date"}
+                        </span>
+                      </div>
+                      {activity.completed_at && (
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="font-semibold uppercase tracking-wide text-slate-500">Completed</span>
+                          <span className="font-bold text-green-700">{formatDate(activity.completed_at)}</span>
+                        </div>
+                      )}
+                    </div>
                     {!activity.completed_at && (
                       <button
                         onClick={() => onCompleteActivity(activity.id, activity.company_id)}
