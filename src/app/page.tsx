@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.42 - Activity History Compact Cards";
+const APP_VERSION = "Rev 2.43 - Activity History Search";
 const REVISION_NOTE =
-  "Made Company Detail activity history cards easier to scan with compact note previews."; 
+  "Added Company Detail activity history search across type, subject, and notes."; 
 
   
 
@@ -9363,6 +9363,7 @@ function CompanyDetailSection({
   const [companyActivityHistorySort, setCompanyActivityHistorySort] = useState<
     "Newest first" | "Due date first" | "Open first"
   >("Newest first");
+  const [companyActivityHistorySearchTerm, setCompanyActivityHistorySearchTerm] = useState("");
 
   if (!detail) {
     return (
@@ -9432,16 +9433,31 @@ function CompanyDetailSection({
   const companyCompletedActivities = companyActivities.filter((activity: any) => activity.completed_at);
   const canSaveCompanyActivity =
     Boolean(activityForm.subject.trim()) || Boolean(activityForm.notes.trim());
+  const normalizedCompanyActivitySearch = normalizeForSearch(companyActivityHistorySearchTerm);
   const filteredCompanyActivities = companyActivities.filter((activity: any) => {
-    if (companyActivityHistoryFilter === "Open") return !activity.completed_at;
-    if (companyActivityHistoryFilter === "Overdue") {
-      return !activity.completed_at && activity.due_date && activity.due_date < companyActivityToday;
-    }
-    if (companyActivityHistoryFilter === "Due Today") {
-      return !activity.completed_at && activity.due_date === companyActivityToday;
-    }
-    if (companyActivityHistoryFilter === "Completed") return Boolean(activity.completed_at);
-    return true;
+    const matchesStatusFilter =
+      companyActivityHistoryFilter === "Open"
+        ? !activity.completed_at
+        : companyActivityHistoryFilter === "Overdue"
+          ? !activity.completed_at && activity.due_date && activity.due_date < companyActivityToday
+          : companyActivityHistoryFilter === "Due Today"
+            ? !activity.completed_at && activity.due_date === companyActivityToday
+            : companyActivityHistoryFilter === "Completed"
+              ? Boolean(activity.completed_at)
+              : true;
+
+    const searchableText = [
+      activity.activity_type,
+      activity.subject,
+      activity.notes,
+    ]
+      .map(normalizeForSearch)
+      .join(" ");
+
+    const matchesSearch =
+      !normalizedCompanyActivitySearch || searchableText.includes(normalizedCompanyActivitySearch);
+
+    return matchesStatusFilter && matchesSearch;
   });
   const sortedCompanyActivities = [...filteredCompanyActivities].sort((a: any, b: any) => {
     if (companyActivityHistorySort === "Open first") {
@@ -9909,6 +9925,16 @@ function CompanyDetailSection({
             >
               {isRefreshingCompanyDetail ? "Refreshing..." : "Refresh Activity History"}
             </button>
+            <label className="flex w-full max-w-xs flex-col gap-1 text-xs font-semibold text-slate-600 md:items-start">
+              Search history
+              <input
+                type="search"
+                value={companyActivityHistorySearchTerm}
+                onChange={(event) => setCompanyActivityHistorySearchTerm(event.target.value)}
+                placeholder="Search activity history..."
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm"
+              />
+            </label>
             <div className="flex flex-wrap gap-2">
               {(["All", "Open", "Overdue", "Due Today", "Completed"] as const).map((filter) => (
                 <button
