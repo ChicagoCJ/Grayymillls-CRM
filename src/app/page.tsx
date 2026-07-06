@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.48 - Activity History Type Count Badges";
+const APP_VERSION = "Rev 2.49 - Activity History Status Count Badges";
 const REVISION_NOTE =
-  "Added Company Detail activity history type filter count badges."; 
+  "Added Company Detail activity history status filter count badges."; 
 
   
 
@@ -9520,6 +9520,14 @@ function CompanyDetailSection({
     },
     {}
   );
+
+  const companyActivityHistoryStatusCounts: Record<string, number> = {
+    All: companyActivities.length,
+    Open: companyOpenActivities.length,
+    Overdue: companyOverdueActivities.length,
+    "Due Today": companyDueTodayActivities.length,
+    Completed: companyCompletedActivities.length,
+  };
   const primaryProspect = detail.primaryProspect;
   const intelligence = detail.intelligence;
   const hasAiAnalysis = hasMeaningfulAnalysis(intelligence);
@@ -10022,11 +10030,20 @@ function CompanyDetailSection({
                   onClick={() => setCompanyActivityHistoryFilter(filter)}
                   className={
                     companyActivityHistoryFilter === filter
-                      ? "rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white shadow-sm"
-                      : "rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+                      ? "inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white shadow-sm"
+                      : "inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
                   }
                 >
-                  {filter}
+                  <span>{filter}</span>
+                  <span
+                    className={
+                      companyActivityHistoryFilter === filter
+                        ? "rounded-full bg-white/20 px-2 py-0.5 text-[11px] font-bold text-white"
+                        : "rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600"
+                    }
+                  >
+                    {companyActivityHistoryStatusCounts[filter] ?? 0}
+                  </span>
                 </button>
               ))}
             </div>
