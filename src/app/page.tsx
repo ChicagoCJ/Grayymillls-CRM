@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.47 - Activity History Active Filter Chips";
+const APP_VERSION = "Rev 2.48 - Activity History Type Count Badges";
 const REVISION_NOTE =
-  "Changed Company Detail activity history active controls into separate readable chips."; 
+  "Added Company Detail activity history type filter count badges."; 
 
   
 
@@ -9508,6 +9508,18 @@ function CompanyDetailSection({
     companyActivityHistorySearchTerm.trim() ? `Search: ${companyActivityHistorySearchTerm.trim()}` : "",
     companyActivityHistorySort !== "Newest first" ? `Sort: ${companyActivityHistorySort}` : "",
   ].filter(Boolean);
+
+  const companyActivityHistoryTypeCounts = companyActivityHistoryTypeFilters.reduce<Record<string, number>>(
+    (counts, typeFilter) => {
+      counts[typeFilter.value] =
+        typeFilter.value === "All Types"
+          ? companyActivities.length
+          : companyActivities.filter((activity: any) => activity.activity_type === typeFilter.value).length;
+
+      return counts;
+    },
+    {}
+  );
   const primaryProspect = detail.primaryProspect;
   const intelligence = detail.intelligence;
   const hasAiAnalysis = hasMeaningfulAnalysis(intelligence);
@@ -9984,11 +9996,20 @@ function CompanyDetailSection({
                     onClick={() => setCompanyActivityHistoryTypeFilter(typeFilter.value)}
                     className={
                       companyActivityHistoryTypeFilter === typeFilter.value
-                        ? "rounded-lg bg-blue-700 px-3 py-2 text-xs font-semibold text-white shadow-sm"
-                        : "rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+                        ? "inline-flex items-center gap-2 rounded-lg bg-blue-700 px-3 py-2 text-xs font-semibold text-white shadow-sm"
+                        : "inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
                     }
                   >
-                    {typeFilter.label}
+                    <span>{typeFilter.label}</span>
+                    <span
+                      className={
+                        companyActivityHistoryTypeFilter === typeFilter.value
+                          ? "rounded-full bg-white/20 px-2 py-0.5 text-[11px] font-bold text-white"
+                          : "rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600"
+                      }
+                    >
+                      {companyActivityHistoryTypeCounts[typeFilter.value] ?? 0}
+                    </span>
                   </button>
                 ))}
               </div>
