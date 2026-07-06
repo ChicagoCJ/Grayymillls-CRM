@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.50 - Activity History Date Polish";
+const APP_VERSION = "Rev 2.51 - Activity History Long Note Expand";
 const REVISION_NOTE =
-  "Polished Company Detail activity history card dates and due-status badges."; 
+  "Added Company Detail activity history long-note expand and collapse controls."; 
 
   
 
@@ -9365,6 +9365,14 @@ function CompanyDetailSection({
   >("Newest first");
   const [companyActivityHistorySearchTerm, setCompanyActivityHistorySearchTerm] = useState("");
   const [companyActivityHistoryTypeFilter, setCompanyActivityHistoryTypeFilter] = useState("All Types");
+  const [expandedCompanyActivityNoteIds, setExpandedCompanyActivityNoteIds] = useState<Record<string, boolean>>({});
+
+  function toggleCompanyActivityNoteExpansion(activityId: string) {
+    setExpandedCompanyActivityNoteIds((current) => ({
+      ...current,
+      [activityId]: !current[activityId],
+    }));
+  }
 
   if (!detail) {
     return (
@@ -10154,13 +10162,24 @@ function CompanyDetailSection({
                     </div>
 
                     <p className="mt-3 font-semibold">{activity.subject || "No subject"}</p>
-                    <p className="mt-2 whitespace-pre-wrap line-clamp-3 text-sm leading-6 text-slate-700">
+                    <p
+                      className={
+                        expandedCompanyActivityNoteIds[String(activity.id)]
+                          ? "mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700"
+                          : "mt-2 whitespace-pre-wrap line-clamp-3 text-sm leading-6 text-slate-700"
+                      }
+                    >
                       {activity.notes || "No notes"}
                     </p>
                     {activity.notes && String(activity.notes).length > 180 && (
-                      <p className="mt-1 text-xs font-semibold text-slate-500">
-                        Long note preview shown.
-                      </p>
+                      <button
+                        type="button"
+                        onClick={() => toggleCompanyActivityNoteExpansion(String(activity.id))}
+                        className="mt-1 text-xs font-semibold text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900"
+                        aria-expanded={Boolean(expandedCompanyActivityNoteIds[String(activity.id)])}
+                      >
+                        {expandedCompanyActivityNoteIds[String(activity.id)] ? "Hide full note" : "Show full note"}
+                      </button>
                     )}
                   </div>
 
