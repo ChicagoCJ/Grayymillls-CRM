@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.44 - Activity History Quick Filters";
+const APP_VERSION = "Rev 2.45 - Activity History Result Summary";
 const REVISION_NOTE =
-  "Added Company Detail activity history type quick filters and clear controls."; 
+  "Added a Company Detail activity history result summary for active filters and search."; 
 
   
 
@@ -9497,6 +9497,17 @@ function CompanyDetailSection({
     const bCreated = b.created_at || "";
     return bCreated.localeCompare(aCreated);
   });
+  const selectedCompanyActivityTypeLabel =
+    companyActivityHistoryTypeFilters.find(
+      (typeFilter) => typeFilter.value === companyActivityHistoryTypeFilter
+    )?.label || companyActivityHistoryTypeFilter;
+
+  const companyActivityHistoryActiveControls = [
+    companyActivityHistoryFilter !== "All" ? `Status: ${companyActivityHistoryFilter}` : "",
+    companyActivityHistoryTypeFilter !== "All Types" ? `Type: ${selectedCompanyActivityTypeLabel}` : "",
+    companyActivityHistorySearchTerm.trim() ? `Search: ${companyActivityHistorySearchTerm.trim()}` : "",
+    companyActivityHistorySort !== "Newest first" ? `Sort: ${companyActivityHistorySort}` : "",
+  ].filter(Boolean);
   const primaryProspect = detail.primaryProspect;
   const intelligence = detail.intelligence;
   const hasAiAnalysis = hasMeaningfulAnalysis(intelligence);
@@ -10034,6 +10045,18 @@ function CompanyDetailSection({
             <p className="text-xs font-bold uppercase tracking-wide text-green-700">Completed</p>
             <p className="mt-1 text-2xl font-bold text-green-800">{companyCompletedActivities.length}</p>
           </div>
+        </div>
+
+        
+        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600" aria-label="Activity history result summary">
+          <span className="font-semibold text-slate-900">
+            Showing {sortedCompanyActivities.length} of {companyActivities.length} activities
+          </span>
+          {companyActivityHistoryActiveControls.length > 0 && (
+            <span className="ml-2">
+              ({companyActivityHistoryActiveControls.join(" | ")})
+            </span>
+          )}
         </div>
 
         {companyActivities.length === 0 ? (
