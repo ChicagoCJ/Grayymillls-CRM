@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.46 - Activity History Empty Message Polish";
+const APP_VERSION = "Rev 2.47 - Activity History Active Filter Chips";
 const REVISION_NOTE =
-  "Improved Company Detail activity history empty-state guidance for active search and filters."; 
+  "Changed Company Detail activity history active controls into separate readable chips."; 
 
   
 
@@ -10053,9 +10053,16 @@ function CompanyDetailSection({
             Showing {sortedCompanyActivities.length} of {companyActivities.length} activities
           </span>
           {companyActivityHistoryActiveControls.length > 0 && (
-            <span className="ml-2">
-              ({companyActivityHistoryActiveControls.join(" | ")})
-            </span>
+            <div className="mt-2 flex flex-wrap gap-2" aria-label="Active activity history controls">
+              {companyActivityHistoryActiveControls.map((activeControl) => (
+                <span
+                  key={activeControl}
+                  className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800"
+                >
+                  {activeControl}
+                </span>
+              ))}
+            </div>
           )}
         </div>
 
