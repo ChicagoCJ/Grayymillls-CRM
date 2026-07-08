@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.54 - Wire Activity Edit Save";
+const APP_VERSION = "Rev 2.55 - Activity Edit Polish";
 const REVISION_NOTE =
-  "Wired Company Detail activity history inline edits to save through the activities API."; 
+  "Polished Company Detail activity editing with clearer edit states and safer action locking."; 
 
   
 
@@ -9438,6 +9438,8 @@ function CompanyDetailSection({
   }
 
   function startEditingCompanyActivity(activity: any) {
+    if (isSavingActivity) return;
+
     setEditingCompanyActivityId(String(activity.id));
     setCompanyActivityEditForm({
       activityType: getEditableCompanyActivityType(activity.activity_type),
@@ -9458,6 +9460,8 @@ function CompanyDetailSection({
   }
 
   async function saveEditingCompanyActivity(activityId: string) {
+    if (isSavingActivity) return;
+
     const saved = await onUpdateActivity(activityId, companyActivityEditForm);
 
     if (saved) {
@@ -9540,6 +9544,7 @@ function CompanyDetailSection({
   const companyCompletedActivities = companyActivities.filter((activity: any) => activity.completed_at);
   const canSaveCompanyActivity =
     Boolean(activityForm.subject.trim()) || Boolean(activityForm.notes.trim());
+  const isEditingCompanyActivity = Boolean(editingCompanyActivityId);
   const companyActivityHistoryTypeFilters = [
     { label: "All Types", value: "All Types" },
     { label: "Notes", value: "note" },
@@ -10257,6 +10262,12 @@ function CompanyDetailSection({
                           Open
                         </span>
                       )}
+
+                      {editingCompanyActivityId === String(activity.id) && (
+                        <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800">
+                          Editing
+                        </span>
+                      )}
                     </div>
 
                     {editingCompanyActivityId === String(activity.id) ? (
@@ -10267,7 +10278,7 @@ function CompanyDetailSection({
                               Edit activity draft
                             </p>
                             <p className="mt-1 text-xs text-blue-800">
-                              Save edits updates the activity. Cancel closes without changing the activity.
+                              Save Edit updates this activity. Cancel closes without changing the activity.
                             </p>
                           </div>
                           <div className="flex flex-wrap gap-2">
@@ -10365,6 +10376,12 @@ function CompanyDetailSection({
                             Enter a subject or note before saving this edit.
                           </p>
                         )}
+
+                        {activity.completed_at && (
+                          <p className="mt-3 rounded-lg border border-blue-100 bg-white px-3 py-2 text-xs font-semibold text-blue-800">
+                            Completed activities can still be edited to correct history or notes.
+                          </p>
+                        )}
                       </div>
                     ) : (
                       <>
@@ -10392,9 +10409,15 @@ function CompanyDetailSection({
                           <button
                             type="button"
                             onClick={() => startEditingCompanyActivity(activity)}
-                            className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+                            disabled={isSavingActivity || (isEditingCompanyActivity && editingCompanyActivityId !== String(activity.id))}
+                            title={
+                              isEditingCompanyActivity && editingCompanyActivityId !== String(activity.id)
+                                ? "Finish or cancel the current edit before editing another activity."
+                                : "Edit this activity"
+                            }
+                            className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                           >
-                            Edit
+                            {isEditingCompanyActivity && editingCompanyActivityId !== String(activity.id) ? "Editing another" : "Edit"}
                           </button>
                         </div>
                       </>
