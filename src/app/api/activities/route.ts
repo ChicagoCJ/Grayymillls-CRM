@@ -19,6 +19,14 @@ type CompleteActivityPayload = {
   completed: boolean;
 };
 
+type EditActivityPayload = {
+  activityId: string;
+  activityType: "note" | "call" | "email" | "meeting" | "task" | "quote_followup" | "import_note";
+  subject: string;
+  notes: string;
+  dueDate?: string | null;
+};
+
 function getSupabaseAdmin() {
   if (!supabaseUrl || !serviceRoleKey) {
     throw new Error("Missing Supabase environment variables.");
@@ -90,7 +98,7 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const payload = (await request.json()) as CompleteActivityPayload;
+    const payload = (await request.json()) as Partial<CompleteActivityPayload & EditActivityPayload>;
 
     if (!payload.activityId) {
       return NextResponse.json({ error: "Activity id is required." }, { status: 400 });
@@ -98,10 +106,42 @@ export async function PATCH(request: Request) {
 
     const supabase = getSupabaseAdmin();
 
+    if (typeof payload.completed === "boolean") {
+      const { data, error } = await supabase
+        .from("activities")
+        .update({
+          completed_at: payload.completed ? new Date().toISOString() : null,
+        })
+        .eq("id", payload.activityId)
+        .select("*")
+        .single();
+
+      if (error) throw error;
+
+      return NextResponse.json({ activity: data });
+    }
+
+    if (!payload.activityType) {
+      return NextResponse.json({ error: "Activity type is required." }, { status: 400 });
+    }
+
+    const subject = cleanText(payload.subject);
+    const notes = cleanText(payload.notes);
+
+    if (!subject && !notes) {
+      return NextResponse.json(
+        { error: "Enter a subject or note before saving activity." },
+        { status: 400 }
+      );
+    }
+
     const { data, error } = await supabase
       .from("activities")
       .update({
-        completed_at: payload.completed ? new Date().toISOString() : null,
+        activity_type: payload.activityType,
+        subject,
+        notes,
+        due_date: payload.dueDate || null,
       })
       .eq("id", payload.activityId)
       .select("*")

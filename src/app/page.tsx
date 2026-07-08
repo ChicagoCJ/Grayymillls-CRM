@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.51 - Activity History Long Note Expand";
+const APP_VERSION = "Rev 2.52 - Activity Edit API Foundation";
 const REVISION_NOTE =
-  "Added Company Detail activity history long-note expand and collapse controls."; 
+  "Extended the activities API foundation so activity records can be edited in a later UI revision."; 
 
   
 
