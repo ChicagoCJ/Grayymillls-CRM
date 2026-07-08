@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.52 - Activity Edit API Foundation";
+const APP_VERSION = "Rev 2.53 - Activity History Edit Mode UI";
 const REVISION_NOTE =
-  "Extended the activities API foundation so activity records can be edited in a later UI revision."; 
+  "Added Company Detail activity history inline edit mode UI with prefilled draft fields and cancel."; 
 
   
 
@@ -9366,6 +9366,48 @@ function CompanyDetailSection({
   const [companyActivityHistorySearchTerm, setCompanyActivityHistorySearchTerm] = useState("");
   const [companyActivityHistoryTypeFilter, setCompanyActivityHistoryTypeFilter] = useState("All Types");
   const [expandedCompanyActivityNoteIds, setExpandedCompanyActivityNoteIds] = useState<Record<string, boolean>>({});
+  const [editingCompanyActivityId, setEditingCompanyActivityId] = useState("");
+  const [companyActivityEditForm, setCompanyActivityEditForm] = useState<ActivityForm>({
+    activityType: "note",
+    subject: "",
+    notes: "",
+    dueDate: "",
+  });
+
+  function getEditableCompanyActivityType(activityType: unknown): ActivityForm["activityType"] {
+    const allowedActivityTypes: ActivityForm["activityType"][] = [
+      "note",
+      "call",
+      "email",
+      "meeting",
+      "task",
+      "quote_followup",
+    ];
+
+    return allowedActivityTypes.includes(activityType as ActivityForm["activityType"])
+      ? (activityType as ActivityForm["activityType"])
+      : "note";
+  }
+
+  function startEditingCompanyActivity(activity: any) {
+    setEditingCompanyActivityId(String(activity.id));
+    setCompanyActivityEditForm({
+      activityType: getEditableCompanyActivityType(activity.activity_type),
+      subject: String(activity.subject || ""),
+      notes: String(activity.notes || ""),
+      dueDate: activity.due_date ? String(activity.due_date) : "",
+    });
+  }
+
+  function cancelEditingCompanyActivity() {
+    setEditingCompanyActivityId("");
+    setCompanyActivityEditForm({
+      activityType: "note",
+      subject: "",
+      notes: "",
+      dueDate: "",
+    });
+  }
 
   function toggleCompanyActivityNoteExpansion(activityId: string) {
     setExpandedCompanyActivityNoteIds((current) => ({
@@ -10161,25 +10203,128 @@ function CompanyDetailSection({
                       )}
                     </div>
 
-                    <p className="mt-3 font-semibold">{activity.subject || "No subject"}</p>
-                    <p
-                      className={
-                        expandedCompanyActivityNoteIds[String(activity.id)]
-                          ? "mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700"
-                          : "mt-2 whitespace-pre-wrap line-clamp-3 text-sm leading-6 text-slate-700"
-                      }
-                    >
-                      {activity.notes || "No notes"}
-                    </p>
-                    {activity.notes && String(activity.notes).length > 180 && (
-                      <button
-                        type="button"
-                        onClick={() => toggleCompanyActivityNoteExpansion(String(activity.id))}
-                        className="mt-1 text-xs font-semibold text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900"
-                        aria-expanded={Boolean(expandedCompanyActivityNoteIds[String(activity.id)])}
-                      >
-                        {expandedCompanyActivityNoteIds[String(activity.id)] ? "Hide full note" : "Show full note"}
-                      </button>
+                    {editingCompanyActivityId === String(activity.id) ? (
+                      <div className="mt-3 rounded-xl border border-blue-200 bg-blue-50 p-3">
+                        <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between">
+                          <div>
+                            <p className="text-xs font-bold uppercase tracking-wide text-blue-700">
+                              Edit activity draft
+                            </p>
+                            <p className="mt-1 text-xs text-blue-800">
+                              Save wiring comes in the next revision. Cancel closes without changing the activity.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={cancelEditingCompanyActivity}
+                            className="w-fit rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-blue-100 hover:bg-blue-50"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+
+                        <div className="mt-3 grid gap-3 md:grid-cols-4">
+                          <div>
+                            <label className="text-xs font-semibold text-slate-700">Type</label>
+                            <select
+                              value={companyActivityEditForm.activityType}
+                              onChange={(event) =>
+                                setCompanyActivityEditForm({
+                                  ...companyActivityEditForm,
+                                  activityType: event.target.value as ActivityForm["activityType"],
+                                })
+                              }
+                              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs shadow-sm"
+                            >
+                              <option value="note">Note</option>
+                              <option value="call">Call</option>
+                              <option value="email">Email</option>
+                              <option value="meeting">Meeting</option>
+                              <option value="task">Task</option>
+                              <option value="quote_followup">Quote Follow-Up</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="text-xs font-semibold text-slate-700">Due Date</label>
+                            <input
+                              type="date"
+                              value={companyActivityEditForm.dueDate}
+                              onChange={(event) =>
+                                setCompanyActivityEditForm({
+                                  ...companyActivityEditForm,
+                                  dueDate: event.target.value,
+                                })
+                              }
+                              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs shadow-sm"
+                            />
+                          </div>
+
+                          <div className="md:col-span-2">
+                            <label className="text-xs font-semibold text-slate-700">Subject</label>
+                            <input
+                              type="text"
+                              value={companyActivityEditForm.subject}
+                              onChange={(event) =>
+                                setCompanyActivityEditForm({
+                                  ...companyActivityEditForm,
+                                  subject: event.target.value,
+                                })
+                              }
+                              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs shadow-sm"
+                              placeholder="Activity subject"
+                            />
+                          </div>
+
+                          <div className="md:col-span-4">
+                            <label className="text-xs font-semibold text-slate-700">Notes</label>
+                            <textarea
+                              rows={4}
+                              value={companyActivityEditForm.notes}
+                              onChange={(event) =>
+                                setCompanyActivityEditForm({
+                                  ...companyActivityEditForm,
+                                  notes: event.target.value,
+                                })
+                              }
+                              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs shadow-sm"
+                              placeholder="Activity notes"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="mt-3 font-semibold">{activity.subject || "No subject"}</p>
+                        <p
+                          className={
+                            expandedCompanyActivityNoteIds[String(activity.id)]
+                              ? "mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700"
+                              : "mt-2 whitespace-pre-wrap line-clamp-3 text-sm leading-6 text-slate-700"
+                          }
+                        >
+                          {activity.notes || "No notes"}
+                        </p>
+                        {activity.notes && String(activity.notes).length > 180 && (
+                          <button
+                            type="button"
+                            onClick={() => toggleCompanyActivityNoteExpansion(String(activity.id))}
+                            className="mt-1 text-xs font-semibold text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900"
+                            aria-expanded={Boolean(expandedCompanyActivityNoteIds[String(activity.id)])}
+                          >
+                            {expandedCompanyActivityNoteIds[String(activity.id)] ? "Hide full note" : "Show full note"}
+                          </button>
+                        )}
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => startEditingCompanyActivity(activity)}
+                            className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+                          >
+                            Edit
+                          </button>
+                        </div>
+                      </>
                     )}
                   </div>
 
