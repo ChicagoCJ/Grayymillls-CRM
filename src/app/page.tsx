@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.53 - Activity History Edit Mode UI";
+const APP_VERSION = "Rev 2.54 - Wire Activity Edit Save";
 const REVISION_NOTE =
-  "Added Company Detail activity history inline edit mode UI with prefilled draft fields and cancel."; 
+  "Wired Company Detail activity history inline edits to save through the activities API."; 
 
   
 
@@ -1816,6 +1816,51 @@ async function handleAnalyzeProspect() {
     }
   }
 
+  async function handleUpdateActivity(activityId: string, form: ActivityForm) {
+    if (!selectedCompanyDetail?.company?.id) return false;
+
+    setIsSavingActivity(true);
+    setErrorMessage("");
+    setImportMessage("");
+
+    try {
+      if (!form.subject.trim() && !form.notes.trim()) {
+        throw new Error("Enter a subject or note before saving.");
+      }
+
+      const response = await fetch("/api/activities", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          activityId,
+          activityType: form.activityType,
+          subject: form.subject,
+          notes: form.notes,
+          dueDate: form.dueDate || null,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to update activity.");
+      }
+
+      setImportMessage("Activity updated.");
+      await loadCompanyDetail(String(selectedCompanyDetail.company.id));
+      await loadCrmSummary();
+
+      return true;
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to update activity.");
+      return false;
+    } finally {
+      setIsSavingActivity(false);
+    }
+  }
+
   const tabs: { key: TabKey; label: string }[] = [
     { key: "dashboard", label: "Dashboard" },
     { key: "companies", label: "Companies" },
@@ -2797,6 +2842,7 @@ async function handleAnalyzeProspect() {
             isCompletingActivity={isCompletingActivity}
             isAnalyzingProspect={isAnalyzingProspect}
             onSaveActivity={handleSaveActivity}
+            onUpdateActivity={handleUpdateActivity}
             onCompleteActivity={handleCompleteActivity}
             onAnalyzeProspect={handleAnalyzeProspect}
             onRefreshCompanyDetail={loadCompanyDetail}
@@ -9332,6 +9378,7 @@ function CompanyDetailSection({
   isCompletingActivity,
   isAnalyzingProspect,
   onSaveActivity,
+  onUpdateActivity,
   onCompleteActivity,
   onAnalyzeProspect,
   onRefreshCompanyDetail,
@@ -9348,6 +9395,7 @@ function CompanyDetailSection({
   isCompletingActivity: string;
   isAnalyzingProspect: boolean;
   onSaveActivity: () => void;
+  onUpdateActivity: (activityId: string, form: ActivityForm) => Promise<boolean>;
   onCompleteActivity: (activityId: string, companyId?: string | null) => void;
   onAnalyzeProspect: () => void;
   onRefreshCompanyDetail: (companyId: string) => void;
@@ -9407,6 +9455,14 @@ function CompanyDetailSection({
       notes: "",
       dueDate: "",
     });
+  }
+
+  async function saveEditingCompanyActivity(activityId: string) {
+    const saved = await onUpdateActivity(activityId, companyActivityEditForm);
+
+    if (saved) {
+      cancelEditingCompanyActivity();
+    }
   }
 
   function toggleCompanyActivityNoteExpansion(activityId: string) {
@@ -10211,16 +10267,27 @@ function CompanyDetailSection({
                               Edit activity draft
                             </p>
                             <p className="mt-1 text-xs text-blue-800">
-                              Save wiring comes in the next revision. Cancel closes without changing the activity.
+                              Save edits updates the activity. Cancel closes without changing the activity.
                             </p>
                           </div>
-                          <button
-                            type="button"
-                            onClick={cancelEditingCompanyActivity}
-                            className="w-fit rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-blue-100 hover:bg-blue-50"
-                          >
-                            Cancel
-                          </button>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => saveEditingCompanyActivity(String(activity.id))}
+                              disabled={isSavingActivity || (!companyActivityEditForm.subject.trim() && !companyActivityEditForm.notes.trim())}
+                              className="w-fit rounded-lg bg-green-700 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-green-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                            >
+                              {isSavingActivity ? "Saving..." : "Save Edit"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={cancelEditingCompanyActivity}
+                              disabled={isSavingActivity}
+                              className="w-fit rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-blue-100 hover:bg-blue-50 disabled:cursor-not-allowed disabled:bg-slate-100"
+                            >
+                              Cancel
+                            </button>
+                          </div>
                         </div>
 
                         <div className="mt-3 grid gap-3 md:grid-cols-4">
@@ -10292,6 +10359,12 @@ function CompanyDetailSection({
                             />
                           </div>
                         </div>
+
+                        {!companyActivityEditForm.subject.trim() && !companyActivityEditForm.notes.trim() && (
+                          <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+                            Enter a subject or note before saving this edit.
+                          </p>
+                        )}
                       </div>
                     ) : (
                       <>
