@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.57 - Activity Date Display Timezone Fix";
+const APP_VERSION = "Rev 2.58 - Complete Button Edit Lock";
 const REVISION_NOTE =
-  "Fixed date-only display formatting so activity due dates do not shift by timezone."; 
+  "Locked Company Detail activity Complete actions while an activity edit is in progress."; 
 
   
 
@@ -10463,10 +10463,11 @@ function CompanyDetailSection({
                     {!activity.completed_at && (
                       <button
                         onClick={() => onCompleteActivity(activity.id, activity.company_id)}
-                        disabled={isCompletingActivity === activity.id}
+                        disabled={isCompletingActivity === activity.id || isSavingActivity || isEditingCompanyActivity}
+                        title={isEditingCompanyActivity ? "Finish or cancel the current edit before completing an activity." : "Mark this activity complete"}
                         className="mt-2 rounded-lg bg-green-700 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-green-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                       >
-                        {isCompletingActivity === activity.id ? "Completing..." : "Complete"}
+                        {isCompletingActivity === activity.id ? "Completing..." : isEditingCompanyActivity ? "Finish edit first" : "Complete"}
                       </button>
                     )}
                   </div>
