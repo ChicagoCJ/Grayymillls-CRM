@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.55 - Activity Edit Polish";
+const APP_VERSION = "Rev 2.57 - Activity Date Display Timezone Fix";
 const REVISION_NOTE =
-  "Polished Company Detail activity editing with clearer edit states and safer action locking."; 
+  "Fixed date-only display formatting so activity due dates do not shift by timezone."; 
 
   
 
@@ -406,7 +406,16 @@ function getConfidenceClass(confidence: MappingSuggestion["confidence"]) {
 
 function formatDate(value: string | null) {
   if (!value) return "No date";
-  return new Date(value).toLocaleDateString();
+
+  const normalizedValue = String(value).trim();
+  const dateOnlyMatch = normalizedValue.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
+  if (dateOnlyMatch) {
+    const [, year, month, day] = dateOnlyMatch;
+    return `${Number(month)}/${Number(day)}/${year}`;
+  }
+
+  return new Date(normalizedValue).toLocaleDateString();
 }
 
 function getLatestProspect(company: CompanySummary) {
@@ -9445,7 +9454,7 @@ function CompanyDetailSection({
       activityType: getEditableCompanyActivityType(activity.activity_type),
       subject: String(activity.subject || ""),
       notes: String(activity.notes || ""),
-      dueDate: activity.due_date ? String(activity.due_date) : "",
+      dueDate: activity.due_date ? String(activity.due_date).slice(0, 10) : "",
     });
   }
 
