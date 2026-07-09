@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.58 - Complete Button Edit Lock";
+const APP_VERSION = "Rev 2.59 - Activity Edit Dirty-State Guard";
 const REVISION_NOTE =
-  "Locked Company Detail activity Complete actions while an activity edit is in progress."; 
+  "Disabled Company Detail activity Save Edit until an edit form actually changes."; 
 
   
 
@@ -9554,6 +9554,20 @@ function CompanyDetailSection({
   const canSaveCompanyActivity =
     Boolean(activityForm.subject.trim()) || Boolean(activityForm.notes.trim());
   const isEditingCompanyActivity = Boolean(editingCompanyActivityId);
+  const selectedEditingCompanyActivity = companyActivities.find(
+    (activity: any) => String(activity.id) === editingCompanyActivityId
+  );
+  const companyActivityEditHasChanges = Boolean(
+    selectedEditingCompanyActivity &&
+      (companyActivityEditForm.activityType !==
+        getEditableCompanyActivityType(selectedEditingCompanyActivity.activity_type) ||
+        companyActivityEditForm.subject !== String(selectedEditingCompanyActivity.subject || "") ||
+        companyActivityEditForm.notes !== String(selectedEditingCompanyActivity.notes || "") ||
+        companyActivityEditForm.dueDate !==
+          (selectedEditingCompanyActivity.due_date
+            ? String(selectedEditingCompanyActivity.due_date).slice(0, 10)
+            : ""))
+  );
   const companyActivityHistoryTypeFilters = [
     { label: "All Types", value: "All Types" },
     { label: "Notes", value: "note" },
@@ -10294,7 +10308,11 @@ function CompanyDetailSection({
                             <button
                               type="button"
                               onClick={() => saveEditingCompanyActivity(String(activity.id))}
-                              disabled={isSavingActivity || (!companyActivityEditForm.subject.trim() && !companyActivityEditForm.notes.trim())}
+                              disabled={
+                                isSavingActivity ||
+                                (!companyActivityEditForm.subject.trim() && !companyActivityEditForm.notes.trim()) ||
+                                !companyActivityEditHasChanges
+                              }
                               className="w-fit rounded-lg bg-green-700 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-green-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                             >
                               {isSavingActivity ? "Saving..." : "Save Edit"}
