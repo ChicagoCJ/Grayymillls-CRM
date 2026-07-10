@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.62.2 - Funnel Stage Save Permission Headers";
+const APP_VERSION = "Rev 2.63 - Local Date-Only Helper";
 const REVISION_NOTE =
-  "Sent signed-in role permission headers with funnel stage create and save requests."; 
+  "Normalized activity due-date today and quick-date calculations to local calendar dates."; 
 
   
 
@@ -418,6 +418,19 @@ function formatDate(value: string | null) {
   return new Date(normalizedValue).toLocaleDateString();
 }
 
+function toLocalDateInputValue(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getLocalDateInputValueOffset(days = 0) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return toLocalDateInputValue(date);
+}
+
 function getActivityUpdatedTimestamp(activity: any) {
   const updatedValue = String(activity?.updated_at || activity?.modified_at || "").trim();
   const createdValue = String(activity?.created_at || "").trim();
@@ -621,7 +634,7 @@ function formatTitleFromKey(key: string) {
 
 function isOverdue(activity: ActivityRecord) {
   if (!activity.due_date || activity.completed_at) return false;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getLocalDateInputValueOffset(0);
   return activity.due_date < today;
 }
 
@@ -6865,7 +6878,7 @@ function OpportunityActivitiesDashboard({
     opportunityActivityCurrentUserRole,
   ]);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getLocalDateInputValueOffset(0);
 
   const openCount = activities.filter((activity: any) => !activity.completed_at).length;
   const dueTodayCount = activities.filter(
@@ -9542,9 +9555,7 @@ function CompanyDetailSection({
     );
   }
   function companyActivityDateOffset(days: number) {
-    const date = new Date();
-    date.setDate(date.getDate() + days);
-    return date.toISOString().slice(0, 10);
+    return getLocalDateInputValueOffset(days);
   }
 
   function setCompanyActivityDueDate(dueDate: string) {
@@ -9581,7 +9592,7 @@ function CompanyDetailSection({
 
   const company = detail.company;
 
-  const companyActivityToday = new Date().toISOString().slice(0, 10);
+  const companyActivityToday = getLocalDateInputValueOffset(0);
   const companyActivities = detail.activities ?? [];
   const companyOpenActivities = companyActivities.filter((activity: any) => !activity.completed_at);
   const companyOverdueActivities = companyActivities.filter(
