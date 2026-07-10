@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.69 - Company Detail Load Label Fix";
+const APP_VERSION = "Rev 2.70 - Company Detail Return Tab Safety Cleanup";
 const REVISION_NOTE =
-  "Corrected the Company Detail API response label used in load error messages."; 
+  "Clarified Company Detail return-tab handling without behavior changes."; 
 
   
 
@@ -1574,7 +1574,8 @@ async function loadCompanyOwnerFilterData() {
   }
 
   function returnFromCompanyDetail() {
-    setActiveTab(companyDetailReturnTab === "companyDetail" ? "companies" : companyDetailReturnTab);
+    const nextTab = companyDetailReturnTab === "companyDetail" ? "companies" : companyDetailReturnTab;
+    setActiveTab(nextTab);
   }
 
   async function loadCompanyDetail(companyId: string) {
