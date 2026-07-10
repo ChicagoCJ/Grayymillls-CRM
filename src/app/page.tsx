@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.67.1 - Company Detail Prop Line Fix";
+const APP_VERSION = "Rev 2.68 - Company Detail Function Formatting Cleanup";
 const REVISION_NOTE =
-  "Fixed Company Detail JSX prop line formatting after Admin tab cleanup."; 
+  "Cleaned Company Detail return and load function formatting without behavior changes."; 
 
   
 
@@ -1573,10 +1573,11 @@ async function loadCompanyOwnerFilterData() {
     }
   }
 
-    function returnFromCompanyDetail() {
+  function returnFromCompanyDetail() {
     setActiveTab(companyDetailReturnTab === "companyDetail" ? "companies" : companyDetailReturnTab);
   }
-async function loadCompanyDetail(companyId: string) {
+
+  async function loadCompanyDetail(companyId: string) {
     setCompanyDetailReturnTab((current) => (activeTab === "companyDetail" ? current : activeTab));
     setIsLoadingCompanyDetail(true);
     setErrorMessage("");
