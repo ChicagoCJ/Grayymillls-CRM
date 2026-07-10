@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.66.2 - Admin Tag Status Indentation Fix";
+const APP_VERSION = "Rev 2.67.1 - Company Detail Prop Line Fix";
 const REVISION_NOTE =
-  "Cleaned Admin tag status permission header formatting."; 
+  "Fixed Company Detail JSX prop line formatting after Admin tab cleanup."; 
 
   
 
@@ -2900,10 +2900,12 @@ async function handleAnalyzeProspect() {
               String(signedInProductionUser.role).toLowerCase() === "admin" ||
               String(signedInProductionUser.role).toLowerCase() === "sales_manager"
             }
-                        apiPermissionHeaders={apiPermissionHeaders}
-canMoveOpportunityStages={currentPermissions.canMoveOpportunityStages}
-/>  
-        )}        {activeTab === "admin" && (
+            apiPermissionHeaders={apiPermissionHeaders}
+            canMoveOpportunityStages={currentPermissions.canMoveOpportunityStages}
+          />
+        )}
+
+        {activeTab === "admin" && (
           <section className="grid max-w-full gap-6 overflow-hidden">
             <UserRolePermissionsReference />
             <AdminUsersSection
