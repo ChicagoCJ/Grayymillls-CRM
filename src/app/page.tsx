@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.65 - Admin Tags Permission Headers";
+const APP_VERSION = "Rev 2.66.2 - Admin Tag Status Indentation Fix";
 const REVISION_NOTE =
-  "Sent signed-in role permission headers with Admin tag create, save, archive, and reactivate requests."; 
+  "Cleaned Admin tag status permission header formatting."; 
 
   
 
@@ -6358,7 +6358,7 @@ function AdminTagsSection({
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
-          ...apiPermissionHeaders(),
+        ...apiPermissionHeaders(),
       },
       body: JSON.stringify({
         id: tagId,
