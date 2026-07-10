@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.76.1 - Funnel Activity Panel Prop Alignment Fix";
+const APP_VERSION = "Rev 2.78 - Activities API Permission Enforcement";
 const REVISION_NOTE =
-  "Aligned Funnel Dashboard activity panel JSX props without behavior changes."; 
+  "Added API permission enforcement and client permission headers for company activity writes."; 
 
   
 
@@ -1834,6 +1834,7 @@ async function handleAnalyzeProspect() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...apiPermissionHeaders(),
         },
         body: JSON.stringify({
           companyId: selectedCompanyDetail.company.id,
@@ -1886,6 +1887,7 @@ async function handleAnalyzeProspect() {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
+          ...apiPermissionHeaders(),
         },
         body: JSON.stringify({
           activityId,

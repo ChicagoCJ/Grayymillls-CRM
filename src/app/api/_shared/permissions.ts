@@ -12,6 +12,7 @@ export type ApiPermissionContext = {
 export type ApiPermissionAction =
   | "import_csv"
   | "assign_sales_coverage"
+  | "manage_sales_activities"
   | "manage_crm_users"
   | "manage_funnel_stage_definition"
   | "manage_admin_settings";
@@ -50,9 +51,14 @@ export function canAssignSalesCoverage(role: ApiUserRole) {
   return role === "admin" || role === "sales_manager";
 }
 
+export function canManageSalesActivities(role: ApiUserRole) {
+  return role === "admin" || role === "sales_manager" || role === "sales_rep";
+}
+
 export function isApiActionAllowed(action: ApiPermissionAction, role: ApiUserRole) {
   if (action === "import_csv") return canImportCsv(role);
   if (action === "assign_sales_coverage") return canAssignSalesCoverage(role);
+  if (action === "manage_sales_activities") return canManageSalesActivities(role);
   if (action === "manage_crm_users") return canManageAdminSettings(role);
   if (action === "manage_funnel_stage_definition") return canManageFunnelStageDefinitions(role);
   if (action === "manage_admin_settings") return canManageAdminSettings(role);
@@ -62,6 +68,7 @@ export function isApiActionAllowed(action: ApiPermissionAction, role: ApiUserRol
 export function apiPermissionDeniedMessage(action: ApiPermissionAction) {
   if (action === "import_csv") return "Your current role cannot import CSV files.";
   if (action === "assign_sales_coverage") return "Your current role cannot edit sales coverage assignments.";
+  if (action === "manage_sales_activities") return "Your current role cannot create, edit, or complete sales activities.";
   if (action === "manage_crm_users") return "Your current role cannot create, edit, archive, or reactivate CRM users.";
   if (action === "manage_funnel_stage_definition") return "Your current role cannot create, edit, archive, or reactivate funnel stage definitions.";
   return "Your current role cannot perform this action.";
