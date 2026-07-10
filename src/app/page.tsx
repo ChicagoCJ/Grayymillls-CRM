@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.71 - Company Detail Return Tab Reset Cleanup";
+const APP_VERSION = "Rev 2.72 - Company Detail Reload Return-Tab Preservation";
 const REVISION_NOTE =
-  "Reset Company Detail return-tab state after returning to prevent stale navigation."; 
+  "Clarified Company Detail reload behavior so the saved return tab is preserved."; 
 
   
 
@@ -1573,6 +1573,10 @@ async function loadCompanyOwnerFilterData() {
     }
   }
 
+  function getCompanyDetailReturnTab(currentReturnTab: TabKey) {
+    return activeTab === "companyDetail" ? currentReturnTab : activeTab;
+  }
+
   function returnFromCompanyDetail() {
     const nextTab = companyDetailReturnTab === "companyDetail" ? "companies" : companyDetailReturnTab;
     setActiveTab(nextTab);
@@ -1580,7 +1584,7 @@ async function loadCompanyOwnerFilterData() {
   }
 
   async function loadCompanyDetail(companyId: string) {
-    setCompanyDetailReturnTab((current) => (activeTab === "companyDetail" ? current : activeTab));
+    setCompanyDetailReturnTab(getCompanyDetailReturnTab);
     setIsLoadingCompanyDetail(true);
     setErrorMessage("");
 
