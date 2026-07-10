@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.72 - Company Detail Reload Return-Tab Preservation";
+const APP_VERSION = "Rev 2.73 - Company Detail Clear Selection on Return";
 const REVISION_NOTE =
-  "Clarified Company Detail reload behavior so the saved return tab is preserved."; 
+  "Cleared Company Detail selection after returning to prevent stale detail state."; 
 
   
 
@@ -1581,6 +1581,7 @@ async function loadCompanyOwnerFilterData() {
     const nextTab = companyDetailReturnTab === "companyDetail" ? "companies" : companyDetailReturnTab;
     setActiveTab(nextTab);
     setCompanyDetailReturnTab("companies");
+    setSelectedCompanyDetail(null);
   }
 
   async function loadCompanyDetail(companyId: string) {
