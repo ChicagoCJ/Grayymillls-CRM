@@ -2828,6 +2828,7 @@ async function handleAnalyzeProspect() {
             setCompanyBuyerPersonaFilter={setCompanyBuyerPersonaFilter}
             companyAccountTypeOverrides={companyAccountTypeOverrides}
             setCompanyAccountTypeOverrides={setCompanyAccountTypeOverrides}
+            apiPermissionHeaders={apiPermissionHeaders}
             companyBuyerPersonaOverrides={companyBuyerPersonaOverrides}
             setCompanyBuyerPersonaOverrides={setCompanyBuyerPersonaOverrides}
             assignmentUserOptions={roleTestUsers}
@@ -8445,6 +8446,7 @@ function CompaniesSection({
   setCompanyBuyerPersonaFilter = () => {},
   companyAccountTypeOverrides = {},
   setCompanyAccountTypeOverrides = () => {},
+  apiPermissionHeaders = () => ({}),
   companyBuyerPersonaOverrides = {},
   setCompanyBuyerPersonaOverrides = () => {},
   assignmentUserOptions = [],
@@ -8507,6 +8509,7 @@ function CompaniesSection({
       | Record<string, CompanyAccountTypeLens>
       | ((current: Record<string, CompanyAccountTypeLens>) => Record<string, CompanyAccountTypeLens>)
   ) => void;
+  apiPermissionHeaders?: () => Record<string, string>;
   companyBuyerPersonaOverrides?: Record<string, string[]>;
   setCompanyBuyerPersonaOverrides?: (
     value: Record<string, string[]> | ((current: Record<string, string[]>) => Record<string, string[]>)
@@ -9132,6 +9135,7 @@ function CompaniesSection({
                                   method: "POST",
                                   headers: {
                                     "Content-Type": "application/json",
+                                    ...apiPermissionHeaders(),
                                   },
                                   body: JSON.stringify({
                                     companyId: rowCompanyKey,
