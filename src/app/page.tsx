@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.63 - Local Date-Only Helper";
+const APP_VERSION = "Rev 2.64 - Admin Users Permission Headers";
 const REVISION_NOTE =
-  "Normalized activity due-date today and quick-date calculations to local calendar dates."; 
+  "Sent signed-in role permission headers with Admin user create, save, archive, and reactivate requests."; 
 
   
 
@@ -5770,6 +5770,7 @@ function AdminUsersSection({
         method: editingUserId ? "PATCH" : "POST",
         headers: {
           "Content-Type": "application/json",
+          ...apiPermissionHeaders(),
         },
         body: JSON.stringify({
           id: editingUserId || undefined,
@@ -5813,6 +5814,7 @@ function AdminUsersSection({
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
+          ...apiPermissionHeaders(),
         },
         body: JSON.stringify({
           id: user.id,
