@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.75 - Company Detail Open Flow Cleanup";
+const APP_VERSION = "Rev 2.76.1 - Funnel Activity Panel Prop Alignment Fix";
 const REVISION_NOTE =
-  "Removed redundant Company Detail tab switching from the funnel dashboard open flow."; 
+  "Aligned Funnel Dashboard activity panel JSX props without behavior changes."; 
 
   
 
@@ -7550,10 +7550,12 @@ const filteredOpportunities = useMemo(() => {
         )}
       </div>
 
-      <OpportunityActivitiesDashboard onOpenCompany={onOpenCompany}
-          opportunityActivityRoleVisibilityActive={funnelApplyRoleVisibility}
-          opportunityActivityCurrentUserId={funnelCurrentUserId}
-          opportunityActivityCurrentUserRole={funnelCurrentUserRole} />
+      <OpportunityActivitiesDashboard
+        onOpenCompany={onOpenCompany}
+        opportunityActivityRoleVisibilityActive={funnelApplyRoleVisibility}
+        opportunityActivityCurrentUserId={funnelCurrentUserId}
+        opportunityActivityCurrentUserRole={funnelCurrentUserRole}
+      />
 
       <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
