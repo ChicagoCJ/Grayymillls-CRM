@@ -1792,6 +1792,7 @@ async function handleAnalyzeProspect() {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        ...apiPermissionHeaders(),
       },
       body: JSON.stringify({
         companyId,
