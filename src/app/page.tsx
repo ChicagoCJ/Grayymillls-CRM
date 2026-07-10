@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.73 - Company Detail Clear Selection on Return";
+const APP_VERSION = "Rev 2.74 - Company Detail Load Error Cleanup";
 const REVISION_NOTE =
-  "Cleared Company Detail selection after returning to prevent stale detail state."; 
+  "Cleared stale Company Detail selection when detail loading fails."; 
 
   
 
@@ -1600,6 +1600,7 @@ async function loadCompanyOwnerFilterData() {
       setSelectedCompanyDetail(data);
       setActiveTab("companyDetail");
     } catch (error) {
+      setSelectedCompanyDetail(null);
       setErrorMessage(error instanceof Error ? error.message : "Could not load company detail.");
     } finally {
       setIsLoadingCompanyDetail(false);
