@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.74 - Company Detail Load Error Cleanup";
+const APP_VERSION = "Rev 2.75 - Company Detail Open Flow Cleanup";
 const REVISION_NOTE =
-  "Cleared stale Company Detail selection when detail loading fails."; 
+  "Removed redundant Company Detail tab switching from the funnel dashboard open flow."; 
 
   
 
@@ -2878,7 +2878,6 @@ async function handleAnalyzeProspect() {
           <FunnelDashboardSection
             onOpenCompany={(companyId) => {
               loadCompanyDetail(companyId);
-              setActiveTab("companyDetail");
 
               if (typeof window !== "undefined") {
                 window.scrollTo({ top: 0, behavior: "smooth" });
