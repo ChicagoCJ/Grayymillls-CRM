@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.68 - Company Detail Function Formatting Cleanup";
+const APP_VERSION = "Rev 2.69 - Company Detail Load Label Fix";
 const REVISION_NOTE =
-  "Cleaned Company Detail return and load function formatting without behavior changes."; 
+  "Corrected the Company Detail API response label used in load error messages."; 
 
   
 
@@ -1584,7 +1584,7 @@ async function loadCompanyOwnerFilterData() {
 
     try {
       const response = await fetch(`/api/company-detail?id=${companyId}`);
-      const data = await readJsonResponse(response, "/api/crm-users");
+      const data = await readJsonResponse(response, "/api/company-detail");
 
       if (!response.ok) {
         throw new Error(data.error || "Could not load company detail.");
