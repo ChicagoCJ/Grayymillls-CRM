@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.60.1 - Activity Edit Cancel Guard Syntax Fix";
+const APP_VERSION = "Rev 2.61 - Activity Updated Timestamp Display";
 const REVISION_NOTE =
-  "Fixed activity edit cancel-guard field change handlers so the discard prompt resets safely."; 
+  "Added an Updated timestamp row to Company Detail activity history when edit/update data is available."; 
 
   
 
@@ -416,6 +416,28 @@ function formatDate(value: string | null) {
   }
 
   return new Date(normalizedValue).toLocaleDateString();
+}
+
+function getActivityUpdatedTimestamp(activity: any) {
+  const updatedValue = String(activity?.updated_at || activity?.modified_at || "").trim();
+  const createdValue = String(activity?.created_at || "").trim();
+
+  if (!updatedValue) return "";
+
+  if (updatedValue === createdValue) return "";
+
+  const updatedTime = Date.parse(updatedValue);
+  const createdTime = Date.parse(createdValue);
+
+  if (
+    !Number.isNaN(updatedTime) &&
+    !Number.isNaN(createdTime) &&
+    Math.abs(updatedTime - createdTime) < 1000
+  ) {
+    return "";
+  }
+
+  return updatedValue;
 }
 
 function getLatestProspect(company: CompanySummary) {
@@ -10482,6 +10504,14 @@ function CompanyDetailSection({
                         <span className="font-semibold uppercase tracking-wide text-slate-500">Created</span>
                         <span className="font-bold text-slate-900">{formatDate(activity.created_at)}</span>
                       </div>
+                      {getActivityUpdatedTimestamp(activity) && (
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="font-semibold uppercase tracking-wide text-slate-500">Updated</span>
+                          <span className="font-bold text-blue-700">
+                            {formatDate(getActivityUpdatedTimestamp(activity))}
+                          </span>
+                        </div>
+                      )}
                       <div className="flex items-center justify-between gap-3">
                         <span className="font-semibold uppercase tracking-wide text-slate-500">Due</span>
                         <span
