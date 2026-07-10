@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.70 - Company Detail Return Tab Safety Cleanup";
+const APP_VERSION = "Rev 2.71 - Company Detail Return Tab Reset Cleanup";
 const REVISION_NOTE =
-  "Clarified Company Detail return-tab handling without behavior changes."; 
+  "Reset Company Detail return-tab state after returning to prevent stale navigation."; 
 
   
 
@@ -1576,6 +1576,7 @@ async function loadCompanyOwnerFilterData() {
   function returnFromCompanyDetail() {
     const nextTab = companyDetailReturnTab === "companyDetail" ? "companies" : companyDetailReturnTab;
     setActiveTab(nextTab);
+    setCompanyDetailReturnTab("companies");
   }
 
   async function loadCompanyDetail(companyId: string) {
