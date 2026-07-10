@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.64 - Admin Users Permission Headers";
+const APP_VERSION = "Rev 2.65 - Admin Tags Permission Headers";
 const REVISION_NOTE =
-  "Sent signed-in role permission headers with Admin user create, save, archive, and reactivate requests."; 
+  "Sent signed-in role permission headers with Admin tag create, save, archive, and reactivate requests."; 
 
   
 
@@ -6324,6 +6324,7 @@ function AdminTagsSection({
         method: editingTagId ? "PATCH" : "POST",
         headers: {
           "Content-Type": "application/json",
+          ...apiPermissionHeaders(),
         },
         body: JSON.stringify({
           id: editingTagId || undefined,
@@ -6357,6 +6358,7 @@ function AdminTagsSection({
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
+          ...apiPermissionHeaders(),
       },
       body: JSON.stringify({
         id: tagId,
