@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { enforceApiPermission } from "../_shared/permissions";
 import { createClient } from "@supabase/supabase-js";
 
 const VALID_BUYER_PERSONAS = new Set([
@@ -31,6 +32,13 @@ function getSupabaseAdminClient() {
 }
 
 export async function POST(request: Request) {
+  const permission = enforceApiPermission(
+    request,
+    "manage_sales_activities"
+  );
+
+  if (permission.response) return permission.response;
+
   try {
     const payload = (await request.json()) as {
       companyId?: unknown;

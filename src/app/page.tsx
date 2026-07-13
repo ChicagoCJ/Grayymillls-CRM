@@ -9204,6 +9204,7 @@ function CompaniesSection({
                                           method: "POST",
                                           headers: {
                                             "Content-Type": "application/json",
+                                            ...apiPermissionHeaders(),
                                           },
                                           body: JSON.stringify({
                                             companyId: rowCompanyKey,
