@@ -10609,7 +10609,10 @@ function CompanyDetailSection({
                   <p>Function: {displayValue(contact.function_area || contact.department)}</p>
                 </div>
 
-                <ContactTagManager contactId={String(contact.id)} />
+                <ContactTagManager
+                  contactId={String(contact.id)}
+                  apiPermissionHeaders={apiPermissionHeaders}
+                />
               </div>
             ))}
           </div>
@@ -12961,7 +12964,13 @@ function TagAssignmentColumn({
 }
 
 
-function ContactTagManager({ contactId }: { contactId: string }) {
+function ContactTagManager({
+  contactId,
+  apiPermissionHeaders = () => ({}),
+}: {
+  contactId: string;
+  apiPermissionHeaders?: () => Record<string, string>;
+}) {
   const [allTags, setAllTags] = useState<CrmTag[]>([]);
   const [assignedTags, setAssignedTags] = useState<AssignedContactTag[]>([]);
   const [selectedMarketTagId, setSelectedMarketTagId] = useState("");
@@ -13042,6 +13051,7 @@ function ContactTagManager({ contactId }: { contactId: string }) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...apiPermissionHeaders(),
         },
         body: JSON.stringify({
           contactId,
@@ -13075,6 +13085,7 @@ function ContactTagManager({ contactId }: { contactId: string }) {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
+          ...apiPermissionHeaders(),
         },
         body: JSON.stringify({
           contactId,
