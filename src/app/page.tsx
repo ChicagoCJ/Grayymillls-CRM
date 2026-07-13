@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.86 - Opportunity Documents Permission Enforcement";
+const APP_VERSION = "Rev 2.87 - Root API Permission Enforcement";
 const REVISION_NOTE =
-  "Added API permission enforcement to active and legacy opportunity document write routes and permission headers to upload and archive requests."; 
+  "Protected the legacy root API import endpoint with the existing CSV import permission requirement."; 
 
   
 

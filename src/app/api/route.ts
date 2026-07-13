@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { enforceApiPermission } from "./_shared/permissions";
 
 type ImportPayload = {
   fileName: string;
@@ -493,6 +494,10 @@ async function findOrCreateContact(supabase: ReturnType<typeof getSupabaseAdmin>
 }
 
 export async function POST(request: Request) {
+  const permission = enforceApiPermission(request, "import_csv");
+
+  if (permission.response) return permission.response;
+
   try {
     const payload = (await request.json()) as ImportPayload;
 
