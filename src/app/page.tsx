@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.85 - Opportunity Activities Permission Enforcement";
+const APP_VERSION = "Rev 2.86 - Opportunity Documents Permission Enforcement";
 const REVISION_NOTE =
-  "Added API permission enforcement to active and legacy opportunity activity write routes and permission headers to the active dashboard completion request."; 
+  "Added API permission enforcement to active and legacy opportunity document write routes and permission headers to upload and archive requests."; 
 
   
 
@@ -11199,10 +11199,12 @@ function OpportunityDocumentsPanel({
   opportunityId,
   companyId,
   contactId,
+  apiPermissionHeaders = () => ({}),
 }: {
   opportunityId: string;
   companyId: string;
   contactId: string | null;
+  apiPermissionHeaders?: () => Record<string, string>;
 }) {
   const [documents, setDocuments] = useState<OpportunityDocument[]>([]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -11261,6 +11263,9 @@ function OpportunityDocumentsPanel({
 
       const response = await fetch("/api/opportunity-documents", {
         method: "POST",
+        headers: {
+          ...apiPermissionHeaders(),
+        },
         body: formData,
       });
 
@@ -11291,6 +11296,7 @@ function OpportunityDocumentsPanel({
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
+          ...apiPermissionHeaders(),
         },
         body: JSON.stringify({
           id: documentId,
@@ -12596,6 +12602,7 @@ function CompanyOpportunityPanel({
                       opportunityId={opportunity.id}
                       companyId={companyId}
                       contactId={opportunity.contact_id}
+                      apiPermissionHeaders={apiPermissionHeaders}
                     />
 
 
