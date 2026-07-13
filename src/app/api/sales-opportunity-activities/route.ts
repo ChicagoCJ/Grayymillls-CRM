@@ -1,5 +1,6 @@
 ﻿import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { enforceApiPermission } from "../_shared/permissions";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -128,6 +129,13 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const permission = enforceApiPermission(
+    request,
+    "manage_sales_activities"
+  );
+
+  if (permission.response) return permission.response;
+
   try {
     const supabase = getSupabaseAdmin();
     const payload = (await request.json()) as OpportunityActivityPayload;
@@ -173,6 +181,13 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  const permission = enforceApiPermission(
+    request,
+    "manage_sales_activities"
+  );
+
+  if (permission.response) return permission.response;
+
   try {
     const supabase = getSupabaseAdmin();
     const payload = (await request.json()) as OpportunityActivityPayload;

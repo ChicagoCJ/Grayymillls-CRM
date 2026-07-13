@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.84 - Sales Opportunities Permission Enforcement";
+const APP_VERSION = "Rev 2.85 - Opportunity Activities Permission Enforcement";
 const REVISION_NOTE =
-  "Added API permission enforcement and client permission headers for sales opportunity create, edit, and quick-update requests."; 
+  "Added API permission enforcement to active and legacy opportunity activity write routes and permission headers to the active dashboard completion request."; 
 
   
 
@@ -6800,11 +6800,13 @@ function OpportunityActivitiesDashboard({
   opportunityActivityRoleVisibilityActive = false,
   opportunityActivityCurrentUserId = null,
   opportunityActivityCurrentUserRole = "admin",
+  opportunityActivityCurrentUserDisplayName = "Manual Role Test",
 }: {
   onOpenCompany: (companyId: string) => void;
   opportunityActivityRoleVisibilityActive?: boolean;
   opportunityActivityCurrentUserId?: string | null;
   opportunityActivityCurrentUserRole?: AppUserRole;
+  opportunityActivityCurrentUserDisplayName?: string;
 }) {
   const [activities, setActivities] = useState<Record<string, any>[]>([]);
   const [statusFilter, setStatusFilter] = useState("open");
@@ -6815,6 +6817,14 @@ function OpportunityActivitiesDashboard({
   const [isSavingActivity, setIsSavingActivity] = useState(false);
   const [activityMessage, setActivityMessage] = useState("");
   const [activityError, setActivityError] = useState("");
+
+  function activityApiPermissionHeaders() {
+    return {
+      "x-crm-user-id": String(opportunityActivityCurrentUserId || ""),
+      "x-crm-user-role": String(opportunityActivityCurrentUserRole || "sales_rep"),
+      "x-crm-user-name": String(opportunityActivityCurrentUserDisplayName || "Manual Role Test"),
+    };
+  }
 
   async function loadActivities() {
     setIsLoadingActivities(true);
@@ -6916,6 +6926,7 @@ function OpportunityActivitiesDashboard({
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
+          ...activityApiPermissionHeaders(),
         },
         body: JSON.stringify({
           activityId,
@@ -7559,6 +7570,7 @@ const filteredOpportunities = useMemo(() => {
         opportunityActivityRoleVisibilityActive={funnelApplyRoleVisibility}
         opportunityActivityCurrentUserId={funnelCurrentUserId}
         opportunityActivityCurrentUserRole={funnelCurrentUserRole}
+        opportunityActivityCurrentUserDisplayName={funnelCurrentUserDisplayName}
       />
 
       <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
