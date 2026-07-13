@@ -9932,7 +9932,10 @@ function CompanyDetailSection({
         apiPermissionHeaders={apiPermissionHeaders}
       />
 
-      <CompanyTagManager companyId={String(detail.company.id)} />
+      <CompanyTagManager
+        companyId={String(detail.company.id)}
+        apiPermissionHeaders={apiPermissionHeaders}
+      />
 
       <div id="company-detail-funnel" className="scroll-mt-80"></div>
       <CompanyOpportunityPanel
@@ -12643,7 +12646,13 @@ function CompanyOpportunityPanel({
   );
 }
 
-function CompanyTagManager({ companyId }: { companyId: string }) {
+function CompanyTagManager({
+  companyId,
+  apiPermissionHeaders = () => ({}),
+}: {
+  companyId: string;
+  apiPermissionHeaders?: () => Record<string, string>;
+}) {
   const [allTags, setAllTags] = useState<CrmTag[]>([]);
   const [assignedTags, setAssignedTags] = useState<AssignedCompanyTag[]>([]);
   const [selectedMarketTagId, setSelectedMarketTagId] = useState("");
@@ -12727,6 +12736,7 @@ if (!tagsResponse.ok) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...apiPermissionHeaders(),
         },
         body: JSON.stringify({
           companyId,
@@ -12760,6 +12770,7 @@ if (!tagsResponse.ok) {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
+          ...apiPermissionHeaders(),
         },
         body: JSON.stringify({
           companyId,
