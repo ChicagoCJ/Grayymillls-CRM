@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.78 - Activities API Permission Enforcement";
+const APP_VERSION = "Rev 2.84 - Sales Opportunities Permission Enforcement";
 const REVISION_NOTE =
-  "Added API permission enforcement and client permission headers for company activity writes."; 
+  "Added API permission enforcement and client permission headers for sales opportunity create, edit, and quick-update requests."; 
 
   
 
@@ -9940,6 +9940,7 @@ function CompanyDetailSection({
       <div id="company-detail-funnel" className="scroll-mt-80"></div>
       <CompanyOpportunityPanel
         canMoveOpportunityStages={canMoveOpportunityStages}
+        apiPermissionHeaders={apiPermissionHeaders}
         companyId={String(detail.company.id)}
         companyName={displayValue(detail.company.company_name)}
         contacts={detail.contacts}
@@ -11771,6 +11772,7 @@ function CompanyOpportunityPanel({
   prospects,
   primaryProspect,
   canMoveOpportunityStages = true,
+  apiPermissionHeaders = () => ({}),
 }: {
   companyId: string;
   companyName: string;
@@ -11778,6 +11780,7 @@ function CompanyOpportunityPanel({
   prospects: Record<string, string | number | null>[];
   primaryProspect: Record<string, string | number | null> | null;
   canMoveOpportunityStages?: boolean;
+  apiPermissionHeaders?: () => Record<string, string>;
 }) {
   const [stages, setStages] = useState<SalesFunnelStage[]>([]);
   const [opportunities, setOpportunities] = useState<SalesOpportunity[]>([]);
@@ -11897,6 +11900,7 @@ function CompanyOpportunityPanel({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...apiPermissionHeaders(),
         },
         body: JSON.stringify({
           companyId,
@@ -12014,6 +12018,7 @@ function CompanyOpportunityPanel({
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
+          ...apiPermissionHeaders(),
         },
         body: JSON.stringify({
           id: editingOpportunityId,
@@ -12060,6 +12065,7 @@ function CompanyOpportunityPanel({
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
+          ...apiPermissionHeaders(),
         },
         body: JSON.stringify({
           id: opportunityId,
