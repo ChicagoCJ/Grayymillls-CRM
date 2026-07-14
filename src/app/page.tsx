@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.90 - Buyer Persona Definition Foundation";
+const APP_VERSION = "Rev 2.91 - Buyer Persona Admin Management";
 const REVISION_NOTE =
-  "Added the database migration and protected API foundation for administratively managed Buyer Persona definitions without changing the current company persona workflow."; 
+  "Added Admin controls to create, edit, archive, reactivate, sort, and describe database-backed Buyer Persona definitions."; 
 
   
 
@@ -2930,6 +2930,10 @@ async function handleAnalyzeProspect() {
               canManageFunnelStages={currentPermissions.canManageFunnelStages}
               apiPermissionHeaders={apiPermissionHeaders}
             />
+            <AdminBuyerPersonaDefinitionsSection
+              canManageBuyerPersonas={currentPermissions.canManageAdminSettings}
+              apiPermissionHeaders={apiPermissionHeaders}
+            />
             <AdminTagsSection
               canManageTags={currentPermissions.canManageAdminSettings}
               apiPermissionHeaders={apiPermissionHeaders}
@@ -3647,6 +3651,477 @@ function ImportTagPicker({
         </div>
       )}
     </div>
+  );
+}
+
+function AdminBuyerPersonaDefinitionsSection({
+  canManageBuyerPersonas = true,
+  apiPermissionHeaders = () => ({}),
+}: {
+  canManageBuyerPersonas?: boolean;
+  apiPermissionHeaders?: () => Record<string, string>;
+}) {
+  const [definitions, setDefinitions] = useState<any[]>([]);
+  const [isLoadingDefinitions, setIsLoadingDefinitions] = useState(false);
+  const [isSavingDefinition, setIsSavingDefinition] = useState(false);
+  const [definitionMessage, setDefinitionMessage] = useState("");
+  const [definitionError, setDefinitionError] = useState("");
+  const [editingDefinitionId, setEditingDefinitionId] = useState("");
+  const [form, setForm] = useState({
+    personaName: "",
+    description: "",
+    sortOrder: "100",
+    status: "active" as "active" | "archived",
+  });
+
+  async function loadDefinitions() {
+    setIsLoadingDefinitions(true);
+    setDefinitionError("");
+
+    try {
+      const response = await fetch(
+        "/api/buyer-persona-definitions?includeInactive=true"
+      );
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Could not load Buyer Persona definitions."
+        );
+      }
+
+      setDefinitions(data.buyerPersonaDefinitions ?? []);
+    } catch (error) {
+      setDefinitionError(
+        error instanceof Error
+          ? error.message
+          : "Could not load Buyer Persona definitions."
+      );
+    } finally {
+      setIsLoadingDefinitions(false);
+    }
+  }
+
+  useEffect(() => {
+    loadDefinitions();
+  }, []);
+
+  function resetDefinitionForm() {
+    setEditingDefinitionId("");
+    setForm({
+      personaName: "",
+      description: "",
+      sortOrder: "100",
+      status: "active",
+    });
+  }
+
+  function startEditingDefinition(definition: any) {
+    setEditingDefinitionId(definition.id);
+    setForm({
+      personaName: definition.persona_name ?? "",
+      description: definition.description ?? "",
+      sortOrder: String(definition.sort_order ?? 100),
+      status:
+        definition.status === "archived"
+          ? "archived"
+          : "active",
+    });
+  }
+
+  async function saveDefinition() {
+    if (!canManageBuyerPersonas) {
+      setDefinitionError(
+        "Your current role cannot create or edit Buyer Persona definitions."
+      );
+      return;
+    }
+
+    setIsSavingDefinition(true);
+    setDefinitionMessage("");
+    setDefinitionError("");
+
+    try {
+      if (!form.personaName.trim()) {
+        throw new Error("Buyer Persona name is required.");
+      }
+
+      const response = await fetch(
+        "/api/buyer-persona-definitions",
+        {
+          method: editingDefinitionId ? "PATCH" : "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...apiPermissionHeaders(),
+          },
+          body: JSON.stringify({
+            id: editingDefinitionId || undefined,
+            personaName: form.personaName,
+            description: form.description,
+            sortOrder: form.sortOrder,
+            status: form.status,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Could not save Buyer Persona definition."
+        );
+      }
+
+      setDefinitionMessage(
+        editingDefinitionId
+          ? "Buyer Persona definition updated."
+          : "Buyer Persona definition created."
+      );
+
+      resetDefinitionForm();
+      await loadDefinitions();
+    } catch (error) {
+      setDefinitionError(
+        error instanceof Error
+          ? error.message
+          : "Could not save Buyer Persona definition."
+      );
+    } finally {
+      setIsSavingDefinition(false);
+    }
+  }
+
+  async function updateDefinitionStatus(
+    definition: any,
+    status: "active" | "archived"
+  ) {
+    if (!canManageBuyerPersonas) {
+      setDefinitionError(
+        "Your current role cannot archive or reactivate Buyer Persona definitions."
+      );
+      return;
+    }
+
+    setIsSavingDefinition(true);
+    setDefinitionMessage("");
+    setDefinitionError("");
+
+    try {
+      const response = await fetch(
+        "/api/buyer-persona-definitions",
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            ...apiPermissionHeaders(),
+          },
+          body: JSON.stringify({
+            id: definition.id,
+            status,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Could not update Buyer Persona definition."
+        );
+      }
+
+      setDefinitionMessage(
+        status === "active"
+          ? "Buyer Persona definition reactivated."
+          : "Buyer Persona definition archived."
+      );
+
+      if (editingDefinitionId === definition.id) {
+        resetDefinitionForm();
+      }
+
+      await loadDefinitions();
+    } catch (error) {
+      setDefinitionError(
+        error instanceof Error
+          ? error.message
+          : "Could not update Buyer Persona definition."
+      );
+    } finally {
+      setIsSavingDefinition(false);
+    }
+  }
+
+  return (
+    <section className="grid gap-6">
+      <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
+              Admin
+            </p>
+            <h2 className="mt-2 text-2xl font-bold">
+              Manage Buyer Persona Definitions
+            </h2>
+            <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-600">
+              Maintain the Buyer Persona definitions used to describe likely stakeholders and selling considerations. Archive definitions instead of deleting them when company records may already contain the persona name.
+            </p>
+
+            {!canManageBuyerPersonas && (
+              <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">
+                Your current role can view Buyer Persona definitions but cannot create, edit, archive, or reactivate them.
+              </p>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={loadDefinitions}
+            disabled={isLoadingDefinitions}
+            className="w-fit rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
+          >
+            {isLoadingDefinitions
+              ? "Refreshing..."
+              : "Refresh Buyer Personas"}
+          </button>
+        </div>
+
+        {(definitionMessage || definitionError) && (
+          <div className="mt-4 grid gap-2">
+            {definitionMessage && (
+              <div className="rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+                {definitionMessage}
+              </div>
+            )}
+
+            {definitionError && (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                {definitionError}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+        <h3 className="text-xl font-bold">
+          {editingDefinitionId
+            ? "Edit Buyer Persona"
+            : "Create Buyer Persona"}
+        </h3>
+
+        <div className="mt-5 grid gap-4 lg:grid-cols-6">
+          <div className="lg:col-span-3">
+            <label className="text-sm font-semibold text-slate-700">
+              Persona Name
+            </label>
+            <input
+              type="text"
+              value={form.personaName}
+              onChange={(event) =>
+                setForm({
+                  ...form,
+                  personaName: event.target.value,
+                })
+              }
+              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
+              placeholder="Example: Plant Manager"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-semibold text-slate-700">
+              Sort Order
+            </label>
+            <input
+              type="number"
+              value={form.sortOrder}
+              onChange={(event) =>
+                setForm({
+                  ...form,
+                  sortOrder: event.target.value,
+                })
+              }
+              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
+            />
+          </div>
+
+          <div className="lg:col-span-2">
+            <label className="text-sm font-semibold text-slate-700">
+              Status
+            </label>
+            <select
+              value={form.status}
+              onChange={(event) =>
+                setForm({
+                  ...form,
+                  status: event.target.value as
+                    | "active"
+                    | "archived",
+                })
+              }
+              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
+            >
+              <option value="active">Active</option>
+              <option value="archived">Archived</option>
+            </select>
+          </div>
+
+          <div className="lg:col-span-6">
+            <label className="text-sm font-semibold text-slate-700">
+              Description
+            </label>
+            <textarea
+              rows={3}
+              value={form.description}
+              onChange={(event) =>
+                setForm({
+                  ...form,
+                  description: event.target.value,
+                })
+              }
+              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
+              placeholder="Describe what this stakeholder typically cares about."
+            />
+          </div>
+        </div>
+
+        <div className="mt-5 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={saveDefinition}
+            disabled={
+              isSavingDefinition || !canManageBuyerPersonas
+            }
+            className="rounded-xl bg-green-700 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-green-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+          >
+            {isSavingDefinition
+              ? "Saving..."
+              : editingDefinitionId
+                ? "Save Buyer Persona"
+                : "Create Buyer Persona"}
+          </button>
+
+          {editingDefinitionId && (
+            <button
+              type="button"
+              onClick={resetDefinitionForm}
+              disabled={isSavingDefinition}
+              className="rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+            >
+              Cancel Edit
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+        <h3 className="text-xl font-bold">
+          Buyer Persona Definitions
+        </h3>
+
+        {definitions.length === 0 ? (
+          <p className="mt-3 text-sm text-slate-600">
+            No Buyer Persona definitions found.
+          </p>
+        ) : (
+          <div className="mt-5 grid gap-3">
+            {definitions.map((definition) => (
+              <div
+                key={definition.id}
+                className={`rounded-xl border p-4 ${
+                  definition.status === "archived"
+                    ? "border-slate-200 bg-slate-50 opacity-70"
+                    : "border-slate-200 bg-white"
+                }`}
+              >
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-semibold text-slate-900">
+                        {definition.persona_name}
+                      </p>
+
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                          definition.status === "archived"
+                            ? "bg-slate-200 text-slate-700"
+                            : "bg-green-100 text-green-800"
+                        }`}
+                      >
+                        {definition.status}
+                      </span>
+
+                      <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-800">
+                        Sort {definition.sort_order}
+                      </span>
+                    </div>
+
+                    {definition.description && (
+                      <p className="mt-3 text-sm leading-6 text-slate-700">
+                        {definition.description}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        startEditingDefinition(definition)
+                      }
+                      disabled={
+                        isSavingDefinition ||
+                        !canManageBuyerPersonas
+                      }
+                      className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
+                    >
+                      Edit
+                    </button>
+
+                    {definition.status === "archived" ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateDefinitionStatus(
+                            definition,
+                            "active"
+                          )
+                        }
+                        disabled={
+                          isSavingDefinition ||
+                          !canManageBuyerPersonas
+                        }
+                        className="rounded-lg bg-blue-700 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                      >
+                        Reactivate
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateDefinitionStatus(
+                            definition,
+                            "archived"
+                          )
+                        }
+                        disabled={
+                          isSavingDefinition ||
+                          !canManageBuyerPersonas
+                        }
+                        className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                      >
+                        Archive
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 
