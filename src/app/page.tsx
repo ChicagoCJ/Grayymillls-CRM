@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.87 - Root API Permission Enforcement";
+const APP_VERSION = "Rev 2.88 - API Permission Audit Complete";
 const REVISION_NOTE =
-  "Protected the legacy root API import endpoint with the existing CSV import permission requirement."; 
+  "Completed the API permission audit: all server write handlers are protected, all active client writes send permission headers, and remaining legacy write routes are protected."; 
 
   
 
