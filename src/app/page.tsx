@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.91 - Buyer Persona Admin Management";
+const APP_VERSION = "Rev 2.92 - Database-Backed Company Buyer Personas";
 const REVISION_NOTE =
-  "Added Admin controls to create, edit, archive, reactivate, sort, and describe database-backed Buyer Persona definitions."; 
+  "Company Buyer Persona filters and editing now use active database definitions while preserving archived personas already saved to company records."; 
 
   
 
@@ -8839,19 +8839,6 @@ function getCompanyBuyerPersonaLenses(accountTypeLens: CompanyAccountTypeLens, c
   return ["Discovery Needed"];
 }
 
-const COMPANY_BUYER_PERSONA_OPTIONS = [
-  "Operations",
-  "Maintenance",
-  "Purchasing",
-  "Quality / Process",
-  "EHS / Safety",
-  "Principal / Owner",
-  "Outside Sales",
-  "Product Specialist",
-  "Inside Sales",
-  "Discovery Needed",
-];
-
 function getCompanySavedBuyerPersonas(company: unknown) {
   const record = company as unknown as Record<string, unknown>;
   const value = record.buyer_personas;
@@ -8860,9 +8847,13 @@ function getCompanySavedBuyerPersonas(company: unknown) {
     return [];
   }
 
-  return value
-    .map((item) => String(item || "").trim())
-    .filter((item) => COMPANY_BUYER_PERSONA_OPTIONS.includes(item));
+  return Array.from(
+    new Set(
+      value
+        .map((item) => String(item || "").trim())
+        .filter(Boolean)
+    )
+  );
 }
 
 function getCompanyEffectiveBuyerPersonas(
@@ -9041,6 +9032,67 @@ function CompaniesSection({
       Boolean(String(company.assigned_salesperson_id || "")) &&
       Boolean(String(company.assigned_sales_manager_id || ""))
   ).length;
+
+  const [buyerPersonaDefinitionOptions, setBuyerPersonaDefinitionOptions] = useState<string[]>([]);
+  const [buyerPersonaDefinitionError, setBuyerPersonaDefinitionError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadBuyerPersonaDefinitions() {
+      try {
+        const response = await fetch("/api/buyer-persona-definitions");
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.error || "Could not load Buyer Persona definitions."
+          );
+        }
+
+        const options = Array.isArray(data.buyerPersonaDefinitions)
+          ? data.buyerPersonaDefinitions
+              .map((definition: any) =>
+                String(definition?.persona_name || "").trim()
+              )
+              .filter(Boolean)
+          : [];
+
+        if (!cancelled) {
+          setBuyerPersonaDefinitionOptions(Array.from(new Set(options)));
+          setBuyerPersonaDefinitionError("");
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setBuyerPersonaDefinitionOptions([]);
+          setBuyerPersonaDefinitionError(
+            error instanceof Error
+              ? error.message
+              : "Could not load Buyer Persona definitions."
+          );
+        }
+      }
+    }
+
+    loadBuyerPersonaDefinitions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const companyBuyerPersonaOptions = useMemo(() => {
+    const savedOptions = companies.flatMap((company) =>
+      getCompanySavedBuyerPersonas(company)
+    );
+
+    return Array.from(
+      new Set([
+        ...buyerPersonaDefinitionOptions,
+        ...savedOptions,
+      ])
+    );
+  }, [companies, buyerPersonaDefinitionOptions]);
 
   const coverageFiltersAreActive =
     companySalespersonFilter !== "All" ||
@@ -9371,13 +9423,19 @@ function CompaniesSection({
                 className="mt-2 w-full max-w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
               >
                 <option value="All">All</option>
-                {COMPANY_BUYER_PERSONA_OPTIONS.map((personaOption) => (
+                {companyBuyerPersonaOptions.map((personaOption) => (
                   <option key={personaOption} value={personaOption}>
                     {personaOption}
                   </option>
                 ))}
               </select>
             </div>
+
+            {buyerPersonaDefinitionError && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold leading-5 text-red-800 lg:col-span-2 xl:col-span-3">
+                {buyerPersonaDefinitionError}
+              </div>
+            )}
 
             <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs leading-5 text-blue-900 lg:col-span-2 xl:col-span-3">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -9664,7 +9722,12 @@ function CompaniesSection({
                         <details className="self-start rounded-xl border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-700 shadow-sm">
                           <summary className="cursor-pointer font-bold text-slate-800">Edit Personas</summary>
                           <div className="mt-2 grid gap-1">
-                            {COMPANY_BUYER_PERSONA_OPTIONS.map((personaOption) => {
+                            {Array.from(
+                              new Set([
+                                ...buyerPersonaDefinitionOptions,
+                                ...rowBuyerPersonas,
+                              ])
+                            ).map((personaOption) => {
                               const checked = rowBuyerPersonas.includes(personaOption);
 
                               return (
