@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.89 - Visible Tag Removal Controls";
+const APP_VERSION = "Rev 2.90 - Buyer Persona Definition Foundation";
 const REVISION_NOTE =
-  "Added clear visible remove controls to assigned company and contact tags while preserving the existing protected delete workflows."; 
+  "Added the database migration and protected API foundation for administratively managed Buyer Persona definitions without changing the current company persona workflow."; 
 
   
 
