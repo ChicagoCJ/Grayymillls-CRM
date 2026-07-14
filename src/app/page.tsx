@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.92 - Database-Backed Company Buyer Personas";
+const APP_VERSION = "Rev 2.93 - Company Detail Buyer Persona Context";
 const REVISION_NOTE =
-  "Company Buyer Persona filters and editing now use active database definitions while preserving archived personas already saved to company records."; 
+  "Company Detail now shows each saved Buyer Persona with its Admin-defined description and identifies archived or legacy persona values."; 
 
   
 
@@ -10042,6 +10042,8 @@ function CompanyDetailSection({
     notes: "",
     dueDate: "",
   });
+  const [companyDetailBuyerPersonaDefinitions, setCompanyDetailBuyerPersonaDefinitions] = useState<any[]>([]);
+  const [companyDetailBuyerPersonaDefinitionError, setCompanyDetailBuyerPersonaDefinitionError] = useState("");
 
   function getEditableCompanyActivityType(activityType: unknown): ActivityForm["activityType"] {
     const allowedActivityTypes: ActivityForm["activityType"][] = [
@@ -10111,6 +10113,55 @@ function CompanyDetailSection({
       [activityId]: !current[activityId],
     }));
   }
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCompanyDetailBuyerPersonaDefinitions() {
+      if (!detail?.company?.id) {
+        setCompanyDetailBuyerPersonaDefinitions([]);
+        setCompanyDetailBuyerPersonaDefinitionError("");
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          "/api/buyer-persona-definitions?includeInactive=true"
+        );
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.error || "Could not load Buyer Persona definitions."
+          );
+        }
+
+        if (!cancelled) {
+          setCompanyDetailBuyerPersonaDefinitions(
+            Array.isArray(data.buyerPersonaDefinitions)
+              ? data.buyerPersonaDefinitions
+              : []
+          );
+          setCompanyDetailBuyerPersonaDefinitionError("");
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setCompanyDetailBuyerPersonaDefinitions([]);
+          setCompanyDetailBuyerPersonaDefinitionError(
+            error instanceof Error
+              ? error.message
+              : "Could not load Buyer Persona definitions."
+          );
+        }
+      }
+    }
+
+    loadCompanyDetailBuyerPersonaDefinitions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [detail?.company?.id]);
 
   if (!detail) {
     return (
@@ -10303,6 +10354,24 @@ function CompanyDetailSection({
 
   const detailAccountTypeLens = getCompanyEffectiveAccountTypeLens(company);
   const detailBuyerPersonas = getCompanyEffectiveBuyerPersonas(detailAccountTypeLens, company);
+  const detailBuyerPersonaContext = detailBuyerPersonas.map((persona) => {
+    const definition = companyDetailBuyerPersonaDefinitions.find(
+      (item: any) =>
+        String(item?.persona_name || "").trim() === persona
+    );
+
+    return {
+      persona,
+      description: definition?.description
+        ? String(definition.description)
+        : "No current Buyer Persona definition is available for this saved value.",
+      status: definition?.status === "archived"
+        ? "archived"
+        : definition
+          ? "active"
+          : "legacy",
+    };
+  });
   const detailAssignedSalespersonId = String(company.assigned_salesperson_id || "");
   const detailAssignedSalesManagerId = String(company.assigned_sales_manager_id || "");
   const detailSalesCoverageStatus =
@@ -10428,14 +10497,43 @@ function CompanyDetailSection({
 
           <div className="border-b border-slate-100 py-2 text-sm">
             <p className="font-semibold text-slate-700">Buyer Personas</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {detailBuyerPersonas.map((persona) => (
-                <span
-                  key={persona}
-                  className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${getCompanyBuyerPersonaLensClass(persona)}`}
+
+            {companyDetailBuyerPersonaDefinitionError && (
+              <p className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold leading-5 text-red-800">
+                {companyDetailBuyerPersonaDefinitionError}
+              </p>
+            )}
+
+            <div className="mt-3 grid gap-3">
+              {detailBuyerPersonaContext.map((personaContext) => (
+                <div
+                  key={personaContext.persona}
+                  className="rounded-xl border border-slate-200 bg-slate-50 p-3"
                 >
-                  {persona}
-                </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${getCompanyBuyerPersonaLensClass(personaContext.persona)}`}
+                    >
+                      {personaContext.persona}
+                    </span>
+
+                    {personaContext.status === "archived" && (
+                      <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-800 ring-1 ring-amber-200">
+                        Archived definition
+                      </span>
+                    )}
+
+                    {personaContext.status === "legacy" && (
+                      <span className="rounded-full bg-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-700 ring-1 ring-slate-300">
+                        Legacy value
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="mt-2 text-xs leading-5 text-slate-600">
+                    {personaContext.description}
+                  </p>
+                </div>
               ))}
             </div>
           </div>
