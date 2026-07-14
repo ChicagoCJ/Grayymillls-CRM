@@ -373,6 +373,16 @@ export async function POST(request: Request) {
 
     if (contactsError) throw contactsError;
 
+    const { data: activities, error: activitiesError } = await supabase
+      .from("activities")
+      .select("activity_type, subject, notes, due_date, completed_at, created_at")
+      .eq("company_id", payload.companyId)
+      .is("archived_at", null)
+      .order("created_at", { ascending: false })
+      .limit(25);
+
+    if (activitiesError) throw activitiesError;
+
     const { data: prospects, error: prospectsError } = await supabase
       .from("prospects")
       .select("*")
@@ -384,6 +394,56 @@ export async function POST(request: Request) {
     if (prospectsError) throw prospectsError;
 
     const existingProspect = prospects?.[0] ?? null;
+
+    const { data: companyTags, error: companyTagsError } = await supabase
+      .from("company_tags")
+      .select("tag_id, crm_tags(*)")
+      .eq("company_id", payload.companyId);
+
+    if (companyTagsError) throw companyTagsError;
+
+    const savedBuyerPersonaNames = Array.isArray(company.buyer_personas)
+      ? Array.from(
+          new Set(
+            company.buyer_personas
+              .map((item: unknown) => String(item || "").trim())
+              .filter(Boolean)
+          )
+        )
+      : [];
+
+    let buyerPersonaDefinitions: any[] = [];
+
+    if (savedBuyerPersonaNames.length > 0) {
+      const {
+        data: buyerPersonaDefinitionRows,
+        error: buyerPersonaDefinitionError,
+      } = await supabase
+        .from("buyer_persona_definitions")
+        .select("persona_name, description, sort_order, status")
+        .in("persona_name", savedBuyerPersonaNames)
+        .order("sort_order", { ascending: true });
+
+      if (buyerPersonaDefinitionError) {
+        throw buyerPersonaDefinitionError;
+      }
+
+      buyerPersonaDefinitions = buyerPersonaDefinitionRows ?? [];
+    }
+
+    const buyerPersonaContext = savedBuyerPersonaNames.map((personaName) => {
+      const definition = buyerPersonaDefinitions.find(
+        (item: any) => item.persona_name === personaName
+      );
+
+      return {
+        persona_name: personaName,
+        description:
+          definition?.description ||
+          "No matching Buyer Persona definition is currently available.",
+        status: definition?.status || "legacy",
+      };
+    });
 
     const { data: knowledgeDocuments, error: knowledgeDocumentsError } = await supabase
       .from("graymills_knowledge_documents")
@@ -435,6 +495,11 @@ Hard rules:
 - Do not invent Graymills model numbers, specifications, certifications, capacities, dimensions, regulatory claims, chemistry compatibility, or guaranteed savings.
 - Use careful language: likely, may, potential fit, worth validating, depending on parts, soils, throughput, chemistry, safety, and workflow.
 - If data is missing, say what must be validated.
+- Treat user-entered CRM notes, activities, saved Account Type, saved Buyer Personas, contacts, and assigned tags as evidence.
+- Clearly distinguish evidence from inference. Do not claim that a likely pain point, application, stakeholder concern, or project exists unless CRM evidence supports it.
+- Use the saved Account Type to separate end-customer selling logic from distributor or channel selling logic.
+- Use the saved Buyer Personas and their Admin-defined descriptions to shape likely priorities, discovery questions, buying committee hypotheses, objections, first-call language, and next-best action.
+- Do not silently replace saved Buyer Personas with generic roles. When a persona is marked archived or legacy, retain it as CRM evidence but flag uncertainty.
 - Prioritize real operating value: uptime, labor, cleaning consistency, print quality, contamination control, maintenance simplicity, EHS support, total cost of ownership, and payback logic.
 - Make the output useful for a Graymills salesperson preparing a first call.
 `;
@@ -447,6 +512,21 @@ ${stringifyForPrompt(company)}
 
 CRM CONTACTS:
 ${stringifyForPrompt(contacts ?? [])}
+
+RECENT CRM ACTIVITIES AND USER-ENTERED NOTES:
+${stringifyForPrompt(activities ?? [])}
+
+ASSIGNED COMPANY TAGS:
+${stringifyForPrompt(companyTags ?? [])}
+
+SAVED ACCOUNT TYPE:
+${stringifyForPrompt(company.account_type ?? "Unknown")}
+
+SAVED BUYER PERSONA NAMES:
+${stringifyForPrompt(savedBuyerPersonaNames)}
+
+BUYER PERSONA DEFINITIONS AND STATUS:
+${stringifyForPrompt(buyerPersonaContext)}
 
 EXISTING PROSPECT RECORD:
 ${stringifyForPrompt(existingProspect ?? {})}
@@ -469,6 +549,14 @@ Scoring guidance:
 - B / 55-74: plausible fit, needs discovery.
 - C / 35-54: weak or unclear fit.
 - D / 0-34: likely poor fit based on available data.
+
+Output guidance:
+- buyer_persona should summarize the saved CRM Buyer Personas and explain their likely role in this account. Do not output a generic list that ignores the saved values.
+- likely_priorities should connect each saved persona to concerns supported by its definition and the available CRM evidence.
+- discovery_questions should include persona-specific questions and identify which stakeholder each question is for when practical.
+- buying_committee_hypothesis should prioritize saved personas. Add an inferred role only when the CRM evidence supports it, and label the role as inferred in the role text.
+- suggested_sales_angle, first_call_opener, email_message, and next_best_action should match the saved Account Type and Buyer Personas.
+- reason_to_believe should identify the strongest CRM evidence used and should acknowledge important missing evidence.
 
 Keep all language commercially useful, technically cautious, and application-driven.
 `;
@@ -557,7 +645,7 @@ Keep all language commercially useful, technically cautious, and application-dri
         prospect_id: prospectId,
         is_ai_generated: true,
         ai_generated_at: new Date().toISOString(),
-        ai_generation_source: "openai_analyze_prospect_rev_1_15_3",
+        ai_generation_source: "openai_analyze_prospect_rev_2_94_persona_grounded",
         what_they_do: analysis.what_they_do,
         likely_relevance: analysis.likely_relevance,
         likely_parts_cleaned: analysis.likely_parts_cleaned,

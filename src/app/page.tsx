@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.93 - Company Detail Buyer Persona Context";
+const APP_VERSION = "Rev 2.94 - AI Buyer Persona Grounding";
 const REVISION_NOTE =
-  "Company Detail now shows each saved Buyer Persona with its Admin-defined description and identifies archived or legacy persona values."; 
+  "Analyze Prospect now uses saved Account Type, Buyer Persona definitions, recent activities, contacts, company tags, and approved Graymills context to create a more grounded sales hypothesis."; 
 
   
 
