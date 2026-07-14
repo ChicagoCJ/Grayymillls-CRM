@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.88 - API Permission Audit Complete";
+const APP_VERSION = "Rev 2.89 - Visible Tag Removal Controls";
 const REVISION_NOTE =
-  "Completed the API permission audit: all server write handlers are protected, all active client writes send permission headers, and remaining legacy write routes are protected."; 
+  "Added clear visible remove controls to assigned company and contact tags while preserving the existing protected delete workflows."; 
 
   
 
@@ -12950,12 +12950,14 @@ function TagAssignmentColumn({
             >
               {tag.crm_tags?.tag_name || "Unnamed tag"}
               <button
+                type="button"
                 onClick={() => onRemoveTag(tag.tag_id)}
                 disabled={isSavingTag}
-                className="rounded-full px-1 text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:text-slate-400"
+                className="inline-flex h-5 w-5 items-center justify-center rounded-full text-sm font-bold leading-none text-blue-700 hover:bg-red-100 hover:text-red-700 focus:outline-none focus:ring-2 focus:ring-red-200 disabled:cursor-not-allowed disabled:text-slate-400"
                 aria-label={`Remove ${tag.crm_tags?.tag_name || "tag"}`}
+                title={`Remove ${tag.crm_tags?.tag_name || "tag"}`}
               >
-
+                ×
               </button>
             </span>
           ))}
@@ -13262,12 +13264,14 @@ function ContactTagAssignmentRow({
             >
               {tag.crm_tags?.tag_name || "Unnamed tag"}
               <button
+                type="button"
                 onClick={() => onRemoveTag(tag.tag_id)}
                 disabled={isSavingTag}
-                className="rounded-full px-1 text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:text-slate-400"
+                className="inline-flex h-5 w-5 items-center justify-center rounded-full text-sm font-bold leading-none text-blue-700 hover:bg-red-100 hover:text-red-700 focus:outline-none focus:ring-2 focus:ring-red-200 disabled:cursor-not-allowed disabled:text-slate-400"
                 aria-label={`Remove ${tag.crm_tags?.tag_name || "tag"}`}
+                title={`Remove ${tag.crm_tags?.tag_name || "tag"}`}
               >
-
+                ×
               </button>
             </span>
           ))}
