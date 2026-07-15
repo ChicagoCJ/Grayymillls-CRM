@@ -4,7 +4,7 @@
 import { getBrowserSupabaseClient, hasBrowserSupabaseConfig } from "../lib/supabase-browser";
 import { ChangeEvent, ReactNode, useEffect, useMemo, useState } from "react";
 
-type TabKey = "dashboard" | "companies" | "contacts" | "funnel" | "import" | "releaseNotes" | "admin" | "companyDetail";
+type TabKey = "dashboard" | "companies" | "contacts" | "funnel" | "import" | "help" | "releaseNotes" | "admin" | "companyDetail";
 
 type ImportResultsReport = {
   companiesCreated: string[];
@@ -1901,6 +1901,7 @@ async function handleAnalyzeProspect() {
     { key: "funnel", label: "Funnel" },
     { key: "import", label: "Import ZoomInfo" },
     { key: "admin", label: "Admin" },
+    { key: "help", label: "Help" },
     { key: "releaseNotes", label: "Release Notes" },
   ];
 
@@ -2502,6 +2503,8 @@ async function handleAnalyzeProspect() {
         )}
 
 
+
+        {activeTab === "help" && <HelpSection />}
 
         {activeTab === "releaseNotes" && <ReleaseNotesSection />}
 
@@ -7197,6 +7200,270 @@ const filteredOpportunities = useMemo(() => {
           </div>
         )}
       </div>
+    </section>
+  );
+}
+
+function renderHelpInlineText(text: string) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
+
+  return parts.map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return <strong key={`${part}-${index}`}>{part.slice(2, -2)}</strong>;
+    }
+
+    return <span key={`${part}-${index}`}>{part}</span>;
+  });
+}
+
+function HelpSection() {
+  const [guideText, setGuideText] = useState("");
+  const [guideState, setGuideState] = useState<"loading" | "ready" | "error">("loading");
+  const [guideMessage, setGuideMessage] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadGuide() {
+      try {
+        const response = await fetch("/USER_GUIDE.md", {
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          throw new Error(`Could not load the user guide (HTTP ${response.status}).`);
+        }
+
+        const text = await response.text();
+
+        if (!cancelled) {
+          setGuideText(text);
+          setGuideState("ready");
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setGuideState("error");
+          setGuideMessage(
+            error instanceof Error ? error.message : "Could not load the user guide."
+          );
+        }
+      }
+    }
+
+    loadGuide();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const blocks = useMemo(() => {
+    if (!guideText) return [];
+
+    const lines = guideText.replace(/\r\n/g, "\n").split("\n");
+    const result: Array<
+      | { type: "heading"; level: number; text: string }
+      | { type: "paragraph"; text: string }
+      | { type: "unordered"; items: string[] }
+      | { type: "ordered"; items: string[] }
+      | { type: "rule" }
+    > = [];
+
+    let paragraphLines: string[] = [];
+    let unorderedItems: string[] = [];
+    let orderedItems: string[] = [];
+
+    function flushParagraph() {
+      if (paragraphLines.length > 0) {
+        result.push({
+          type: "paragraph",
+          text: paragraphLines.join(" "),
+        });
+        paragraphLines = [];
+      }
+    }
+
+    function flushUnordered() {
+      if (unorderedItems.length > 0) {
+        result.push({
+          type: "unordered",
+          items: unorderedItems,
+        });
+        unorderedItems = [];
+      }
+    }
+
+    function flushOrdered() {
+      if (orderedItems.length > 0) {
+        result.push({
+          type: "ordered",
+          items: orderedItems,
+        });
+        orderedItems = [];
+      }
+    }
+
+    function flushAll() {
+      flushParagraph();
+      flushUnordered();
+      flushOrdered();
+    }
+
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+
+      if (!line) {
+        flushAll();
+        continue;
+      }
+
+      if (line === "---") {
+        flushAll();
+        result.push({ type: "rule" });
+        continue;
+      }
+
+      const headingMatch = line.match(/^(#{1,3})\s+(.+)$/);
+
+      if (headingMatch) {
+        flushAll();
+        result.push({
+          type: "heading",
+          level: headingMatch[1].length,
+          text: headingMatch[2],
+        });
+        continue;
+      }
+
+      const unorderedMatch = line.match(/^[-*]\s+(.+)$/);
+
+      if (unorderedMatch) {
+        flushParagraph();
+        flushOrdered();
+        unorderedItems.push(unorderedMatch[1]);
+        continue;
+      }
+
+      const orderedMatch = line.match(/^\d+\.\s+(.+)$/);
+
+      if (orderedMatch) {
+        flushParagraph();
+        flushUnordered();
+        orderedItems.push(orderedMatch[1]);
+        continue;
+      }
+
+      flushUnordered();
+      flushOrdered();
+      paragraphLines.push(line);
+    }
+
+    flushAll();
+
+    return result;
+  }, [guideText]);
+
+  return (
+    <section className="grid max-w-full gap-6 overflow-hidden">
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
+        <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
+          Graymills CRM
+        </p>
+        <h2 className="mt-2 text-2xl font-bold">Help and User Guide</h2>
+        <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-600">
+          Instructions for signing in, managing companies and contacts, using the sales funnel,
+          running prospect analysis, importing CSV files, administering users, and resolving
+          common problems.
+        </p>
+      </div>
+
+      {guideState === "loading" && (
+        <div className="rounded-2xl bg-white p-6 text-sm text-slate-600 shadow-sm">
+          Loading the Graymills CRM User Guide...
+        </div>
+      )}
+
+      {guideState === "error" && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-800 shadow-sm">
+          <p className="font-bold">The user guide could not be loaded.</p>
+          <p className="mt-2">{guideMessage}</p>
+        </div>
+      )}
+
+      {guideState === "ready" && (
+        <article className="rounded-2xl bg-white p-6 shadow-sm md:p-8">
+          <div className="mx-auto max-w-5xl">
+            {blocks.map((block, index) => {
+              if (block.type === "heading") {
+                if (block.level === 1) {
+                  return (
+                    <h1 key={index} className="mt-2 text-3xl font-black text-slate-950">
+                      {renderHelpInlineText(block.text)}
+                    </h1>
+                  );
+                }
+
+                if (block.level === 2) {
+                  return (
+                    <h2
+                      key={index}
+                      className="mt-10 border-b border-slate-200 pb-2 text-2xl font-bold text-slate-950"
+                    >
+                      {renderHelpInlineText(block.text)}
+                    </h2>
+                  );
+                }
+
+                return (
+                  <h3 key={index} className="mt-7 text-xl font-bold text-slate-900">
+                    {renderHelpInlineText(block.text)}
+                  </h3>
+                );
+              }
+
+              if (block.type === "unordered") {
+                return (
+                  <ul
+                    key={index}
+                    className="mt-4 list-disc space-y-2 pl-6 text-sm leading-6 text-slate-700"
+                  >
+                    {block.items.map((item, itemIndex) => (
+                      <li key={`${item}-${itemIndex}`}>
+                        {renderHelpInlineText(item)}
+                      </li>
+                    ))}
+                  </ul>
+                );
+              }
+
+              if (block.type === "ordered") {
+                return (
+                  <ol
+                    key={index}
+                    className="mt-4 list-decimal space-y-2 pl-6 text-sm leading-6 text-slate-700"
+                  >
+                    {block.items.map((item, itemIndex) => (
+                      <li key={`${item}-${itemIndex}`}>
+                        {renderHelpInlineText(item)}
+                      </li>
+                    ))}
+                  </ol>
+                );
+              }
+
+              if (block.type === "rule") {
+                return <hr key={index} className="my-8 border-slate-200" />;
+              }
+
+              return (
+                <p key={index} className="mt-4 text-sm leading-7 text-slate-700">
+                  {renderHelpInlineText(block.text)}
+                </p>
+              );
+            })}
+          </div>
+        </article>
+      )}
     </section>
   );
 }
