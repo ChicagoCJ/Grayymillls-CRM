@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.98 - Sales Coverage Placement";
+const APP_VERSION = "Rev 2.99 - AI Analysis Metric Snapshots";
 const REVISION_NOTE =
-  "The Sales Coverage panel now appears directly below the Company Detail header so account ownership is visible before analysis and opportunity information."; 
+  "Each new AI analysis now preserves its priority, fit, confidence, product-path, application, soils, cleaning-action, and next-step values for historical review."; 
 
   
 
@@ -10740,6 +10740,9 @@ function CompanyDetailSection({
                 : historyItem?.created_at
                   ? new Date(String(historyItem.created_at)).toLocaleString()
                   : "Generation time unavailable";
+              const historyHasMetricSnapshot =
+                historyItem?.analysis_priority_score !== null &&
+                historyItem?.analysis_priority_score !== undefined;
 
               return (
                 <details
@@ -10775,7 +10778,16 @@ function CompanyDetailSection({
                             </span>
                           ) : (
                             <span className="rounded-full bg-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-700 ring-1 ring-slate-300">
-                              Snapshot unavailable
+                              Context snapshot unavailable
+                            </span>
+                          )}
+                          {historyHasMetricSnapshot ? (
+                            <span className="rounded-full bg-violet-100 px-2.5 py-1 text-[11px] font-bold text-violet-800 ring-1 ring-violet-200">
+                              Metric snapshot saved
+                            </span>
+                          ) : (
+                            <span className="rounded-full bg-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-700 ring-1 ring-slate-300">
+                              Metric snapshot unavailable
                             </span>
                           )}
                         </div>
@@ -10789,7 +10801,114 @@ function CompanyDetailSection({
                     </div>
                   </summary>
 
-                  <div className="mt-4 grid gap-3 border-t border-slate-200 pt-4 lg:grid-cols-2">
+                  <div className="mt-4 border-t border-slate-200 pt-4">
+                    {historyHasMetricSnapshot ? (
+                      <div className="mb-3 rounded-xl border border-violet-200 bg-violet-50 p-4">
+                        <p className="text-xs font-bold uppercase tracking-wide text-violet-700">
+                          Analysis Metrics
+                        </p>
+
+                        <div className="mt-3 grid gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                          <div className="rounded-lg bg-white p-3 ring-1 ring-violet-100">
+                            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                              Priority
+                            </p>
+                            <p className="mt-1 text-sm font-bold text-slate-900">
+                              {displayValue(historyItem?.analysis_priority_score)} / 100
+                            </p>
+                          </div>
+
+                          <div className="rounded-lg bg-white p-3 ring-1 ring-violet-100">
+                            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                              Tier
+                            </p>
+                            <p className="mt-1 text-sm font-bold text-slate-900">
+                              {displayValue(historyItem?.analysis_priority_tier)}
+                            </p>
+                          </div>
+
+                          <div className="rounded-lg bg-white p-3 ring-1 ring-violet-100">
+                            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                              Fit
+                            </p>
+                            <p className="mt-1 text-sm font-bold text-slate-900">
+                              {displayValue(historyItem?.analysis_fit_rating)}
+                            </p>
+                          </div>
+
+                          <div className="rounded-lg bg-white p-3 ring-1 ring-violet-100">
+                            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                              Confidence
+                            </p>
+                            <p className="mt-1 text-sm font-bold text-slate-900">
+                              {displayValue(historyItem?.analysis_confidence)}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                          <div className="rounded-lg bg-white p-3 ring-1 ring-violet-100">
+                            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                              Product Line
+                            </p>
+                            <p className="mt-1 text-sm leading-6 text-slate-700">
+                              {displayValue(historyItem?.analysis_product_line)}
+                            </p>
+                          </div>
+
+                          <div className="rounded-lg bg-white p-3 ring-1 ring-violet-100">
+                            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                              Product Path
+                            </p>
+                            <p className="mt-1 text-sm leading-6 text-slate-700">
+                              {displayValue(historyItem?.analysis_likely_product_path)}
+                            </p>
+                          </div>
+
+                          <div className="rounded-lg bg-white p-3 ring-1 ring-violet-100">
+                            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                              Primary Use Case
+                            </p>
+                            <p className="mt-1 text-sm leading-6 text-slate-700">
+                              {displayValue(historyItem?.analysis_primary_use_case)}
+                            </p>
+                          </div>
+
+                          <div className="rounded-lg bg-white p-3 ring-1 ring-violet-100">
+                            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                              Likely Soils
+                            </p>
+                            <p className="mt-1 text-sm leading-6 text-slate-700">
+                              {displayValue(historyItem?.analysis_likely_soils)}
+                            </p>
+                          </div>
+
+                          <div className="rounded-lg bg-white p-3 ring-1 ring-violet-100">
+                            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                              Cleaning Action
+                            </p>
+                            <p className="mt-1 text-sm leading-6 text-slate-700">
+                              {displayValue(historyItem?.analysis_likely_cleaning_action)}
+                            </p>
+                          </div>
+
+                          <div className="rounded-lg bg-white p-3 ring-1 ring-violet-100">
+                            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                              Next-Best Action
+                            </p>
+                            <p className="mt-1 text-sm leading-6 text-slate-700">
+                              {displayValue(historyItem?.analysis_next_best_action)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="mb-3 rounded-lg border border-slate-200 bg-white p-3 text-xs leading-5 text-slate-600">
+                        This analysis predates Rev 2.99, so its score and product-path metrics were not saved with the historical record.
+                      </p>
+                    )}
+
+                    <div className="grid gap-3 lg:grid-cols-2">
                     <div className="rounded-lg bg-white p-3 ring-1 ring-slate-200">
                       <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
                         Account Type Used
@@ -10826,6 +10945,7 @@ function CompanyDetailSection({
                       <p className="mt-1 text-sm leading-6 text-slate-700">
                         {displayValue(historyItem?.reason_to_believe)}
                       </p>
+                    </div>
                     </div>
                   </div>
                 </details>
