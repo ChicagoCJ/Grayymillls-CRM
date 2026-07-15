@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.94 - AI Buyer Persona Grounding";
+const APP_VERSION = "Rev 2.95 - AI Analysis Context Snapshot";
 const REVISION_NOTE =
-  "Analyze Prospect now uses saved Account Type, Buyer Persona definitions, recent activities, contacts, company tags, and approved Graymills context to create a more grounded sales hypothesis."; 
+  "AI prospect analyses now record the Account Type and Buyer Personas used and warn when current company context no longer matches the saved analysis."; 
 
   
 
@@ -10341,6 +10341,34 @@ function CompanyDetailSection({
   const primaryProspect = detail.primaryProspect;
   const intelligence = detail.intelligence;
   const hasAiAnalysis = hasMeaningfulAnalysis(intelligence);
+  const currentSavedAccountType = String(company.account_type || "Unknown").trim() || "Unknown";
+  const currentSavedBuyerPersonas = getCompanySavedBuyerPersonas(company).sort((a, b) =>
+    a.localeCompare(b)
+  );
+  const analysisAccountType = String(intelligence?.analysis_account_type || "").trim();
+  const analysisBuyerPersonas = Array.isArray(intelligence?.analysis_buyer_personas)
+    ? intelligence.analysis_buyer_personas
+        .map((item: unknown) => String(item || "").trim())
+        .filter(Boolean)
+        .sort((a: string, b: string) => a.localeCompare(b))
+    : [];
+  const hasAnalysisContextSnapshot = Boolean(
+    hasAiAnalysis &&
+      analysisAccountType &&
+      Array.isArray(intelligence?.analysis_buyer_personas)
+  );
+  const analysisAccountTypeChanged = Boolean(
+    hasAnalysisContextSnapshot && analysisAccountType !== currentSavedAccountType
+  );
+  const analysisBuyerPersonasChanged = Boolean(
+    hasAnalysisContextSnapshot &&
+      JSON.stringify(analysisBuyerPersonas) !== JSON.stringify(currentSavedBuyerPersonas)
+  );
+  const isAnalysisContextStale =
+    analysisAccountTypeChanged || analysisBuyerPersonasChanged;
+  const analysisGeneratedAt = intelligence?.ai_generated_at
+    ? new Date(String(intelligence.ai_generated_at)).toLocaleString()
+    : "Generation time unavailable";
 
   const discoveryQuestions = hasAiAnalysis
     ? parseJsonArray(intelligence?.discovery_questions)
@@ -10474,6 +10502,80 @@ function CompanyDetailSection({
           </a>
         </div>
       </div>
+
+      {hasAiAnalysis && (
+        <div
+          className={`rounded-2xl border p-4 shadow-sm ${
+            isAnalysisContextStale
+              ? "border-amber-300 bg-amber-50"
+              : hasAnalysisContextSnapshot
+                ? "border-green-200 bg-green-50"
+                : "border-blue-200 bg-blue-50"
+          }`}
+        >
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div>
+              <p
+                className={`text-sm font-bold ${
+                  isAnalysisContextStale
+                    ? "text-amber-900"
+                    : hasAnalysisContextSnapshot
+                      ? "text-green-900"
+                      : "text-blue-900"
+                }`}
+              >
+                {isAnalysisContextStale
+                  ? "AI analysis context has changed"
+                  : hasAnalysisContextSnapshot
+                    ? "AI analysis context is current"
+                    : "AI analysis context snapshot unavailable"}
+              </p>
+              <p
+                className={`mt-1 text-xs leading-5 ${
+                  isAnalysisContextStale
+                    ? "text-amber-800"
+                    : hasAnalysisContextSnapshot
+                      ? "text-green-800"
+                      : "text-blue-800"
+                }`}
+              >
+                Generated {analysisGeneratedAt}.
+                {isAnalysisContextStale
+                  ? " Rerun Analyze Prospect before relying on this analysis."
+                  : hasAnalysisContextSnapshot
+                    ? " The saved Account Type and Buyer Personas still match the current company record."
+                    : " This analysis predates Rev 2.95. Rerun Analyze Prospect to save a context snapshot."}
+              </p>
+
+              {isAnalysisContextStale && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {analysisAccountTypeChanged && (
+                    <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-900 ring-1 ring-amber-300">
+                      Account Type changed
+                    </span>
+                  )}
+                  {analysisBuyerPersonasChanged && (
+                    <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-900 ring-1 ring-amber-300">
+                      Buyer Personas changed
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {(isAnalysisContextStale || !hasAnalysisContextSnapshot) && (
+              <button
+                type="button"
+                onClick={onAnalyzeProspect}
+                disabled={isAnalyzingProspect}
+                className="w-fit rounded-xl bg-green-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                {isAnalyzingProspect ? "Analyzing..." : "Rerun Analyze Prospect"}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       <div id="company-detail-snapshot" className="scroll-mt-80"></div>
       <div className="grid gap-6 lg:grid-cols-3">
