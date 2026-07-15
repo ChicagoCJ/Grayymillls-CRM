@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.96 - AI Analysis Context Comparison";
+const APP_VERSION = "Rev 2.97 - AI Analysis History";
 const REVISION_NOTE =
-  "Company Detail now shows the Account Type and Buyer Personas used by the saved AI analysis beside the company record's current values."; 
+  "Company Detail now displays prior AI prospect analyses with their generation dates, sources, and saved Account Type and Buyer Persona context."; 
 
   
 
@@ -10044,6 +10044,7 @@ function CompanyDetailSection({
   });
   const [companyDetailBuyerPersonaDefinitions, setCompanyDetailBuyerPersonaDefinitions] = useState<any[]>([]);
   const [companyDetailBuyerPersonaDefinitionError, setCompanyDetailBuyerPersonaDefinitionError] = useState("");
+  const [showAiAnalysisHistory, setShowAiAnalysisHistory] = useState(false);
 
   function getEditableCompanyActivityType(activityType: unknown): ActivityForm["activityType"] {
     const allowedActivityTypes: ActivityForm["activityType"][] = [
@@ -10113,6 +10114,10 @@ function CompanyDetailSection({
       [activityId]: !current[activityId],
     }));
   }
+
+  useEffect(() => {
+    setShowAiAnalysisHistory(false);
+  }, [detail?.company?.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -10340,6 +10345,9 @@ function CompanyDetailSection({
   };
   const primaryProspect = detail.primaryProspect;
   const intelligence = detail.intelligence;
+  const intelligenceHistory = Array.isArray(detail.intelligenceHistory)
+    ? detail.intelligenceHistory
+    : [];
   const hasAiAnalysis = hasMeaningfulAnalysis(intelligence);
   const currentSavedAccountType = String(company.account_type || "Unknown").trim() || "Unknown";
   const currentSavedBuyerPersonas = getCompanySavedBuyerPersonas(company).sort((a, b) =>
@@ -10646,16 +10654,166 @@ function CompanyDetailSection({
               </p>
             </div>
 
-            {(isAnalysisContextStale || !hasAnalysisContextSnapshot) && (
-              <button
-                type="button"
-                onClick={onAnalyzeProspect}
-                disabled={isAnalyzingProspect}
-                className="w-fit rounded-xl bg-green-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-              >
-                {isAnalyzingProspect ? "Analyzing..." : "Rerun Analyze Prospect"}
-              </button>
-            )}
+            <div className="flex flex-wrap gap-2">
+              {intelligenceHistory.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowAiAnalysisHistory((current) => !current)}
+                  aria-expanded={showAiAnalysisHistory}
+                  className="w-fit rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+                >
+                  {showAiAnalysisHistory
+                    ? "Hide Analysis History"
+                    : `Show Analysis History (${intelligenceHistory.length})`}
+                </button>
+              )}
+
+              {(isAnalysisContextStale || !hasAnalysisContextSnapshot) && (
+                <button
+                  type="button"
+                  onClick={onAnalyzeProspect}
+                  disabled={isAnalyzingProspect}
+                  className="w-fit rounded-xl bg-green-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                >
+                  {isAnalyzingProspect ? "Analyzing..." : "Rerun Analyze Prospect"}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {intelligenceHistory.length > 0 && showAiAnalysisHistory && (
+        <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            <div>
+              <h3 className="text-xl font-bold text-slate-900">AI Analysis History</h3>
+              <p className="mt-1 text-sm leading-6 text-slate-600">
+                Review the most recent saved analysis runs and the company context used by each one.
+              </p>
+            </div>
+            <span className="w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
+              {intelligenceHistory.length} saved {intelligenceHistory.length === 1 ? "analysis" : "analyses"}
+            </span>
+          </div>
+
+          <div className="mt-4 grid gap-3">
+            {intelligenceHistory.map((historyItem: any, historyIndex: number) => {
+              const historyAccountType = String(
+                historyItem?.analysis_account_type || "Snapshot unavailable"
+              );
+              const historyBuyerPersonas = Array.isArray(historyItem?.analysis_buyer_personas)
+                ? historyItem.analysis_buyer_personas
+                    .map((item: unknown) => String(item || "").trim())
+                    .filter(Boolean)
+                    .sort((a: string, b: string) => a.localeCompare(b))
+                : [];
+              const historyHasSnapshot = Boolean(
+                historyItem?.analysis_account_type &&
+                  Array.isArray(historyItem?.analysis_buyer_personas)
+              );
+              const historyContextMatches = Boolean(
+                historyHasSnapshot &&
+                  historyAccountType === currentSavedAccountType &&
+                  JSON.stringify(historyBuyerPersonas) ===
+                    JSON.stringify(currentSavedBuyerPersonas)
+              );
+              const historyGeneratedAt = historyItem?.ai_generated_at
+                ? new Date(String(historyItem.ai_generated_at)).toLocaleString()
+                : historyItem?.created_at
+                  ? new Date(String(historyItem.created_at)).toLocaleString()
+                  : "Generation time unavailable";
+
+              return (
+                <details
+                  key={String(historyItem?.id || historyIndex)}
+                  open={historyIndex === 0}
+                  className={`rounded-xl border p-4 ${
+                    historyIndex === 0
+                      ? "border-blue-200 bg-blue-50"
+                      : "border-slate-200 bg-slate-50"
+                  }`}
+                >
+                  <summary className="cursor-pointer list-none">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-bold text-slate-900">{historyGeneratedAt}</p>
+                          {historyIndex === 0 && (
+                            <span className="rounded-full bg-blue-100 px-2.5 py-1 text-[11px] font-bold text-blue-800 ring-1 ring-blue-200">
+                              Current analysis
+                            </span>
+                          )}
+                          {historyHasSnapshot ? (
+                            <span
+                              className={`rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 ${
+                                historyContextMatches
+                                  ? "bg-green-100 text-green-800 ring-green-200"
+                                  : "bg-amber-100 text-amber-900 ring-amber-300"
+                              }`}
+                            >
+                              {historyContextMatches
+                                ? "Matches current context"
+                                : "Different company context"}
+                            </span>
+                          ) : (
+                            <span className="rounded-full bg-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-700 ring-1 ring-slate-300">
+                              Snapshot unavailable
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {String(historyItem?.ai_generation_source || "Source unavailable")}
+                        </p>
+                      </div>
+                      <span className="text-xs font-semibold text-slate-500">
+                        Open details
+                      </span>
+                    </div>
+                  </summary>
+
+                  <div className="mt-4 grid gap-3 border-t border-slate-200 pt-4 lg:grid-cols-2">
+                    <div className="rounded-lg bg-white p-3 ring-1 ring-slate-200">
+                      <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                        Account Type Used
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-slate-900">
+                        {historyAccountType}
+                      </p>
+                    </div>
+
+                    <div className="rounded-lg bg-white p-3 ring-1 ring-slate-200">
+                      <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                        Buyer Personas Used
+                      </p>
+                      <p className="mt-1 text-sm font-semibold leading-6 text-slate-900">
+                        {historyBuyerPersonas.length > 0
+                          ? historyBuyerPersonas.join(", ")
+                          : "None saved or snapshot unavailable"}
+                      </p>
+                    </div>
+
+                    <div className="rounded-lg bg-white p-3 ring-1 ring-slate-200">
+                      <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                        Analysis Buyer Persona Summary
+                      </p>
+                      <p className="mt-1 text-sm leading-6 text-slate-700">
+                        {displayValue(historyItem?.buyer_persona)}
+                      </p>
+                    </div>
+
+                    <div className="rounded-lg bg-white p-3 ring-1 ring-slate-200">
+                      <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                        Reason to Believe
+                      </p>
+                      <p className="mt-1 text-sm leading-6 text-slate-700">
+                        {displayValue(historyItem?.reason_to_believe)}
+                      </p>
+                    </div>
+                  </div>
+                </details>
+              );
+            })}
           </div>
         </div>
       )}

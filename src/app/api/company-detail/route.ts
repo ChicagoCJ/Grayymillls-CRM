@@ -56,6 +56,7 @@ export async function GET(request: Request) {
     const primaryProspect = prospects?.[0] ?? null;
 
     let intelligence = null;
+    let intelligenceHistory: any[] = [];
 
     if (primaryProspect) {
       const { data: intelligenceData, error: intelligenceError } = await supabase
@@ -63,12 +64,12 @@ export async function GET(request: Request) {
         .select("*")
         .eq("prospect_id", primaryProspect.id)
         .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .limit(10);
 
       if (intelligenceError) throw intelligenceError;
 
-      intelligence = intelligenceData;
+      intelligenceHistory = intelligenceData ?? [];
+      intelligence = intelligenceHistory[0] ?? null;
     }
 
     const { data: activities, error: activitiesError } = await supabase
@@ -87,6 +88,7 @@ export async function GET(request: Request) {
       prospects: prospects ?? [],
       primaryProspect,
       intelligence,
+      intelligenceHistory,
       activities: activities ?? [],
     });
   } catch (error) {
