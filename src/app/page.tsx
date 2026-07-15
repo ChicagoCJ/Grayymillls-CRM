@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.99 - AI Analysis Metric Snapshots";
+const APP_VERSION = "Version 3.0 - Production Release";
 const REVISION_NOTE =
-  "Each new AI analysis now preserves its priority, fit, confidence, product-path, application, soils, cleaning-action, and next-step values for historical review."; 
+  "Production CRM with authenticated user access, role-based permissions, sales coverage, funnel management, AI prospect analysis, backup export, and in-app Help."; 
 
   
 
@@ -1894,6 +1894,38 @@ async function handleAnalyzeProspect() {
     }
   }
 
+  const [isMainNavSigningOut, setIsMainNavSigningOut] = useState(false);
+
+  async function handleMainNavigationSignOut() {
+    setIsMainNavSigningOut(true);
+    setErrorMessage("");
+
+    try {
+      if (!hasBrowserSupabaseConfig()) {
+        setErrorMessage(
+          "Browser Supabase configuration is not available in this environment."
+        );
+        return;
+      }
+
+      const supabase = getBrowserSupabaseClient();
+      const { error } = await supabase.auth.signOut();
+
+      if (error) {
+        setErrorMessage(error.message || "Could not sign out.");
+        return;
+      }
+
+      window.location.reload();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Could not sign out."
+      );
+    } finally {
+      setIsMainNavSigningOut(false);
+    }
+  }
+
   const tabs: { key: TabKey; label: string }[] = [
     { key: "dashboard", label: "Dashboard" },
     { key: "companies", label: "Companies" },
@@ -2247,6 +2279,16 @@ async function handleAnalyzeProspect() {
             className="ml-auto shrink-0 whitespace-nowrap rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:text-slate-400"
           >
             {isLoadingSummary ? "Refreshing CRM..." : "Refresh CRM"}
+          </button>
+
+          <button
+            type="button"
+            onClick={handleMainNavigationSignOut}
+            disabled={isMainNavSigningOut}
+            aria-busy={isMainNavSigningOut}
+            className="shrink-0 whitespace-nowrap rounded-full bg-slate-800 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-400"
+          >
+            {isMainNavSigningOut ? "Signing Out..." : "Sign Out"}
           </button>
         </nav>
 
@@ -4523,7 +4565,7 @@ function SignedInSessionStatusPanel() {
           state: "signed_in",
           email: user.email || "",
           userId: user.id || "",
-          message: "Signed-in Supabase user session detected. Permissions are not yet driven by this session.",
+          message: "Signed-in Supabase user session detected. CRM permissions are enforced through the matched CRM Users record.",
         });
       } catch (error) {
         if (!cancelled) {
@@ -4584,7 +4626,7 @@ function SignedInSessionStatusPanel() {
         </div>
       </dl>
       <p className="mt-3 text-slate-600">
-        This panel is informational only. Manual role testing remains active until signed-in CRM user role matching is implemented and verified.
+        This panel confirms the browser authentication session used by the production CRM login gate.
       </p>
     </div>
   );
@@ -4786,7 +4828,7 @@ function SignedInCrmUserMatchPanel() {
           crmUserRole,
           crmUserStatus,
           crmUserCoverageType,
-          message: "Signed-in Supabase Auth email matches a CRM Users record. This is still informational only.",
+          message: "Signed-in Supabase Auth email matches an active CRM Users record used for production role enforcement.",
         });
       } catch (error) {
         if (!cancelled) {
@@ -4872,7 +4914,7 @@ function SignedInCrmUserMatchPanel() {
       </dl>
 
       <p className="mt-3 text-emerald-800">
-        This panel is informational only. Production permissions are not yet driven by the signed-in CRM user.
+        Production permissions, navigation, and record visibility follow the matched CRM user role.
       </p>
     </div>
   );
@@ -5026,7 +5068,7 @@ function SignedInCrmRolePreviewPanel() {
           permissionPreview,
           message:
             roleIsRecognized && userIsActive
-              ? "CRM user is active and has a recognized production role. This role is ready for future enforcement."
+              ? "CRM user is active and has a recognized production role. This role is currently enforced."
               : "CRM user match exists, but role enforcement should remain blocked until the role is recognized and status is Active.",
         });
       } catch (error) {
@@ -5113,7 +5155,7 @@ function SignedInCrmRolePreviewPanel() {
       </div>
 
       <p className="mt-3 text-purple-800">
-        This panel is a preview only. Production permissions are still controlled by the manual role visibility test harness.
+        This panel summarizes the permissions currently applied to the signed-in production CRM user.
       </p>
     </div>
   );
@@ -5187,7 +5229,7 @@ function SupabaseEmailPasswordLoginPanel() {
     <div className="mt-4 rounded-xl border border-indigo-200 bg-white p-3 text-xs leading-5 text-indigo-900 ring-1 ring-indigo-100">
       <p className="font-bold text-indigo-950">Supabase Email/Password Login</p>
       <p className="mt-1">
-        Use this panel to test manually created Supabase Auth users. Production permissions are still controlled by the manual role test controls until signed-in CRM role enforcement is verified and enabled.
+        Use this panel to sign in or sign out with a Supabase Authentication account. The email must match an active CRM Users record.
       </p>
 
       <form className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto]" onSubmit={handleSupabaseEmailPasswordSignIn}>
@@ -6343,7 +6385,7 @@ function OpportunityActivitiesDashboard({
   opportunityActivityRoleVisibilityActive = false,
   opportunityActivityCurrentUserId = null,
   opportunityActivityCurrentUserRole = "admin",
-  opportunityActivityCurrentUserDisplayName = "Manual Role Test",
+  opportunityActivityCurrentUserDisplayName = "Signed-in CRM user",
 }: {
   onOpenCompany: (companyId: string) => void;
   opportunityActivityRoleVisibilityActive?: boolean;
@@ -6365,7 +6407,7 @@ function OpportunityActivitiesDashboard({
     return {
       "x-crm-user-id": String(opportunityActivityCurrentUserId || ""),
       "x-crm-user-role": String(opportunityActivityCurrentUserRole || "sales_rep"),
-      "x-crm-user-name": String(opportunityActivityCurrentUserDisplayName || "Manual Role Test"),
+      "x-crm-user-name": String(opportunityActivityCurrentUserDisplayName || "Signed-in CRM user"),
     };
   }
 
@@ -6717,7 +6759,7 @@ function FunnelDashboardSection({
   funnelApplyRoleVisibility = false,
   funnelCurrentUserId = "",
   funnelCurrentUserRole = "admin",
-  funnelCurrentUserDisplayName = "Manual Role Test",
+  funnelCurrentUserDisplayName = "Signed-in CRM user",
 }: {
   onOpenCompany: (companyId: string) => void;
   funnelApplyRoleVisibility?: boolean;
@@ -7470,6 +7512,27 @@ function HelpSection() {
 
 function ReleaseNotesSection() {
   const releases = [
+    {
+      version: "Version 3.0",
+      title: "Production Release",
+      date: "July 15, 2026",
+      summary:
+        "Promotes the Graymills CRM from the Rev 2.x development series to the Version 3.0 production release.",
+      changes: [
+        "Enabled Supabase email/password authentication and a login-required CRM shell.",
+        "Matched authenticated accounts to active CRM Users records for role-based permissions.",
+        "Enforced Admin, Sales Manager, and Sales Rep navigation and record visibility.",
+        "Added sales coverage, funnel management, activities, documents, AI prospect analysis, and analysis history.",
+        "Added production backup export, a full user guide, and an in-app Help area.",
+        "Removed temporary role-testing controls and purged development/test CRM records.",
+      ],
+      testNotes: [
+        "Confirm signed-out users see the login gate.",
+        "Confirm Admin, Sales Manager, and Sales Rep accounts receive the correct tabs and record visibility.",
+        "Confirm Dashboard, Companies, Contacts, Funnel, Import, Admin, Help, and Release Notes load without errors.",
+        "Confirm the application header and login gate display Version 3.0 - Production Release.",
+      ],
+    },
     {
       version: "Rev 1.20",
       title: "Release Notes Tab",
@@ -8226,7 +8289,7 @@ function CompaniesSection({
   unfilteredCompanyCount = totalCompanyCount,
   roleVisibilityActive = false,
   roleVisibilityNeedsUser = false,
-  currentUserDisplayName = "Manual Role Test",
+  currentUserDisplayName = "Signed-in CRM user",
   currentUserRole = "admin",
   currentCoverageType = "internal",
   companySearchTerm,
