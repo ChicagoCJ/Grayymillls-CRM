@@ -691,12 +691,12 @@ type AssignedContactTag = any;
 export default function Home() {
   const [activeTab, setActiveTab] = useState<TabKey>("dashboard");
   const [companyDetailReturnTab, setCompanyDetailReturnTab] = useState<TabKey>("companies");
-  const [currentUserRole, setCurrentUserRole] = useState<AppUserRole>("admin");
+  const [currentUserRole, setCurrentUserRole] = useState<AppUserRole>("sales_rep");
   const [currentUserId, setCurrentUserId] = useState("");
-  const [currentUserDisplayName, setCurrentUserDisplayName] = useState("Manual Role Test");
+  const [currentUserDisplayName, setCurrentUserDisplayName] = useState(
+    "Checking signed-in CRM user"
+  );
   const [currentCoverageType, setCurrentCoverageType] = useState("internal");
-  const [applyRoleVisibility, setApplyRoleVisibility] = useState(false);
-  const [testingModeEnabled, setTestingModeEnabled] = useState(false);
   const [signedInProductionUser, setSignedInProductionUser] = useState({
     state: "checking",
     crmUserId: "",
@@ -708,27 +708,6 @@ export default function Home() {
     authUserId: "",
     message: "Checking signed-in CRM user role.",
   });
-
-  useEffect(() => {
-    try {
-      const storedTestingMode = window.localStorage.getItem("graymills-crm-testing-mode");
-      setTestingModeEnabled(storedTestingMode === "on");
-    } catch {
-      setTestingModeEnabled(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem("graymills-crm-testing-mode", testingModeEnabled ? "on" : "off");
-    } catch {
-      // Ignore local storage issues.
-    }
-
-    if (!testingModeEnabled) {
-      setApplyRoleVisibility(false);
-    }
-  }, [testingModeEnabled]);
 
   useEffect(() => {
     let cancelled = false;
@@ -748,12 +727,10 @@ export default function Home() {
         message,
       });
 
-      if (!testingModeEnabled) {
-        setCurrentUserRole("sales_rep");
-        setCurrentUserId("__no_crm_user_match__");
-        setCurrentUserDisplayName("No matched CRM user");
-        setCurrentCoverageType("internal");
-      }
+      setCurrentUserRole("sales_rep");
+      setCurrentUserId("__no_crm_user_match__");
+      setCurrentUserDisplayName("No matched CRM user");
+      setCurrentCoverageType("internal");
     }
 
     async function loadSignedInProductionUser() {
@@ -859,21 +836,19 @@ export default function Home() {
           message: "Signed-in CRM user role is active and is controlling UI permissions.",
         });
 
-        if (!testingModeEnabled) {
-          setCurrentUserRole(normalizedRole);
-          setCurrentUserId(matchedUserId);
-          setCurrentUserDisplayName(matchedDisplayName);
-          setCurrentCoverageType(matchedCoverageType);
+        setCurrentUserRole(normalizedRole);
+        setCurrentUserId(matchedUserId);
+        setCurrentUserDisplayName(matchedDisplayName);
+        setCurrentCoverageType(matchedCoverageType);
 
-          const nextPermissions = getRolePermissions(normalizedRole);
+        const nextPermissions = getRolePermissions(normalizedRole);
 
-          if (activeTab === "admin" && !nextPermissions.canManageAdminSettings) {
-            setActiveTab("dashboard");
-          }
+        if (activeTab === "admin" && !nextPermissions.canManageAdminSettings) {
+          setActiveTab("dashboard");
+        }
 
-          if (activeTab === "import" && !nextPermissions.canImportCsv) {
-            setActiveTab("dashboard");
-          }
+        if (activeTab === "import" && !nextPermissions.canImportCsv) {
+          setActiveTab("dashboard");
         }
       } catch (error) {
         applyLimitedFallback(
@@ -889,7 +864,7 @@ export default function Home() {
     return () => {
       cancelled = true;
     };
-  }, [testingModeEnabled, activeTab]);
+  }, [activeTab]);
   const [importAssignedSalespersonId, setImportAssignedSalespersonId] = useState("");
   const [importAssignedSalesManagerId, setImportAssignedSalesManagerId] = useState("");
   const [selectedCompanyIds, setSelectedCompanyIds] = useState<string[]>([]);
@@ -908,16 +883,11 @@ export default function Home() {
   );
 
   const productionRoleEnforcementEnabled =
-    !testingModeEnabled &&
     signedInProductionUser.state !== "checking" &&
     signedInProductionUser.state !== "signed_out";
 
-  const roleVisibilityEnabled = testingModeEnabled
-    ? applyRoleVisibility
-    : productionRoleEnforcementEnabled;
-
-  const navigationRole: AppUserRole =
-    testingModeEnabled && applyRoleVisibility ? "admin" : currentUserRole;
+  const roleVisibilityEnabled = productionRoleEnforcementEnabled;
+  const navigationRole: AppUserRole = currentUserRole;
   const [csvData, setCsvData] = useState<ParsedCsv | null>(null);
   const [manualMapping, setManualMapping] = useState<Record<string, string>>({});
   const [errorMessage, setErrorMessage] = useState("");
@@ -1172,7 +1142,7 @@ export default function Home() {
     contactMarketTagFilter,
     contactSectorTagFilter,
     contactCategoryTagFilter,
-    applyRoleVisibility,
+    roleVisibilityEnabled,
     currentUserId,
     currentUserRole,
   ]);
@@ -1195,7 +1165,7 @@ export default function Home() {
     contactMarketTagFilter,
     contactSectorTagFilter,
     contactCategoryTagFilter,
-    applyRoleVisibility,
+    roleVisibilityEnabled,
     currentUserId,
     currentUserRole,
   ]);
@@ -1219,7 +1189,7 @@ export default function Home() {
     contactMarketTagFilter,
     contactSectorTagFilter,
     contactCategoryTagFilter,
-    applyRoleVisibility,
+    roleVisibilityEnabled,
     currentUserId,
     currentUserRole,
   ]);
@@ -1938,7 +1908,7 @@ async function handleAnalyzeProspect() {
     return {
       "x-crm-user-id": String(currentUserId || ""),
       "x-crm-user-role": String(currentUserRole || "sales_rep"),
-      "x-crm-user-name": String(currentUserDisplayName || "Manual Role Test"),
+      "x-crm-user-name": String(currentUserDisplayName || "Signed-in CRM user"),
     };
   }
   function clearImportAssignments() {
@@ -2059,54 +2029,6 @@ async function handleAnalyzeProspect() {
     loadRoleTestUsers();
   }, []);
 
-  function applyRoleTestUser(userId: string) {
-    setCurrentUserId(userId);
-
-    if (!userId) {
-      setCurrentUserDisplayName("Manual Role Test");
-      setCurrentCoverageType("internal");
-      return;
-    }
-
-    const selectedUser = roleTestUsers.find((user) => user.id === userId);
-
-    if (!selectedUser) {
-      setCurrentUserDisplayName("Unknown User");
-      setCurrentCoverageType("internal");
-      return;
-    }
-
-    setCurrentUserDisplayName(
-      selectedUser.display_name || selectedUser.email || "Unnamed User"
-    );
-    setCurrentCoverageType(selectedUser.coverage_type || "internal");
-
-    if (
-      selectedUser.user_role === "admin" ||
-      selectedUser.user_role === "sales_manager" ||
-      selectedUser.user_role === "sales_rep"
-    ) {
-      setCurrentUserRole(selectedUser.user_role);
-    }
-  }
-  function getRoleVisibleCompanies(companies: CompanySummary[]) {
-    if (!applyRoleVisibility) return companies;
-    if (currentUserRole === "admin") return companies;
-    if (!currentUserId) return companies;
-
-    return companies.filter((company) => {
-      if (currentUserRole === "sales_manager") {
-        return true;
-      }
-
-      if (currentUserRole === "sales_rep") {
-        return String(company.assigned_salesperson_id || "") === currentUserId;
-      }
-
-      return true;
-    });
-  }
-
   function activityRecordMatchesRoleVisibility(activity: ActivityRecord) {
     if (!roleVisibilityEnabled) return true;
     if (currentUserRole === "admin") return true;
@@ -2127,7 +2049,7 @@ async function handleAnalyzeProspect() {
   const roleVisibleOverdueActivities = crmSummary.activities.overdue.filter(activityRecordMatchesRoleVisibility);
   const roleVisibleDueTodayActivities = crmSummary.activities.dueToday.filter(activityRecordMatchesRoleVisibility);
   const roleVisibleOpenActivities = crmSummary.activities.open.filter(activityRecordMatchesRoleVisibility);
-  const displayedCompanies = getRoleVisibleCompanies(filteredCompanies);
+  const displayedCompanies = filteredCompanies;
   const visibleCompanyCount = displayedCompanies.length;
   const totalCompanyCount = crmSummary.companies.length;
   const visibleContactCount = filteredContacts.length;
@@ -2275,41 +2197,6 @@ async function handleAnalyzeProspect() {
               />
             </div>
 
-            {testingModeEnabled && (
-              <RoleTestingPanel
-                currentUserRole={currentUserRole}
-                currentUserId={currentUserId}
-                currentUserDisplayName={currentUserDisplayName}
-                currentCoverageType={currentCoverageType}
-                applyRoleVisibility={applyRoleVisibility}
-                setApplyRoleVisibility={setApplyRoleVisibility}
-                testingModeEnabled={testingModeEnabled}
-                roleVisibilityNeedsUser={roleVisibilityNeedsUser}
-                roleTotalCompanyCount={crmSummary.companies.length}
-                roleVisibleCompanyCount={getRoleVisibleCompanies(crmSummary.companies).length}
-                roleAssignedCompanyCount={currentUserAssignedCompanyCount}
-                roleUnassignedCompanyCount={unassignedSalespersonCompanyCount}
-                roleTestUsers={roleTestUsers}
-                isLoadingRoleUsers={isLoadingRoleUsers}
-                roleUserError={roleUserError}
-                onSelectUser={applyRoleTestUser}
-                setCurrentUserRole={(role) => {
-                  const nextPermissions = getRolePermissions(role);
-
-                  setCurrentUserRole(role);
-
-                  if (activeTab === "admin" && !nextPermissions.canManageAdminSettings) {
-                    setActiveTab("dashboard");
-                  }
-
-                  if (activeTab === "import" && !nextPermissions.canImportCsv) {
-                    setActiveTab("dashboard");
-                  }
-                }}
-                permissions={currentPermissions}
-              />
-            )}
-
             <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm">
               <p className="font-semibold text-blue-900">{APP_VERSION}</p>
               <p className="mt-1 text-blue-700">{REVISION_NOTE}</p>
@@ -2368,7 +2255,7 @@ async function handleAnalyzeProspect() {
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div>
                 <p className="text-xs font-bold uppercase tracking-wide text-green-700">
-                  Production Role Enforcement Phase 1
+                  Production Role Enforcement
                 </p>
                 <h2 className="mt-1 text-lg font-bold text-green-950">
                   Signed-in CRM user is controlling UI permissions
@@ -2384,9 +2271,9 @@ async function handleAnalyzeProspect() {
               </div>
 
               <div className="rounded-xl bg-white p-3 text-sm text-green-950 ring-1 ring-green-100 md:max-w-xl">
-                <p className="font-bold">UI enforcement only in Rev 2.23</p>
+                <p className="font-bold">Signed-in permissions are active</p>
                 <p className="mt-1 leading-5">
-                  Navigation, Admin tools, Import access, and client-side record visibility now follow the signed-in CRM role. Server-side API guardrails come next in Rev 2.24.
+                  Navigation, record visibility, administrative controls, imports, and protected API actions follow the matched CRM user role.
                 </p>
               </div>
             </div>
@@ -2395,338 +2282,7 @@ async function handleAnalyzeProspect() {
 
 
 
-        {testingModeEnabled && applyRoleVisibility && (
-          <section className="rounded-2xl border border-blue-200 bg-blue-50 p-4 shadow-sm">
-            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-blue-700">
-                  Role Visibility Scope Banner
-                </p>
-                <h2 className="mt-1 text-lg font-bold text-blue-950">
-                  Role Visibility is ON
-                </h2>
-                <p className="mt-1 text-sm text-blue-900">
-                  Current role:{" "}
-                  <span className="font-semibold">
-                    {currentUserRole === "sales_rep"
-                      ? "Sales Rep"
-                      : currentUserRole === "sales_manager"
-                        ? "Sales Manager"
-                        : "Admin"}
-                  </span>
-                  {currentUserId ? (
-                    <>
 
-                    </>
-                  ) : null}
-                </p>
-              </div>
-
-              <div className="rounded-xl bg-white p-3 text-sm text-blue-950 ring-1 ring-blue-100 md:max-w-xl">
-                {currentUserRole === "sales_rep" ? (
-                  <p>
-                    Sales Rep visibility is scoped by company sales coverage. Companies, contacts,
-                    funnel opportunities, and activities are limited to records tied to companies
-                    assigned to this rep.
-                  </p>
-                ) : (
-                  <p>
-                    Admins and Sales Managers retain full visibility across companies, contacts,
-                    funnel opportunities, and activities.
-                  </p>
-                )}
-              </div>
-            </div>
-
-            <div data-testid="role-visibility-count-grid" className="mt-4 grid gap-3 md:grid-cols-3">
-              <div className="rounded-xl bg-white p-3 ring-1 ring-blue-100">
-                <p className="text-xs font-bold uppercase tracking-wide text-blue-700">Companies</p>
-                <p className="mt-1 text-2xl font-bold text-blue-950">
-                  {visibleCompanyCount} <span className="text-sm font-semibold text-blue-700">of {totalCompanyCount}</span>
-                </p>
-                <p className="mt-1 text-xs text-blue-800">Visible under current role scope</p>
-              </div>
-
-              <div className="rounded-xl bg-white p-3 ring-1 ring-blue-100">
-                <p className="text-xs font-bold uppercase tracking-wide text-blue-700">Contacts</p>
-                <p className="mt-1 text-2xl font-bold text-blue-950">
-                  {visibleContactCount} <span className="text-sm font-semibold text-blue-700">of {totalContactCount}</span>
-                </p>
-                <p className="mt-1 text-xs text-blue-800">Inherited from related company coverage</p>
-              </div>
-
-              <div className="rounded-xl bg-white p-3 ring-1 ring-blue-100">
-                <p className="text-xs font-bold uppercase tracking-wide text-blue-700">Open Follow-Ups</p>
-                <p className="mt-1 text-2xl font-bold text-blue-950">
-                  {visibleOpenFollowUpCount} <span className="text-sm font-semibold text-blue-700">of {totalOpenFollowUpCount}</span>
-                </p>
-                <p className="mt-1 text-xs text-blue-800">Activities tied to visible companies</p>
-              </div>
-
-              <div className="rounded-xl bg-white p-3 ring-1 ring-blue-100">
-                <p className="text-xs font-bold uppercase tracking-wide text-blue-700">Due Today</p>
-                <p className="mt-1 text-2xl font-bold text-blue-950">
-                  {visibleDueTodayFollowUpCount} <span className="text-sm font-semibold text-blue-700">of {totalDueTodayFollowUpCount}</span>
-                </p>
-                <p className="mt-1 text-xs text-blue-800">Today and overdue activity counts are visible under current scope.</p>
-              </div>
-
-              <div className="rounded-xl bg-white p-3 ring-1 ring-blue-100">
-                <p className="text-xs font-bold uppercase tracking-wide text-blue-700">Overdue</p>
-                <p className="mt-1 text-2xl font-bold text-blue-950">
-                  {visibleOverdueFollowUpCount} <span className="text-sm font-semibold text-blue-700">of {totalOverdueFollowUpCount}</span>
-                </p>
-                <p className="mt-1 text-xs text-blue-800">Visible overdue follow-ups</p>
-              </div>
-
-              <div className="rounded-xl bg-white p-3 ring-1 ring-blue-100">
-                <p className="text-xs font-bold uppercase tracking-wide text-blue-700">Funnel</p>
-                <p className="mt-1 text-sm font-bold text-blue-950">Live counts in Funnel tab</p>
-                <p className="mt-1 text-xs text-blue-800">
-                  Funnel opportunities and opportunity activities inherit related company coverage. Open Funnel for live visible/total counts.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-4 flex flex-col gap-2 rounded-xl bg-white p-3 text-sm text-blue-950 ring-1 ring-blue-100 md:flex-row md:items-center md:justify-between">
-              <div>
-                <p className="font-bold">Sales Coverage Diagnostics</p>
-                <p className="mt-1 text-xs text-blue-800">
-                  Review company assignment health when role visibility is active. Open details to use company-level links.
-                </p>
-                <p className="mt-1 text-xs font-semibold text-blue-900">
-                  Unassigned: {unassignedSalespersonCompanyCount}  - Inactive/Missing: {inactiveCoverageCompanyCount}  - Current User Coverage: {currentUserAssignedCompanyCount}
-                </p>
-                <p className="mt-1 text-xs font-semibold text-blue-900">
-                  Coverage Status:{" "}
-                  <span
-                    className={
-                      unassignedSalespersonCompanyCount + inactiveCoverageCompanyCount === 0
-                        ? "rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-800"
-                        : "rounded-full bg-amber-100 px-2 py-0.5 text-amber-800"
-                    }
-                  >
-                    {unassignedSalespersonCompanyCount + inactiveCoverageCompanyCount === 0
-                      ? "All Clear"
-                      : "Needs Review"}
-                  </span>
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowSalesCoverageDiagnostics(!showSalesCoverageDiagnostics)}
-                className="w-fit rounded-lg bg-blue-700 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-800"
-                aria-expanded={showSalesCoverageDiagnostics}
-                aria-label="Toggle Sales Coverage Diagnostics Details"
-              >
-                {showSalesCoverageDiagnostics ? "Hide Details" : "Show Details"}
-              </button>
-            </div>
-
-            {showSalesCoverageDiagnostics && (
-            <div data-testid="sales-coverage-diagnostics-grid" className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-              <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wide text-amber-700">
-                    Coverage Detail
-                  </p>
-                  <h3 className="mt-1 text-base font-bold text-amber-950">
-                    Assignment health and company-level follow-up
-                  </h3>
-                  <p className="mt-1 text-xs text-amber-800">
-                    These diagnostics help identify records that may disappear for Sales Reps because company sales coverage is missing or stale.
-                    Click a company name below to open Company Detail.
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-4 grid gap-3 md:grid-cols-4">
-                <div className="rounded-xl bg-white p-3 ring-1 ring-amber-100">
-                  <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Assigned Rep Coverage</p>
-                  <p className="mt-1 text-2xl font-bold">
-                    {assignedSalespersonCompanyCount} <span className="text-sm font-semibold text-amber-700">of {totalCompanyCount}</span>
-                  </p>
-                  <p className="mt-1 text-xs text-amber-800">Companies with a Salesperson / Rep</p>
-                </div>
-
-                <div className="rounded-xl bg-white p-3 ring-1 ring-amber-100">
-                  <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Unassigned</p>
-                  <p className="mt-1 text-2xl font-bold">
-                    {unassignedSalespersonCompanyCount}
-                  </p>
-                  <p className="mt-1 text-xs text-amber-800">Companies without Salesperson / Rep coverage</p>
-                </div>
-
-                <div className="rounded-xl bg-white p-3 ring-1 ring-amber-100">
-                  <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Current User Coverage</p>
-                  <p className="mt-1 text-2xl font-bold">
-                    {currentUserAssignedCompanyCount}
-                  </p>
-                  <p className="mt-1 text-xs text-amber-800">Companies assigned to the selected user as Rep or Manager</p>
-                </div>
-
-                <div className="rounded-xl bg-white p-3 ring-1 ring-amber-100">
-                  <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Inactive / Missing User Assignments</p>
-                  <p className="mt-1 text-2xl font-bold">
-                    {inactiveCoverageCompanyCount}
-                  </p>
-                  <p className="mt-1 text-xs text-amber-800">
-                    {inactiveCoverageCompanyCount > 0
-                      ? `Review inactive or missing coverage: ${inactiveCoverageUserDisplayNames}`
-                      : "No inactive or missing-user company assignments detected."}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-4 rounded-xl bg-white p-3 text-xs text-amber-900 ring-1 ring-amber-100">
-                <p className="font-bold text-amber-950">How to fix coverage issues</p>
-                <p className="mt-1">
-                  Click a company name to open Company Detail, then update Sales Coverage in the company record.
-                  This keeps assignment changes inside the existing permission-controlled workflow.
-                </p>
-              </div>
-
-              <div className="mt-4 rounded-xl bg-white p-3 text-xs text-amber-900 ring-1 ring-amber-100">
-                <label className="font-bold text-amber-950" htmlFor="diagnostics-company-search">
-                  Search diagnostic company lists
-                </label>
-                <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-                  <input
-                    id="diagnostics-company-search"
-                    data-testid="sales-coverage-diagnostics-search"
-                    type="search"
-                    value={diagnosticsCompanySearch}
-                    onChange={(event) => setDiagnosticsCompanySearch(event.target.value)}
-                    placeholder="Type a company name..."
-                    className="w-full rounded-lg border border-amber-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                  />
-                  {diagnosticsCompanySearch && (
-                    <button
-                      type="button"
-                      onClick={() => setDiagnosticsCompanySearch("")}
-                      className="w-fit rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-                {diagnosticsCompanySearchTerm && (
-                  <p className="mt-2 text-[11px] font-semibold text-amber-800">
-                    Filtering visible diagnostic lists by company name.
-                  </p>
-                )}
-              </div>
-
-              <div data-testid="sales-coverage-diagnostics-drilldown" className="mt-4 grid gap-3 md:grid-cols-3">
-                <div className="rounded-xl bg-white p-3 ring-1 ring-amber-100">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Unassigned Companies</p>
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800">
-                      {unassignedSalespersonCompanyCount}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-[11px] font-semibold text-amber-800">Fix in Company Detail ? Sales Coverage</p>
-                  <p className="mt-1 text-[11px] text-amber-700">
-                    Showing {filteredUnassignedSalespersonCompanySamples.length} of {unassignedSalespersonCompanyCount}
-                  </p>
-                  {filteredUnassignedSalespersonCompanySamples.length === 0 ? (
-                    <p className="mt-2 text-xs text-amber-800">
-                      {diagnosticsCompanySearchTerm && unassignedSalespersonCompanyCount > 0
-                        ? "No unassigned companies match this search."
-                        : "No unassigned companies detected."}
-                    </p>
-                  ) : (
-                    <ul className="mt-2 max-h-48 list-disc space-y-1 overflow-y-auto pr-2 pl-4 text-xs text-amber-900">
-                      {filteredUnassignedSalespersonCompanySamples.map((company) => (
-                        <li key={`unassigned-${company.id}`}>
-                          <button
-                            type="button"
-                            onClick={() => loadCompanyDetail(company.id)}
-                            className="inline-flex items-center gap-1 rounded-md px-1 text-left font-semibold text-blue-800 underline decoration-blue-300 underline-offset-2 hover:bg-blue-50 hover:text-blue-950"
-                          >
-                            <span>{company.name}</span>
-                            <span className="text-[10px] font-bold uppercase tracking-wide text-blue-600">Open ?</span>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-
-                <div className="rounded-xl bg-white p-3 ring-1 ring-amber-100">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Current User Coverage</p>
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800">
-                      {currentUserAssignedCompanyCount}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-[11px] font-semibold text-amber-800">Open Company Detail to review coverage</p>
-                  <p className="mt-1 text-[11px] text-amber-700">
-                    Showing {filteredCurrentUserCoverageCompanySamples.length} of {currentUserAssignedCompanyCount}
-                  </p>
-                  {filteredCurrentUserCoverageCompanySamples.length === 0 ? (
-                    <p className="mt-2 text-xs text-amber-800">
-                      {diagnosticsCompanySearchTerm && currentUserAssignedCompanyCount > 0
-                        ? "No assigned companies match this search."
-                        : "No companies assigned to the selected user."}
-                    </p>
-                  ) : (
-                    <ul className="mt-2 max-h-48 list-disc space-y-1 overflow-y-auto pr-2 pl-4 text-xs text-amber-900">
-                      {filteredCurrentUserCoverageCompanySamples.map((company) => (
-                        <li key={`current-user-${company.id}`}>
-                          <button
-                            type="button"
-                            onClick={() => loadCompanyDetail(company.id)}
-                            className="inline-flex items-center gap-1 rounded-md px-1 text-left font-semibold text-blue-800 underline decoration-blue-300 underline-offset-2 hover:bg-blue-50 hover:text-blue-950"
-                          >
-                            <span>{company.name}</span>
-                            <span className="text-[10px] font-bold uppercase tracking-wide text-blue-600">Open ?</span>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-
-                <div className="rounded-xl bg-white p-3 ring-1 ring-amber-100">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Inactive / Missing Coverage</p>
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800">
-                      {inactiveCoverageCompanyCount}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-[11px] font-semibold text-amber-800">Fix stale assignments in Company Detail</p>
-                  <p className="mt-1 text-[11px] text-amber-700">
-                    Showing {filteredInactiveCoverageCompanySamples.length} of {inactiveCoverageCompanyCount}
-                  </p>
-                  {filteredInactiveCoverageCompanySamples.length === 0 ? (
-                    <p className="mt-2 text-xs text-amber-800">
-                      {diagnosticsCompanySearchTerm && inactiveCoverageCompanyCount > 0
-                        ? "No inactive or missing coverage records match this search."
-                        : "No inactive or missing coverage detected."}
-                    </p>
-                  ) : (
-                    <ul className="mt-2 max-h-48 list-disc space-y-1 overflow-y-auto pr-2 pl-4 text-xs text-amber-900">
-                      {filteredInactiveCoverageCompanySamples.map((company) => (
-                        <li key={`inactive-missing-${company.id}`}>
-                          <button
-                            type="button"
-                            onClick={() => loadCompanyDetail(company.id)}
-                            className="inline-flex items-center gap-1 rounded-md px-1 text-left font-semibold text-blue-800 underline decoration-blue-300 underline-offset-2 hover:bg-blue-50 hover:text-blue-950"
-                          >
-                            <span>{company.name}</span>
-                            <span className="text-[10px] font-bold uppercase tracking-wide text-blue-600">Open ?</span>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </div>
-            </div>
-            )}
-          </section>
-        )}
         {(errorMessage || importMessage) && (
           <div className="grid gap-3">
             {errorMessage && (
@@ -2927,8 +2483,6 @@ async function handleAnalyzeProspect() {
           <section className="grid max-w-full gap-6 overflow-hidden">
             <UserRolePermissionsReference />
             <AdminUsersSection
-              testingModeEnabled={testingModeEnabled}
-              setTestingModeEnabled={setTestingModeEnabled}
               canManageAdminUsers={currentPermissions.canManageAdminSettings}
               apiPermissionHeaders={apiPermissionHeaders}
             />
@@ -4612,468 +4166,6 @@ function AdminFunnelStagesSection({
   );
 }
 
-function RoleTestingPanel({
-  currentUserRole,
-  currentUserId,
-  currentUserDisplayName,
-  currentCoverageType,
-  applyRoleVisibility,
-  setApplyRoleVisibility,
-  testingModeEnabled = false,
-  roleVisibilityNeedsUser,
-  roleTotalCompanyCount,
-  roleVisibleCompanyCount,
-  roleAssignedCompanyCount,
-  roleUnassignedCompanyCount,
-  roleTestUsers,
-  isLoadingRoleUsers,
-  roleUserError,
-  onSelectUser,
-  setCurrentUserRole,
-  permissions,
-}: {
-  currentUserRole: AppUserRole;
-  currentUserId: string;
-  currentUserDisplayName: string;
-  currentCoverageType: string;
-  applyRoleVisibility: boolean;
-  setApplyRoleVisibility: (value: boolean) => void;
-  testingModeEnabled?: boolean;
-  roleVisibilityNeedsUser: boolean;
-  roleTotalCompanyCount: number;
-  roleVisibleCompanyCount: number;
-  roleAssignedCompanyCount: number;
-  roleUnassignedCompanyCount: number;
-  roleTestUsers: CrmUser[];
-  isLoadingRoleUsers: boolean;
-  roleUserError: string;
-  onSelectUser: (userId: string) => void;
-  setCurrentUserRole: (role: AppUserRole) => void;
-  permissions: AppPermissions;
-}) {
-
-  return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
-            Role Testing Mode
-          </p>
-          <h3 className="mt-1 text-lg font-bold">
-            Current Role: {formatAppUserRole(currentUserRole)}
-          </h3>
-          <p className="mt-1 text-sm leading-6 text-slate-600">
-            UI-only permission testing. API-level enforcement will come in a later revision.
-          </p>
-
-          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-            <p className="font-bold text-slate-900">Controlled test status</p>
-            <div className="mt-3 grid gap-2 md:grid-cols-2">
-              <p>
-                Selected user: <span className="font-semibold">{currentUserDisplayName}</span>
-              </p>
-              <p>
-                Role: <span className="font-semibold">{formatAppUserRole(currentUserRole)}</span>
-              </p>
-              <p>
-                Coverage: <span className="font-semibold">{formatCoverageType(currentCoverageType)}</span>
-              </p>
-              <p>
-                Visibility switch:{" "}
-                <span className={applyRoleVisibility ? "font-semibold text-green-700" : "font-semibold text-slate-700"}>
-                  {applyRoleVisibility ? "ON" : "OFF"}
-                </span>
-              </p>
-              <p>
-                Total companies: <span className="font-semibold">{roleTotalCompanyCount}</span>
-              </p>
-              <p>
-                Visible companies: <span className="font-semibold">{roleVisibleCompanyCount}</span>
-              </p>
-              <p>
-                {currentUserRole === "sales_manager"
-                  ? "Companies assigned to this manager"
-                  : currentUserRole === "sales_rep"
-                    ? "Companies assigned to this rep"
-                    : "Companies assigned to selected user"}
-                : <span className="font-semibold">{roleAssignedCompanyCount}</span>
-              </p>
-              <p>
-                Unassigned companies: <span className="font-semibold">{roleUnassignedCompanyCount}</span>
-              </p>
-            </div>
-
-            {currentUserRole === "sales_manager" && (
-              <p className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-2 text-xs font-semibold leading-5 text-blue-900">
-                Sales Manager view is intentionally broad: managers see all companies and contacts so they can assign and rebalance sales coverage.
-              </p>
-            )}
-
-            {currentUserRole === "sales_rep" && (
-              <p className="mt-3 rounded-lg border border-green-200 bg-green-50 p-2 text-xs font-semibold leading-5 text-green-900">
-                Sales Rep view is scoped: reps see companies assigned to them as Salesperson / Rep, with related contacts, funnel, and activities.
-              </p>
-            )}
-
-            <ol className="mt-3 list-decimal space-y-1 pl-5 text-xs leading-5 text-slate-600">
-              <li>Keep Testing Mode OFF during normal CRM use. Turn it ON only while checking test users.</li>
-              <li>Use a Sales Manager to confirm broad assignment-management visibility.</li>
-              <li>Use a Sales Rep with known company assignments to confirm scoped rep visibility.</li>
-              <li>Turn Testing Mode ON, then turn Apply Role Visibility ON only long enough to compare visible Companies, Contacts, Funnel, and Activities.</li>
-              <li>Return Testing Mode and Apply Role Visibility to OFF after testing.</li>
-            </ol>
-          </div>
-        </div>
-
-        <div className="w-full max-w-xs">
-          <label className="text-sm font-semibold text-slate-700">Test as CRM User</label>
-          <select
-            value={currentUserId}
-            onChange={(event) => onSelectUser(event.target.value)}
-            className="mt-2 w-full max-w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-          >
-            <option value="">Manual Role Test</option>
-            {roleTestUsers.map((user) => (
-              <option key={user.id} value={user.id}>
-                {user.display_name || user.email || user.id}
-              </option>
-            ))}
-          </select>
-          <p className="mt-2 text-xs text-slate-500">
-            {isLoadingRoleUsers
-              ? "Loading users..."
-              : `Current user: ${currentUserDisplayName}  - ${formatCoverageType(currentCoverageType)}`}
-          </p>
-          {roleUserError && (
-            <p className="mt-2 text-xs font-semibold text-red-700">{roleUserError}</p>
-          )}
-        </div>
-
-        <div className="w-full max-w-xs">
-          <label className="text-sm font-semibold text-slate-700">Test as Role</label>
-          <select
-            value={currentUserRole}
-            onChange={(event) => setCurrentUserRole(event.target.value as AppUserRole)}
-            className="mt-2 w-full max-w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-          >
-            <option value="admin">Admin</option>
-            <option value="sales_manager">Sales Manager</option>
-            <option value="sales_rep">Sales Rep</option>
-          </select>
-        </div>
-      </div>
-
-      <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-        <p className="text-sm font-semibold text-slate-900">Record Visibility Rules</p>
-        <div className="mt-3 grid gap-3 text-xs leading-5 text-slate-600 lg:grid-cols-3">
-          <div className="rounded-xl bg-white p-3 ring-1 ring-slate-200">
-            <p className="font-bold text-slate-900">Admin</p>
-            <p className="mt-1">
-              Can view all companies, contacts, opportunities, activities, documents, import history,
-              sales assignments, user administration, and admin settings.
-            </p>
-          </div>
-
-          <div className="rounded-xl bg-white p-3 ring-1 ring-slate-200">
-            <p className="font-bold text-slate-900">Sales Manager</p>
-            <p className="mt-1">
-              Can view all companies, contacts, opportunities, and activities so they can manage team coverage,
-              assign Sales Manager / Sales Rep coverage, and rebalance accounts. Cannot manage admin settings or users.
-            </p>
-          </div>
-
-          <div className="rounded-xl bg-white p-3 ring-1 ring-slate-200">
-            <p className="font-bold text-slate-900">Sales Rep</p>
-            <p className="mt-1">
-              Can view only companies assigned to them as Salesperson / Rep, plus related contacts,
-              opportunities, activities, notes, and documents. Can create and update opportunities,
-              move opportunity stages, and mark opportunities won or lost within their assigned accounts.
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-4 rounded-xl border border-blue-200 bg-white p-3">
-          <label className="flex items-start gap-3 text-sm font-semibold text-slate-800">
-            <input
-              type="checkbox"
-              checked={testingModeEnabled && applyRoleVisibility}
-              onChange={(event) => setApplyRoleVisibility(testingModeEnabled && event.target.checked)}
-              disabled={!testingModeEnabled}
-              className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-700 focus:ring-blue-500"
-            />
-            <span>
-              Apply Role Visibility
-              <span className="mt-1 block text-xs font-normal leading-5 text-slate-600">
-                When Testing Mode is On, the UI applies the selected CRM user's visibility scope.
-                Admins and Sales Managers see all records. Sales Reps see records tied to companies where they are assigned as Salesperson / Rep. Sales Reps see companies
-                where they are assigned as Salesperson / Rep. Contacts, Funnel, and Activities inherit related company visibility.
-              </span>
-            </span>
-          </label>
-
-          {roleVisibilityNeedsUser && (
-            <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs font-semibold text-amber-800">
-              Select a CRM user to apply Sales Manager or Sales Rep visibility. No company records are hidden until a user is selected.
-            </p>
-          )}
-
-          {testingModeEnabled && applyRoleVisibility && !roleVisibilityNeedsUser && (
-            <p className="mt-3 rounded-lg border border-green-200 bg-green-50 p-2 text-xs font-semibold text-green-800">
-              Role visibility is active for Companies, Contacts, Funnel, and Activities.
-            </p>
-          )}
-        </div>
-
-        <p className="mt-3 text-xs font-semibold text-amber-700">
-          Role visibility filters Companies, Contacts, Funnel opportunities, and Activities for Sales Reps. Admins and Sales Managers currently see all records.
-        </p>
-
-        <div className="mt-5 rounded-2xl border border-green-200 bg-green-50 p-4">
-          <p className="text-xs font-bold uppercase tracking-wide text-green-700">Production Role Visibility Review</p>
-          <h4 className="mt-2 text-lg font-bold text-green-950">Role model checkpoint</h4>
-          <div className="mt-3 grid gap-3 lg:grid-cols-3">
-            <div className="rounded-xl bg-white p-3 ring-1 ring-green-100">
-              <p className="text-sm font-bold text-green-950">Admin</p>
-              <p className="mt-1 text-xs leading-5 text-green-900">
-                Sees all CRM records and can manage users, imports, workflow settings, assignments, and admin configuration.
-              </p>
-            </div>
-
-            <div className="rounded-xl bg-white p-3 ring-1 ring-green-100">
-              <p className="text-sm font-bold text-green-950">Sales Manager</p>
-              <p className="mt-1 text-xs leading-5 text-green-900">
-                Sees all companies, contacts, funnel records, and activities for oversight and coverage management, without user/admin settings.
-              </p>
-            </div>
-
-            <div className="rounded-xl bg-white p-3 ring-1 ring-green-100">
-              <p className="text-sm font-bold text-green-950">Sales Rep</p>
-              <p className="mt-1 text-xs leading-5 text-green-900">
-                Sees companies assigned as Salesperson / Rep; contacts, funnel opportunities, and activities inherit company visibility.
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-4 rounded-xl bg-white p-3 text-xs leading-5 text-green-900 ring-1 ring-green-100">
-            <p className="font-bold text-green-950">Production validation checklist</p>
-            <p className="mt-1">
-              Confirm Admin broad visibility, Sales Manager broad visibility, Sales Rep scoped visibility, coverage filters, work queue shortcuts, and assignment badges before treating the role model as stable.
-            </p>
-          </div>
-
-          <div className="mt-4 rounded-xl border border-green-200 bg-white p-3 text-xs leading-5 text-green-900 ring-1 ring-green-100">
-            <p className="font-bold text-green-950">Role visibility test pass notes</p>
-            <ul className="mt-2 list-disc space-y-1 pl-5">
-              <li>Admin pass: sees all companies, contacts, funnel records, and activities; Admin tab remains available.</li>
-              <li>Sales Manager pass: sees all companies, contacts, funnel records, and activities; Admin user management remains unavailable.</li>
-              <li>Sales Rep pass: sees only companies assigned as Salesperson / Rep, with related contacts, funnel records, and activities.</li>
-              <li>Coverage pass: KPI cards, assignment flags, work queue shortcuts, and coverage filters align with visible company records.</li>
-              <li>Cleanup pass: Apply Role Visibility is returned to OFF after testing.</li>
-            </ul>
-          </div>
-
-          <div className="mt-4 rounded-xl border border-blue-200 bg-white p-3 text-xs leading-5 text-blue-900 ring-1 ring-blue-100">
-            <p className="font-bold text-blue-950">Auth / Role Source Review</p>
-            <p className="mt-1">
-              Manual role testing should remain only until the app uses the signed-in Supabase user as the source of CRM identity.
-            </p>
-            <ol className="mt-2 list-decimal space-y-1 pl-5">
-              <li>Confirm Supabase auth identifies the signed-in user by email or user id.</li>
-              <li>Match the signed-in user to the CRM Users table.</li>
-              <li>Use CRM User Role to drive Admin, Sales Manager, and Sales Rep permissions.</li>
-              <li>Use CRM User Status so archived users cannot receive new assignment coverage.</li>
-              <li>Replace Apply Role Visibility with always-on production role enforcement.</li>
-              <li>Remove manual role dropdowns, test user selectors, and temporary role visibility controls after signed-in role enforcement is verified.</li>
-            </ol>
-          </div>
-
-          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900 ring-1 ring-amber-100">
-            <p className="font-bold text-amber-950">Signed-In User Role Inspection Result</p>
-            <p className="mt-1">
-              Current finding: Supabase data access is implemented through server/API service-role clients. The app does not yet expose a client-side signed-in Supabase user session for production role enforcement.
-            </p>
-            <ol className="mt-2 list-decimal space-y-1 pl-5">
-              <li>Keep Apply Role Visibility and manual role test controls for QA until real auth is added.</li>
-              <li>Add Supabase auth/session detection before removing manual controls.</li>
-              <li>Match signed-in user email or auth id to CRM Users.</li>
-              <li>Use CRM User Role and Status as the production source for permissions.</li>
-              <li>Only then remove manual role dropdowns, test user selectors, and temporary role visibility controls.</li>
-            </ol>
-          </div>
-
-          <div className="mt-4 rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-xs leading-5 text-indigo-900 ring-1 ring-indigo-100">
-            <p className="font-bold text-indigo-950">Browser Supabase Client Foundation</p>
-            <p className="mt-1">
-              A browser Supabase client foundation has been added so the app can later detect the signed-in user session and map that user to CRM Users.
-            </p>
-            <ol className="mt-2 list-decimal space-y-1 pl-5">
-              <li>This revision does not change production permissions.</li>
-              <li>Manual role testing remains active for QA.</li>
-              <li>Signed-in Supabase session detection is now available for Admin readiness testing.</li>
-              <li>The app can match signed-in email or auth id to CRM Users for readiness review.</li>
-              <li>Only after production verification should Apply Role Visibility and manual test controls be removed.</li>
-            </ol>
-          </div>
-
-          <SignedInSessionStatusPanel />
-
-          <SupabaseEmailPasswordLoginPanel />
-
-          <SignedInCrmUserMatchPanel />
-
-          <SignedInCrmRolePreviewPanel />
-
-          <div className="mt-4 rounded-xl border border-orange-200 bg-orange-50 p-3 text-xs leading-5 text-orange-900 ring-1 ring-orange-100">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="font-bold text-orange-950">Auth Enforcement Readiness Gate</p>
-              <span className="rounded-full bg-orange-100 px-2 py-1 text-[11px] font-bold text-orange-800 ring-1 ring-orange-200">
-                Not enforced yet
-              </span>
-            </div>
-
-            <p className="mt-2">
-              Do not remove Apply Role Visibility or manual role controls until each readiness item below is confirmed in production.
-            </p>
-
-            <ol className="mt-3 list-decimal space-y-1 pl-5">
-              <li>Supabase Email/Password Login successfully signs in manually created Auth users.</li>
-              <li>Signed-In Session Status shows Signed in with the expected Supabase Auth email and user id.</li>
-              <li>Signed-In CRM User Match shows Matched for the same email in CRM Users.</li>
-              <li>Signed-In CRM Role Preview shows Ready for enforcement.</li>
-              <li>CRM user status is Active.</li>
-              <li>CRM role is recognized as Admin, Sales Manager, or Sales Rep.</li>
-              <li>Admin, Sales Manager, and Sales Rep test accounts have each passed role visibility testing.</li>
-              <li>System access is blocked until login; unauthenticated users must not be able to enter the CRM shell.</li>
-              <li>Backup and restore readiness has been reviewed before irreversible permission cleanup.</li>
-            </ol>
-
-            <div className="mt-3 rounded-lg bg-white p-3 ring-1 ring-orange-100">
-              <p className="font-bold text-orange-950">System Access Lock Requirement</p>
-              <p className="mt-1">
-                Before production enforcement is complete, the CRM should require a signed-in Supabase Auth session before showing CRM data, navigation, or workspace controls.
-              </p>
-            </div>
-
-            <div className="mt-3 rounded-lg bg-white p-3 ring-1 ring-orange-100">
-              <p className="font-bold text-orange-950">Next enforcement sequence</p>
-              <p className="mt-1">
-                First add signed-in CRM role as a selectable test source, then compare it against the manual harness, then remove the harness only after parity is confirmed.
-              </p>
-            </div>
-
-            <div className="mt-3 rounded-lg bg-white p-3 ring-1 ring-orange-100">
-              <p className="font-bold text-orange-950">Backup & Restore Readiness</p>
-              <p className="mt-1">
-                Before removing the manual role harness or adding restore workflows, the CRM needs a controlled backup plan for core operational data.
-              </p>
-              <ol className="mt-2 list-decimal space-y-1 pl-5">
-                <li>Define which tables must be backed up before production permission cleanup.</li>
-                <li>Export companies, contacts, prospects, activities, tags, funnel stages, CRM users, assignments, and intelligence records.</li>
-                <li>Separate backup export from restore; export should come first and be safer.</li>
-                <li>Require Admin-only access for backup and restore actions.</li>
-                <li>Require restore preview, row counts, and confirmation before any restore writes data.</li>
-                <li>Prevent accidental overwrite of production data without a dated backup file and explicit confirmation.</li>
-                <li>Keep manual database backups in Supabase available as the fallback during early restore testing.</li>
-              </ol>
-            </div>
-
-            <BackupExportPanel />
-
-            <div className="mt-3 rounded-lg bg-white p-3 ring-1 ring-orange-100">
-              <p className="font-bold text-orange-950">Future workflow idea: Outlook email drag-and-drop</p>
-              <p className="mt-1">
-                Evaluate whether users can drag Outlook emails or saved message files into the CRM to create activities, notes, or follow-up records. This should be scoped after auth enforcement and backup/restore planning.
-              </p>
-            </div>
-
-            <div className="mt-3 rounded-lg bg-white p-3 ring-1 ring-purple-100">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="font-bold text-purple-950">AI Company Intelligence Requirements</p>
-                <span className="rounded-full bg-purple-100 px-2 py-1 text-[11px] font-bold text-purple-800 ring-1 ring-purple-200">
-                  Requirements only
-                </span>
-              </div>
-
-              <p className="mt-2">
-                Revive the AI company intelligence workflow so company listings and detail pages can use user-entered context, account type, buyer personas, and Graymills source material to guide better sales action.
-              </p>
-
-              <div className="mt-3 grid gap-3 lg:grid-cols-2">
-                <div className="rounded-lg bg-purple-50 p-3 ring-1 ring-purple-100">
-                  <p className="font-bold text-purple-950">User-entered context</p>
-                  <ul className="mt-2 list-disc space-y-1 pl-5">
-                    <li>Use notes, activity history, manually entered pains, application clues, tags, industry, and contact roles.</li>
-                    <li>Separate user-entered observations from imported data so sales reps can see what drove the AI recommendation.</li>
-                    <li>Flag missing information instead of guessing.</li>
-                  </ul>
-                </div>
-
-                <div className="rounded-lg bg-purple-50 p-3 ring-1 ring-purple-100">
-                  <p className="font-bold text-purple-950">Account type split</p>
-                  <ul className="mt-2 list-disc space-y-1 pl-5">
-                    <li>Classify each account as End Customer, Distributor, or Unknown.</li>
-                    <li>End customers need application fit, uptime, cleaning consistency, safety, labor reduction, workflow, and payback logic.</li>
-                    <li>Distributors need line-card fit, resale opportunity, margin logic, territory fit, quote support, and technical support clarity.</li>
-                  </ul>
-                </div>
-
-                <div className="rounded-lg bg-purple-50 p-3 ring-1 ring-purple-100">
-                  <p className="font-bold text-purple-950">Buyer personas</p>
-                  <ul className="mt-2 list-disc space-y-1 pl-5">
-                    <li>Identify likely stakeholders such as Operations, Maintenance, Quality / Process Engineering, EHS, Procurement, and Owner / Executive.</li>
-                    <li>For distributors, identify Principal / Owner, Outside Sales, Product Specialist / Application Engineer, and Inside Sales.</li>
-                    <li>Translate each persona into practical discovery questions and sales angles.</li>
-                  </ul>
-                </div>
-
-                <div className="rounded-lg bg-purple-50 p-3 ring-1 ring-purple-100">
-                  <p className="font-bold text-purple-950">Graymills catalog grounding</p>
-                  <ul className="mt-2 list-disc space-y-1 pl-5">
-                    <li>Ground recommendations in Graymills catalogs, sell sheets, and approved product materials.</li>
-                    <li>Cover parts washers, pumps / metalworking fluid systems, inking systems, cleaning fluids, Tempest spray washers, and OEM / custom paths.</li>
-                    <li>Do not invent specifications, certifications, dimensions, capacities, compatibility claims, or regulatory statements.</li>
-                  </ul>
-                </div>
-              </div>
-
-              <div className="mt-3 rounded-lg bg-white p-3 ring-1 ring-purple-100">
-                <p className="font-bold text-purple-950">Target AI output structure</p>
-                <ol className="mt-2 list-decimal space-y-1 pl-5">
-                  <li>Account Type: End Customer, Distributor, or Unknown.</li>
-                  <li>Likely Buyer Personas and what each persona likely cares about.</li>
-                  <li>Application Clues from user-entered context and CRM data.</li>
-                  <li>Likely Graymills Fit by product family, with uncertainty clearly flagged.</li>
-                  <li>Recommended Discovery Questions based on account type and persona.</li>
-                  <li>Sales Angle focused on operating value, risk reduction, channel fit, or lifecycle value.</li>
-                  <li>Source Guardrails: no invented specs; verify uncertain fit with Graymills.</li>
-                </ol>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
-        <span className={`rounded-full px-2.5 py-1 ${permissions.canManageAdminSettings ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-500"}`}>
-          Admin Settings
-        </span>
-        <span className={`rounded-full px-2.5 py-1 ${permissions.canImportCsv ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-500"}`}>
-          CSV Import
-        </span>
-        <span className={`rounded-full px-2.5 py-1 ${permissions.canManageFunnelStages ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-500"}`}>
-          Manage Stage Definitions
-        </span>
-        <span className={`rounded-full px-2.5 py-1 ${permissions.canMoveOpportunityStages ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-500"}`}>
-          Move Opportunity Stages
-        </span>
-        <span className={`rounded-full px-2.5 py-1 ${permissions.canAssignSalesCoverage ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-500"}`}>
-          Assign Sales Coverage
-        </span>
-      </div>
-    </section>
-  );
-}
-
 function UserRolePermissionsReference() {
   const roles = [
     {
@@ -6143,13 +5235,9 @@ function SupabaseEmailPasswordLoginPanel() {
 }
 
 function AdminUsersSection({
-  testingModeEnabled = false,
-  setTestingModeEnabled = () => {},
   canManageAdminUsers = false,
   apiPermissionHeaders = () => ({}),
 }: {
-  testingModeEnabled?: boolean;
-  setTestingModeEnabled?: (value: boolean) => void;
   canManageAdminUsers?: boolean;
   apiPermissionHeaders?: any;
 }) {
@@ -6375,42 +5463,13 @@ function AdminUsersSection({
             </span>
           </div>
 
-          <div className={`mt-5 rounded-2xl border p-4 text-sm ${
-            testingModeEnabled
-              ? "border-blue-200 bg-blue-50 text-blue-900"
-              : "border-slate-200 bg-slate-50 text-slate-700"
-          }`}>
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div>
-                <p className="font-semibold text-slate-950">Testing Mode</p>
-                <p className="mt-1 text-sm leading-6">
-                  Keeps role visibility testing available without leaving it active during normal CRM use.
-                </p>
-              </div>
-
-              <label className="flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-bold shadow-sm ring-1 ring-slate-200">
-                <input
-                  type="checkbox"
-                  checked={testingModeEnabled}
-                  onChange={(event) => setTestingModeEnabled(event.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 text-blue-700 focus:ring-blue-600"
-                />
-                Testing Mode {testingModeEnabled ? "On" : "Off"}
-              </label>
-            </div>
-
-            <p className="mt-3 text-xs leading-5">
-              When Testing Mode is Off, Apply Role Visibility is automatically turned off. Turn Testing Mode On to use the manual role visibility test harness.
-            </p>
-          </div>
-
           <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 p-4">
           <p className="text-xs font-bold uppercase tracking-wide text-blue-700">CRM User Role Guide</p>
           <div className="mt-3 grid gap-3 lg:grid-cols-4">
             <div className="rounded-xl bg-white p-3 ring-1 ring-blue-100">
               <p className="text-sm font-bold text-blue-950">Admin</p>
               <p className="mt-1 text-xs leading-5 text-blue-900">
-                Full CRM access, including users, imports, workflow settings, role testing, and sales coverage assignment.
+                Full CRM access, including users, imports, workflow settings, and sales coverage assignment.
               </p>
             </div>
 
