@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.97 - AI Analysis History";
+const APP_VERSION = "Rev 2.98 - Sales Coverage Placement";
 const REVISION_NOTE =
-  "Company Detail now displays prior AI prospect analyses with their generation dates, sources, and saved Account Type and Buyer Persona context."; 
+  "The Sales Coverage panel now appears directly below the Company Detail header so account ownership is visible before analysis and opportunity information."; 
 
   
 
@@ -1599,6 +1599,12 @@ async function loadCompanyOwnerFilterData() {
 
       setSelectedCompanyDetail(data);
       setActiveTab("companyDetail");
+
+      if (typeof window !== "undefined") {
+        window.requestAnimationFrame(() => {
+          window.scrollTo({ top: 0, behavior: "auto" });
+        });
+      }
     } catch (error) {
       setSelectedCompanyDetail(null);
       setErrorMessage(error instanceof Error ? error.message : "Could not load company detail.");
@@ -10522,6 +10528,17 @@ function CompanyDetailSection({
         </div>
       </div>
 
+      <div
+        id="company-detail-sales-coverage"
+        className="scroll-mt-[260px]"
+      >
+        <CompanySalesAssignmentPanel
+          companyId={String(detail.company.id)}
+          canEditSalesCoverage={salesCoverageCanEdit}
+          apiPermissionHeaders={apiPermissionHeaders}
+        />
+      </div>
+
       {hasAiAnalysis && (
         <div
           className={`rounded-2xl border p-4 shadow-sm ${
@@ -10915,13 +10932,6 @@ function CompanyDetailSection({
           )}
         </DetailCard>
       </div>      <CompanyIndustryEnrichmentPanel company={detail.company} />
-
-      <div id="company-detail-sales-coverage" className="scroll-mt-80"></div>
-      <CompanySalesAssignmentPanel
-        companyId={String(detail.company.id)}
-        canEditSalesCoverage={salesCoverageCanEdit}
-        apiPermissionHeaders={apiPermissionHeaders}
-      />
 
       <CompanyTagManager
         companyId={String(detail.company.id)}
