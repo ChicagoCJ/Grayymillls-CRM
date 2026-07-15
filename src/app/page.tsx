@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Rev 2.95 - AI Analysis Context Snapshot";
+const APP_VERSION = "Rev 2.96 - AI Analysis Context Comparison";
 const REVISION_NOTE =
-  "AI prospect analyses now record the Account Type and Buyer Personas used and warn when current company context no longer matches the saved analysis."; 
+  "Company Detail now shows the Account Type and Buyer Personas used by the saved AI analysis beside the company record's current values."; 
 
   
 
@@ -10369,6 +10369,17 @@ function CompanyDetailSection({
   const analysisGeneratedAt = intelligence?.ai_generated_at
     ? new Date(String(intelligence.ai_generated_at)).toLocaleString()
     : "Generation time unavailable";
+  const analysisGenerationSource = String(
+    intelligence?.ai_generation_source || "Source unavailable"
+  );
+  const analysisBuyerPersonasDisplay =
+    analysisBuyerPersonas.length > 0
+      ? analysisBuyerPersonas.join(", ")
+      : "None saved";
+  const currentBuyerPersonasDisplay =
+    currentSavedBuyerPersonas.length > 0
+      ? currentSavedBuyerPersonas.join(", ")
+      : "None saved";
 
   const discoveryQuestions = hasAiAnalysis
     ? parseJsonArray(intelligence?.discovery_questions)
@@ -10561,6 +10572,78 @@ function CompanyDetailSection({
                   )}
                 </div>
               )}
+
+              {hasAnalysisContextSnapshot && (
+                <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                  <div
+                    className={`rounded-xl border p-3 ${
+                      analysisAccountTypeChanged
+                        ? "border-amber-300 bg-white"
+                        : "border-green-200 bg-white"
+                    }`}
+                  >
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                      Account Type
+                    </p>
+                    <div className="mt-2 grid gap-2 text-xs">
+                      <div>
+                        <p className="font-semibold text-slate-500">Used by analysis</p>
+                        <p className="mt-1 font-bold text-slate-900">
+                          {analysisAccountType || "Unavailable"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-500">Current company value</p>
+                        <p
+                          className={`mt-1 font-bold ${
+                            analysisAccountTypeChanged
+                              ? "text-amber-900"
+                              : "text-green-800"
+                          }`}
+                        >
+                          {currentSavedAccountType}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div
+                    className={`rounded-xl border p-3 ${
+                      analysisBuyerPersonasChanged
+                        ? "border-amber-300 bg-white"
+                        : "border-green-200 bg-white"
+                    }`}
+                  >
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                      Buyer Personas
+                    </p>
+                    <div className="mt-2 grid gap-2 text-xs">
+                      <div>
+                        <p className="font-semibold text-slate-500">Used by analysis</p>
+                        <p className="mt-1 font-bold leading-5 text-slate-900">
+                          {analysisBuyerPersonasDisplay}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-500">Current company values</p>
+                        <p
+                          className={`mt-1 font-bold leading-5 ${
+                            analysisBuyerPersonasChanged
+                              ? "text-amber-900"
+                              : "text-green-800"
+                          }`}
+                        >
+                          {currentBuyerPersonasDisplay}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <p className="mt-3 text-[11px] leading-5 text-slate-500">
+                Analysis source: {analysisGenerationSource}
+              </p>
             </div>
 
             {(isAnalysisContextStale || !hasAnalysisContextSnapshot) && (
