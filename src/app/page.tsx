@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Version 3.01 - Funnel Stage Edit Navigation";
+const APP_VERSION = "Version 3.02 - Admin Authentication Management";
 const REVISION_NOTE =
-  "Clicking Edit Stage now scrolls directly to the editing form and focuses the Stage Name field."; 
+  "Admins can now verify login status, create matching Auth logins, and reset passwords through protected server-side controls."; 
 
   
 
@@ -7840,6 +7840,29 @@ function HelpSection() {
 
 function ReleaseNotesSection() {
   const releases = [
+    {
+      version: "Version 3.02",
+      title: "Admin Authentication Management",
+      date: "July 17, 2026",
+      summary:
+        "Adds protected Supabase authentication-management tools to the CRM Admin user workflow.",
+      changes: [
+        "Added a verified server-side Auth-management API that validates the signed-in Supabase session and matches it to an active CRM Admin.",
+        "Added login-status badges, email-confirmation status, last-sign-in details, and current-login identification to CRM User cards.",
+        "Added protected creation of matching Supabase Auth logins for active CRM Users without an existing login.",
+        "Added protected password-reset controls for other active users with an existing Auth login.",
+        "Prevented Admin users from resetting their own password from the CRM user-management page.",
+        "Temporary passwords are sent directly to Supabase and are not stored in CRM records or browser storage.",
+      ],
+      testNotes: [
+        "Confirm an Admin can view Auth status for every CRM User.",
+        "Confirm active CRM Users without a login show Create Auth Login controls.",
+        "Confirm active users with a login show password-reset controls.",
+        "Confirm the current signed-in Admin cannot reset their own password from this page.",
+        "Confirm archived users do not show login-creation or password-reset controls.",
+        "Confirm non-Admin users cannot access Auth-management actions.",
+      ],
+    },
     {
       version: "Version 3.01",
       title: "Funnel Stage Edit Navigation",

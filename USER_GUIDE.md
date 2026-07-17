@@ -1,7 +1,7 @@
 # Graymills CRM User Guide
 
 **Application:** Graymills CRM / Prospecting Tool  
-**Release:** Version 3.0 Production Release  
+**Release:** Version 3.02 - Admin Authentication Management  
 **Audience:** Graymills sales, sales management, and CRM administrators
 
 ---
@@ -436,81 +436,165 @@ Persona assignments should support sales judgment rather than replace it.
 
 ---
 
-## 13. Creating a New User
+## 13. Admin User Management
 
-A new user requires two matching records:
+Only a signed-in Admin can create or modify CRM Users and manage matching authentication logins.
 
-1. A Supabase Authentication account.
-2. A Graymills CRM Users record.
+Each person who signs in requires two linked records:
 
-The email address must match in both systems.
+1. A Graymills CRM Users record.
+2. A Supabase Authentication login.
 
-### Step 1: Create the login in Supabase
+The email address must match exactly in both records. The CRM performs this matching automatically.
 
-In the Supabase project:
+### Creating a new user
 
-1. Open **Authentication**.
-2. Open **Users**.
-3. Select **Add user** or **Create user**.
-4. Enter the userâ€™s email.
-5. Assign a temporary password.
-6. Mark the email confirmed when appropriate.
+#### Step 1: Create the CRM Users record
 
-Provide the temporary password to the user through an approved secure method.
-
-### Step 2: Create the CRM Users record
-
-In the Graymills CRM:
-
-1. Sign in as an Admin.
+1. Sign in to the CRM as an Admin.
 2. Open **Admin**.
-3. Add the new CRM user.
-4. Enter the same email used in Supabase.
-5. Enter the display name.
-6. Assign the correct role.
-7. Set the user status to **Active**.
-8. Select the appropriate coverage type.
-9. Save the user.
+3. Find **Create CRM User**.
+4. Enter the user’s display name.
+5. Enter the user’s email address.
+6. Select the correct **User Role**.
+7. Select the appropriate **Coverage Type**.
+8. Set **Status** to **Active**.
+9. Enter optional phone, function, notes, and sort-order information.
+10. Select **Create CRM User**.
 
-### Step 3: Verify access
+The new user initially displays **No login**.
 
-Have the user sign in.
+#### Step 2: Create the matching Auth login
+
+1. Find the new user in the **CRM Users** list.
+2. Confirm the email address is correct.
+3. Confirm the user is Active.
+4. Enter a temporary password in the **Temporary Password** field.
+5. Use at least eight characters.
+6. Select **Create Auth Login**.
+7. Confirm the user now displays **Login exists**.
+8. Confirm **Email confirmed** displays **Yes**.
+
+The temporary password is sent directly to Supabase Authentication. It is not stored in the CRM or browser storage.
+
+Give the temporary password to the user through an approved secure method. Do not include passwords in ordinary support tickets, screenshots, CRM notes, or shared documents.
+
+### Selecting the correct role
+
+Use these application roles:
+
+- **Admin:** Full CRM access, including protected Admin settings and user management.
+- **Sales Manager:** Broad sales visibility, funnel management, imports, and sales coverage assignment.
+- **Sales Rep:** Assigned-account visibility and permitted work on related contacts, activities, and opportunities.
+
+Assign the least-privileged role that still allows the person to perform their work.
+
+### Selecting status
+
+- **Active:** The user can be matched to a login and appears in applicable assignment controls.
+- **Archived:** The CRM User record is retained for history but should not receive new work or normal CRM access.
+
+An archived CRM User cannot receive a new Auth login or have a password reset from the CRM Admin page.
+
+### Selecting coverage type
+
+- **Internal:** A Graymills employee or other internal CRM user.
+- **Outside Rep:** An external sales representative who may receive assigned account coverage.
+
+Coverage type does not replace the application role. Set both fields correctly.
+
+### Verifying a new user
+
+After creating both records, have the user sign in with the exact email address and temporary password.
 
 Confirm:
 
-- The correct user name is shown.
-- The correct role is applied.
-- The correct navigation tabs appear.
-- Record visibility matches the role.
-- Sales coverage behaves as expected.
+- The login succeeds.
+- The correct display name appears.
+- The correct application role is applied.
+- The expected navigation tabs appear.
+- Company and contact visibility match the user’s role and assignments.
+- Sales coverage dropdowns include the user when appropriate.
+- Admin functions are hidden from non-Admin users.
+- Import access is available only to Admins and Sales Managers.
+
+Resolve role or visibility problems before assigning normal production work.
 
 ---
 
 ## 14. Password Administration
 
-The current CRM does not provide a complete self-service password-management workflow inside the application.
+Admins can reset another active user’s password from the CRM.
 
-Password administration is handled through Supabase Authentication.
+### Resetting another user’s password
 
-An administrator may need to:
+1. Sign in as an Admin.
+2. Open **Admin**.
+3. Find the active user in **CRM Users**.
+4. Confirm the user displays **Login exists**.
+5. Enter a new temporary password under **New Temporary Password**.
+6. Use at least eight characters.
+7. Select **Reset Password**.
+8. Confirm the success message appears.
+9. Give the temporary password to the user securely.
+10. Have the user verify that the new password works.
 
-- Create the initial password
-- Send a password-reset invitation
-- Reset a password
-- Confirm a userâ€™s email
-- Disable or remove an authentication account
+The password is sent directly to Supabase and is not stored in CRM records or browser storage.
 
-Changing or disabling the CRM Users record alone does not automatically change the Supabase password.
+### Resetting your own password
 
-For terminated or inactive users:
+The CRM intentionally prevents an Admin from resetting their own password from the Admin user-management page.
 
-1. Set the CRM Users record to inactive.
-2. Disable or remove the Supabase Authentication account.
-3. Reassign open companies, opportunities, and activities.
+The current signed-in account displays **Current login** and the message:
+
+**Your own password cannot be reset from this Admin page.**
+
+Use the approved Supabase or account-recovery process for your own password.
+
+### Password safety
+
+- Never place a password in CRM notes.
+- Never send a password in an ordinary support message.
+- Never include a visible password in a screenshot.
+- Use a unique temporary password.
+- Send credentials through an approved secure method.
+- Confirm the intended recipient before sharing credentials.
 
 ---
 
-## 15. Backup Export
+## 15. Archiving and Reactivating Users
+
+### Archiving a CRM User
+
+Archive a user who should no longer appear as an active CRM participant.
+
+1. Open **Admin**.
+2. Find the user in **CRM Users**.
+3. Review open companies, opportunities, and activities assigned to the user.
+4. Reassign active work when necessary.
+5. Select **Archive**.
+6. Confirm the user displays **archived**.
+
+Archiving retains the CRM User record for historical references.
+
+Archiving the CRM User does not delete the Supabase Authentication account. Because the CRM only matches active CRM Users for access, the archived user should no longer receive normal CRM access. For terminated users or other security-sensitive situations, an administrator should also disable or remove the Supabase Authentication account through the approved authentication-administration process.
+
+### Reactivating a CRM User
+
+1. Open **Admin**.
+2. Find the archived user.
+3. Select **Reactivate**.
+4. Confirm the status returns to **active**.
+5. Review the assigned role and coverage type.
+6. Confirm whether the existing Auth login is still appropriate.
+7. Reset the password when required.
+8. Verify the user’s access and record visibility.
+
+Do not create a second Auth login when **Login exists** is already displayed.
+
+---
+
+## 16. Backup Export
 
 Admins can download a dated JSON backup of core CRM operational tables.
 
@@ -528,7 +612,7 @@ A full automated restore workflow is not currently enabled.
 
 ---
 
-## 16. Data Quality Practices
+## 17. Data Quality Practices
 
 Follow these practices when adding or updating records:
 
@@ -545,7 +629,7 @@ Follow these practices when adding or updating records:
 
 ---
 
-## 17. Troubleshooting
+## 18. Troubleshooting
 
 ### The login screen keeps appearing
 
@@ -611,7 +695,7 @@ Select **Refresh CRM** and recheck the record.
 
 ---
 
-## 18. Production Administrator Checklist
+## 19. Production Administrator Checklist
 
 Before adding the first production records:
 
@@ -629,7 +713,7 @@ Before adding the first production records:
 
 ---
 
-## 19. Support and Change Requests
+## 20. Support and Change Requests
 
 Report CRM issues with:
 
@@ -645,9 +729,9 @@ Do not include passwords in support messages or screenshots.
 
 ---
 
-## 20. Version 3.0 Release Notes
+## 21. Version 3.02 Release Notes
 
-Version 3.0 establishes the CRM as the production release.
+Version 3.02 expands the production CRM with protected Admin authentication-management controls.
 
 Production-release priorities include:
 
@@ -662,3 +746,9 @@ Production-release priorities include:
 - Removal of temporary role-testing controls
 - Production documentation
 - Removal of test CRM data before normal use
+- Verified Admin authentication-management API
+- Auth-login status and email-confirmation visibility
+- In-app creation of matching Auth logins
+- Protected password resets for other active users
+- Protection against resetting the current Admin’s own password
+- Updated operational instructions for creating, verifying, archiving, and reactivating users
