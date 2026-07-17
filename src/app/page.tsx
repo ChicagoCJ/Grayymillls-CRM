@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 
 import { getBrowserSupabaseClient, hasBrowserSupabaseConfig } from "../lib/supabase-browser";
@@ -87,11 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Version 3.02 - Admin Authentication Management";
+const APP_VERSION = "Version 3.03 - Projects / Lists Foundation";
 const REVISION_NOTE =
-  "Admins can now verify login status, create matching Auth logins, and reset passwords through protected server-side controls."; 
-
-  
+  "Admins can now create, edit, archive, reactivate, and assign owners to Projects and Lists through verified session-protected controls.";
 
 type SignedInSessionStatus = {
   state: "checking" | "not_configured" | "signed_out" | "signed_in" | "error";
@@ -2305,8 +2303,8 @@ async function handleAnalyzeProspect() {
                 </h2>
                 <p className="mt-1 text-sm leading-6 text-green-900">
                   Current user: <span className="font-semibold">{currentUserDisplayName}</span>
-                  {" "}· Role: <span className="font-semibold">{formatAppUserRole(currentUserRole)}</span>
-                  {" "}· Status: <span className="font-semibold">{signedInProductionUser.status || "Not detected"}</span>
+                  {" "}Â· Role: <span className="font-semibold">{formatAppUserRole(currentUserRole)}</span>
+                  {" "}Â· Status: <span className="font-semibold">{signedInProductionUser.status || "Not detected"}</span>
                 </p>
                 <p className="mt-1 text-xs leading-5 text-green-800">
                   {signedInProductionUser.message}
@@ -2528,6 +2526,9 @@ async function handleAnalyzeProspect() {
             <AdminUsersSection
               canManageAdminUsers={currentPermissions.canManageAdminSettings}
               apiPermissionHeaders={apiPermissionHeaders}
+            />
+            <AdminProjectsListsSection
+              canManageProjectsLists={currentPermissions.canManageAdminSettings}
             />
             <AdminFunnelStagesSection
               canManageFunnelStages={currentPermissions.canManageFunnelStages}
@@ -3723,6 +3724,553 @@ function AdminBuyerPersonaDefinitionsSection({
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+
+function AdminProjectsListsSection({
+  canManageProjectsLists = false,
+}: {
+  canManageProjectsLists?: boolean;
+}) {
+  const [projectsLists, setProjectsLists] = useState<any[]>([]);
+  const [users, setUsers] = useState<CrmUser[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [editingId, setEditingId] = useState("");
+  const formRef = useRef<HTMLDivElement | null>(null);
+  const nameInputRef = useRef<HTMLInputElement | null>(null);
+  const [form, setForm] = useState({
+    projectName: "",
+    projectKind: "project" as "project" | "list",
+    description: "",
+    ownerUserId: "",
+    sortOrder: "100",
+    status: "active" as "active" | "archived",
+  });
+
+  async function getVerifiedAdminHeaders() {
+    const supabase = getBrowserSupabaseClient();
+    const { data, error } = await supabase.auth.getSession();
+
+    if (error) {
+      throw new Error(
+        error.message || "Could not read the signed-in session."
+      );
+    }
+
+    const accessToken = data.session?.access_token;
+
+    if (!accessToken) {
+      throw new Error("A signed-in Supabase session is required.");
+    }
+
+    return {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    };
+  }
+
+  async function loadProjectsLists() {
+    setIsLoading(true);
+    setErrorMessage("");
+
+    try {
+      const [projectsResponse, usersResponse] = await Promise.all([
+        fetch("/api/projects-lists?includeInactive=true"),
+        fetch("/api/crm-users"),
+      ]);
+
+      const projectsData = await projectsResponse.json();
+      const usersData = await usersResponse.json();
+
+      if (!projectsResponse.ok) {
+        throw new Error(
+          projectsData.error || "Could not load Projects / Lists."
+        );
+      }
+
+      if (!usersResponse.ok) {
+        throw new Error(
+          usersData.error || "Could not load CRM users."
+        );
+      }
+
+      setProjectsLists(projectsData.projectsLists ?? []);
+      setUsers(usersData.users ?? []);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not load Projects / Lists."
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadProjectsLists();
+  }, []);
+
+  function resetForm() {
+    setEditingId("");
+    setForm({
+      projectName: "",
+      projectKind: "project",
+      description: "",
+      ownerUserId: "",
+      sortOrder: "100",
+      status: "active",
+    });
+  }
+
+  function startEditing(item: any) {
+    setEditingId(String(item.id || ""));
+    setForm({
+      projectName: String(item.project_name || ""),
+      projectKind:
+        item.project_kind === "list" ? "list" : "project",
+      description: String(item.description || ""),
+      ownerUserId: String(item.owner_user_id || ""),
+      sortOrder: String(item.sort_order ?? 100),
+      status:
+        item.status === "archived" ? "archived" : "active",
+    });
+
+    window.requestAnimationFrame(() => {
+      formRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+
+      window.setTimeout(() => {
+        nameInputRef.current?.focus({ preventScroll: true });
+      }, 350);
+    });
+  }
+
+  async function saveProjectList() {
+    if (!canManageProjectsLists) {
+      setErrorMessage(
+        "Only CRM Admin users can create or edit Projects / Lists."
+      );
+      return;
+    }
+
+    setIsSaving(true);
+    setMessage("");
+    setErrorMessage("");
+
+    try {
+      if (!form.projectName.trim()) {
+        throw new Error("Project / List name is required.");
+      }
+
+      const headers = await getVerifiedAdminHeaders();
+
+      const response = await fetch("/api/projects-lists", {
+        method: editingId ? "PATCH" : "POST",
+        headers,
+        body: JSON.stringify({
+          id: editingId || undefined,
+          projectName: form.projectName,
+          projectKind: form.projectKind,
+          description: form.description,
+          ownerUserId: form.ownerUserId || null,
+          sortOrder: form.sortOrder,
+          status: form.status,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Could not save Project / List."
+        );
+      }
+
+      setMessage(
+        editingId
+          ? "Project / List updated."
+          : "Project / List created."
+      );
+
+      resetForm();
+      await loadProjectsLists();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not save Project / List."
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function updateStatus(
+    item: any,
+    status: "active" | "archived"
+  ) {
+    if (!canManageProjectsLists) {
+      setErrorMessage(
+        "Only CRM Admin users can archive or reactivate Projects / Lists."
+      );
+      return;
+    }
+
+    setIsSaving(true);
+    setMessage("");
+    setErrorMessage("");
+
+    try {
+      const headers = await getVerifiedAdminHeaders();
+
+      const response = await fetch("/api/projects-lists", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          id: item.id,
+          status,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Could not update Project / List status."
+        );
+      }
+
+      setMessage(
+        status === "active"
+          ? "Project / List reactivated."
+          : "Project / List archived."
+      );
+
+      if (editingId === item.id) {
+        resetForm();
+      }
+
+      await loadProjectsLists();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not update Project / List status."
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  const projectCount = projectsLists.filter(
+    (item) => item.project_kind === "project"
+  ).length;
+
+  const listCount = projectsLists.filter(
+    (item) => item.project_kind === "list"
+  ).length;
+
+  return (
+    <section className="grid gap-6">
+      <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
+              Admin
+            </p>
+            <h2 className="mt-2 text-2xl font-bold">
+              Manage Projects / Lists
+            </h2>
+            <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-600">
+              Create sales projects, campaigns, territory initiatives, and
+              flexible lists used to group companies and contacts. Archive
+              records instead of deleting them.
+            </p>
+
+            {!canManageProjectsLists && (
+              <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">
+                Your current role can view Projects / Lists but cannot create,
+                edit, archive, or reactivate them.
+              </p>
+            )}
+          </div>
+
+          <div className="flex flex-wrap gap-2 text-sm">
+            <span className="rounded-full bg-blue-50 px-3 py-1 font-semibold text-blue-800">
+              {projectCount} Projects
+            </span>
+            <span className="rounded-full bg-violet-50 px-3 py-1 font-semibold text-violet-800">
+              {listCount} Lists
+            </span>
+          </div>
+        </div>
+
+        {message ? (
+          <p className="mt-4 rounded-xl border border-green-200 bg-green-50 p-3 text-sm font-semibold text-green-800">
+            {message}
+          </p>
+        ) : null}
+
+        {errorMessage ? (
+          <p className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-800">
+            {errorMessage}
+          </p>
+        ) : null}
+      </div>
+
+      <div
+        ref={formRef}
+        className="scroll-mt-32 max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm"
+      >
+        <h3 className="text-xl font-bold">
+          {editingId
+            ? "Edit Project / List"
+            : "Add Project / List"}
+        </h3>
+
+        <div className="mt-5 grid gap-4 lg:grid-cols-2">
+          <label className="grid gap-1 text-sm font-semibold text-slate-700">
+            Name
+            <input
+              ref={nameInputRef}
+              value={form.projectName}
+              disabled={!canManageProjectsLists || isSaving}
+              onChange={(event) =>
+                setForm({
+                  ...form,
+                  projectName: event.target.value,
+                })
+              }
+              className="rounded-xl border border-slate-300 px-3 py-2 font-normal"
+              placeholder="Example: Aviation MRO Campaign"
+            />
+          </label>
+
+          <label className="grid gap-1 text-sm font-semibold text-slate-700">
+            Type
+            <select
+              value={form.projectKind}
+              disabled={!canManageProjectsLists || isSaving}
+              onChange={(event) =>
+                setForm({
+                  ...form,
+                  projectKind:
+                    event.target.value === "list"
+                      ? "list"
+                      : "project",
+                })
+              }
+              className="rounded-xl border border-slate-300 px-3 py-2 font-normal"
+            >
+              <option value="project">Project</option>
+              <option value="list">List</option>
+            </select>
+          </label>
+
+          <label className="grid gap-1 text-sm font-semibold text-slate-700">
+            Owner
+            <select
+              value={form.ownerUserId}
+              disabled={!canManageProjectsLists || isSaving}
+              onChange={(event) =>
+                setForm({
+                  ...form,
+                  ownerUserId: event.target.value,
+                })
+              }
+              className="rounded-xl border border-slate-300 px-3 py-2 font-normal"
+            >
+              <option value="">Unassigned</option>
+              {users.map((user) => (
+                <option key={String(user.id)} value={String(user.id)}>
+                  {user.display_name || user.email || "Unnamed user"}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="grid gap-1 text-sm font-semibold text-slate-700">
+            Sort order
+            <input
+              type="number"
+              value={form.sortOrder}
+              disabled={!canManageProjectsLists || isSaving}
+              onChange={(event) =>
+                setForm({
+                  ...form,
+                  sortOrder: event.target.value,
+                })
+              }
+              className="rounded-xl border border-slate-300 px-3 py-2 font-normal"
+            />
+          </label>
+
+          <label className="grid gap-1 text-sm font-semibold text-slate-700 lg:col-span-2">
+            Description
+            <textarea
+              value={form.description}
+              disabled={!canManageProjectsLists || isSaving}
+              onChange={(event) =>
+                setForm({
+                  ...form,
+                  description: event.target.value,
+                })
+              }
+              className="min-h-24 rounded-xl border border-slate-300 px-3 py-2 font-normal"
+              placeholder="Purpose, scope, or membership guidance"
+            />
+          </label>
+        </div>
+
+        <div className="mt-5 flex flex-wrap gap-3">
+          <button
+            type="button"
+            disabled={!canManageProjectsLists || isSaving}
+            onClick={saveProjectList}
+            className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isSaving
+              ? "Saving..."
+              : editingId
+                ? "Save Changes"
+                : "Create Project / List"}
+          </button>
+
+          {editingId ? (
+            <button
+              type="button"
+              disabled={isSaving}
+              onClick={resetForm}
+              className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          ) : null}
+
+          <button
+            type="button"
+            disabled={isLoading || isSaving}
+            onClick={loadProjectsLists}
+            className="rounded-xl border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 disabled:opacity-50"
+          >
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+        <h3 className="text-xl font-bold">
+          Existing Projects / Lists
+        </h3>
+
+        {isLoading ? (
+          <p className="mt-4 text-sm text-slate-600">
+            Loading Projects / Lists...
+          </p>
+        ) : projectsLists.length === 0 ? (
+          <p className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-600">
+            No Projects or Lists have been created.
+          </p>
+        ) : (
+          <div className="mt-5 grid gap-3">
+            {projectsLists.map((item) => {
+              const ownerName =
+                item.owner?.display_name ||
+                item.owner?.email ||
+                "Unassigned";
+
+              const isArchived = item.status === "archived";
+
+              return (
+                <div
+                  key={String(item.id)}
+                  className={`rounded-xl border p-4 ${
+                    isArchived
+                      ? "border-slate-200 bg-slate-50"
+                      : "border-blue-100 bg-white"
+                  }`}
+                >
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-bold text-slate-950">
+                          {item.project_name}
+                        </p>
+                        <span
+                          className={`rounded-full px-2 py-1 text-xs font-semibold ${
+                            item.project_kind === "list"
+                              ? "bg-violet-100 text-violet-800"
+                              : "bg-blue-100 text-blue-800"
+                          }`}
+                        >
+                          {item.project_kind === "list"
+                            ? "List"
+                            : "Project"}
+                        </span>
+                        {isArchived ? (
+                          <span className="rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-700">
+                            Archived
+                          </span>
+                        ) : null}
+                      </div>
+
+                      <p className="mt-2 text-sm text-slate-600">
+                        Owner: {ownerName} Â· Sort order:{" "}
+                        {item.sort_order ?? 100}
+                      </p>
+
+                      {item.description ? (
+                        <p className="mt-2 text-sm leading-6 text-slate-600">
+                          {item.description}
+                        </p>
+                      ) : null}
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={!canManageProjectsLists || isSaving}
+                        onClick={() => startEditing(item)}
+                        className="rounded-lg border border-blue-200 px-3 py-2 text-xs font-semibold text-blue-700 disabled:opacity-50"
+                      >
+                        Edit
+                      </button>
+
+                      {isArchived ? (
+                        <button
+                          type="button"
+                          disabled={!canManageProjectsLists || isSaving}
+                          onClick={() => updateStatus(item, "active")}
+                          className="rounded-lg border border-green-200 px-3 py-2 text-xs font-semibold text-green-700 disabled:opacity-50"
+                        >
+                          Reactivate
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={!canManageProjectsLists || isSaving}
+                          onClick={() => updateStatus(item, "archived")}
+                          className="rounded-lg border border-amber-200 px-3 py-2 text-xs font-semibold text-amber-800 disabled:opacity-50"
+                        >
+                          Archive
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -7840,6 +8388,29 @@ function HelpSection() {
 
 function ReleaseNotesSection() {
   const releases = [
+    {
+      version: "Version 3.03",
+      title: "Projects / Lists Foundation",
+      date: "July 17, 2026",
+      summary:
+        "Adds the first production-ready Projects / Lists foundation for grouping companies and contacts around campaigns, initiatives, and reusable lists.",
+      changes: [
+        "Added Supabase tables for Projects / Lists plus company and contact assignment foundations.",
+        "Enabled Row Level Security on the new Projects / Lists tables while keeping server-side access through protected APIs.",
+        "Added a Projects / Lists API with public read access and verified signed-in CRM Admin protection for create and update actions.",
+        "Added Admin controls to create Projects or Lists, assign an owner, set description and sort order, edit records, and archive or reactivate them.",
+        "Added verified Supabase bearer-token handling for all Projects / Lists write actions.",
+        "Confirmed Projects / Lists persist after browser refresh and that archive/reactivate workflows function correctly.",
+      ],
+      testNotes: [
+        "Confirm the Admin tab shows Manage Projects / Lists before Manage Sales Funnel Stages.",
+        "Confirm an Admin can create both a Project and a List.",
+        "Confirm owner assignment, description, and sort order save correctly.",
+        "Confirm Edit loads the selected record into the form.",
+        "Confirm Archive and Reactivate update status correctly.",
+        "Confirm a non-Admin user cannot create, edit, archive, or reactivate Projects / Lists.",
+      ],
+    },
     {
       version: "Version 3.02",
       title: "Admin Authentication Management",
@@ -13825,7 +14396,7 @@ function TagAssignmentColumn({
                 aria-label={`Remove ${tag.crm_tags?.tag_name || "tag"}`}
                 title={`Remove ${tag.crm_tags?.tag_name || "tag"}`}
               >
-                ×
+                Ã—
               </button>
             </span>
           ))}
@@ -14139,7 +14710,7 @@ function ContactTagAssignmentRow({
                 aria-label={`Remove ${tag.crm_tags?.tag_name || "tag"}`}
                 title={`Remove ${tag.crm_tags?.tag_name || "tag"}`}
               >
-                ×
+                Ã—
               </button>
             </span>
           ))}
