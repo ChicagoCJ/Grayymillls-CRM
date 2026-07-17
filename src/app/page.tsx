@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Version 3.03 - Projects / Lists Foundation";
+const APP_VERSION = "Version 3.04 - Project / List Assignments";
 const REVISION_NOTE =
-  "Admins can now create, edit, archive, reactivate, and assign owners to Projects and Lists through verified session-protected controls.";
+  "Companies and contacts can now be assigned to Projects and Lists manually or during import, with company filtering and verified Admin-only assignment controls.";
 
 type SignedInSessionStatus = {
   state: "checking" | "not_configured" | "signed_out" | "signed_in" | "error";
@@ -865,6 +865,10 @@ export default function Home() {
   }, [activeTab]);
   const [importAssignedSalespersonId, setImportAssignedSalespersonId] = useState("");
   const [importAssignedSalesManagerId, setImportAssignedSalesManagerId] = useState("");
+  const [importProjectListOptions, setImportProjectListOptions] = useState<any[]>([]);
+  const [importSelectedProjectListIds, setImportSelectedProjectListIds] = useState<string[]>([]);
+  const [isLoadingImportProjectLists, setIsLoadingImportProjectLists] = useState(false);
+  const [importProjectListError, setImportProjectListError] = useState("");
   const [selectedCompanyIds, setSelectedCompanyIds] = useState<string[]>([]);
   const [bulkAssignedSalespersonId, setBulkAssignedSalespersonId] = useState("");
   const [bulkAssignedSalesManagerId, setBulkAssignedSalesManagerId] = useState("");
@@ -910,6 +914,8 @@ export default function Home() {
   const [companyCategoryTagFilter, setCompanyCategoryTagFilter] = useState("All");
   const [allCrmTags, setAllCrmTags] = useState<CrmTag[]>([]);
   const [allCompanyTags, setAllCompanyTags] = useState<CompanyTagSummary[]>([]);
+  const [allCompanyProjectAssignments, setAllCompanyProjectAssignments] = useState<any[]>([]);
+  const [companyProjectListFilter, setCompanyProjectListFilter] = useState("All");
   const [companyOwnerFilter, setCompanyOwnerFilter] = useState("All");
   const [companySalespersonFilter, setCompanySalespersonFilter] = useState("All");
   const [companySalesManagerFilter, setCompanySalesManagerFilter] = useState("All");
@@ -1301,6 +1307,14 @@ const companyBuyerPersonas = getCompanyEffectiveBuyerPersonas(
       const matchesBuyerPersona =
         companyBuyerPersonaFilter === "All" || companyBuyerPersonas.includes(companyBuyerPersonaFilter);
 
+      const companyProjectListIds = allCompanyProjectAssignments
+        .filter((assignment) => String(assignment.company_id) === String(company.id))
+        .map((assignment) => String(assignment.project_id));
+
+      const matchesProjectList =
+        companyProjectListFilter === "All" ||
+        companyProjectListIds.includes(companyProjectListFilter);
+
       return (
         matchesSearch &&
         matchesTier &&
@@ -1313,12 +1327,14 @@ const companyBuyerPersonas = getCompanyEffectiveBuyerPersonas(
         matchesSalesManagerCoverage &&
         matchesAssignmentStatus &&
         matchesAccountType &&
-        matchesBuyerPersona
+        matchesBuyerPersona &&
+        matchesProjectList
       );
     });
   }, [
     crmSummary.companies,
     allCompanyTags,
+    allCompanyProjectAssignments,
     companySearchTerm,
     companyTierFilter,
     companyStatusFilter,
@@ -1330,6 +1346,7 @@ const companyBuyerPersonas = getCompanyEffectiveBuyerPersonas(
     companyAccountTypeFilter,
 
     companyBuyerPersonaFilter,
+    companyProjectListFilter,
     companyAccountTypeOverrides,
     companyBuyerPersonaOverrides,
     companyMarketTagFilter,
@@ -1347,6 +1364,7 @@ const companyBuyerPersonas = getCompanyEffectiveBuyerPersonas(
     setCompanyAssignmentStatusFilter("All");
     setCompanyAccountTypeFilter("All");
     setCompanyBuyerPersonaFilter("All");
+    setCompanyProjectListFilter("All");
     setCompanyPrimaryIndustryFilter("All");
     setCompanyPrimarySubIndustryFilter("All");
   }
@@ -1378,6 +1396,7 @@ const companyBuyerPersonas = getCompanyEffectiveBuyerPersonas(
       if (typeof preferences.companyAssignmentStatusFilter === "string") setCompanyAssignmentStatusFilter(preferences.companyAssignmentStatusFilter);
       if (typeof preferences.companyAccountTypeFilter === "string") setCompanyAccountTypeFilter(preferences.companyAccountTypeFilter);
       if (typeof preferences.companyBuyerPersonaFilter === "string") setCompanyBuyerPersonaFilter(preferences.companyBuyerPersonaFilter);
+      if (typeof preferences.companyProjectListFilter === "string") setCompanyProjectListFilter(preferences.companyProjectListFilter);
       if (typeof preferences.companyPrimaryIndustryFilter === "string") setCompanyPrimaryIndustryFilter(preferences.companyPrimaryIndustryFilter);
       if (typeof preferences.companyPrimarySubIndustryFilter === "string") setCompanyPrimarySubIndustryFilter(preferences.companyPrimarySubIndustryFilter);
       if (typeof preferences.companyMarketTagFilter === "string") setCompanyMarketTagFilter(preferences.companyMarketTagFilter);
@@ -1407,6 +1426,7 @@ const companyBuyerPersonas = getCompanyEffectiveBuyerPersonas(
         companyAssignmentStatusFilter,
         companyAccountTypeFilter,
         companyBuyerPersonaFilter,
+        companyProjectListFilter,
         companyPrimaryIndustryFilter,
         companyPrimarySubIndustryFilter,
         companyMarketTagFilter,
@@ -1434,6 +1454,7 @@ const companyBuyerPersonas = getCompanyEffectiveBuyerPersonas(
     companyAssignmentStatusFilter,
     companyAccountTypeFilter,
     companyBuyerPersonaFilter,
+    companyProjectListFilter,
     companyPrimaryIndustryFilter,
     companyPrimarySubIndustryFilter,
     companyMarketTagFilter,
@@ -1464,6 +1485,7 @@ const companyBuyerPersonas = getCompanyEffectiveBuyerPersonas(
     setCompanyAssignmentStatusFilter("All");
     setCompanyAccountTypeFilter("All");
     setCompanyBuyerPersonaFilter("All");
+    setCompanyProjectListFilter("All");
     setCompanyPrimaryIndustryFilter("All");
     setCompanyPrimarySubIndustryFilter("All");
     setCompanyMarketTagFilter("All");
@@ -1501,18 +1523,20 @@ async function loadCompanyOwnerFilterData() {
     setIsLoadingSummary(true);
 
     try {
-      const [summaryResponse, tagsResponse, companyTagsResponse, contactTagsResponse] =
+      const [summaryResponse, tagsResponse, companyTagsResponse, contactTagsResponse, companyProjectAssignmentsResponse] =
         await Promise.all([
           fetch("/api/crm-summary"),
           fetch("/api/tags"),
           fetch("/api/company-tag-summary"),
           fetch("/api/contact-tag-summary"),
+          fetch("/api/company-project-assignment-summary"),
         ]);
 
       const summaryData = await summaryResponse.json();
       const tagsData = await tagsResponse.json();
       const companyTagsData = await companyTagsResponse.json();
       const contactTagsData = await contactTagsResponse.json();
+      const companyProjectAssignmentsData = await companyProjectAssignmentsResponse.json();
 
       if (!summaryResponse.ok) {
         throw new Error(summaryData.error || "Could not load CRM summary.");
@@ -1530,10 +1554,20 @@ async function loadCompanyOwnerFilterData() {
         throw new Error(contactTagsData.error || "Could not load contact tags.");
       }
 
+      if (!companyProjectAssignmentsResponse.ok) {
+        throw new Error(
+          companyProjectAssignmentsData.error ||
+            "Could not load company Project / List assignments."
+        );
+      }
+
       setCrmSummary(summaryData);
       setAllCrmTags(tagsData.tags ?? []);
       setAllCompanyTags(companyTagsData.companyTags ?? []);
       setAllContactTags(contactTagsData.contactTags ?? []);
+      setAllCompanyProjectAssignments(
+        companyProjectAssignmentsData.companyProjectAssignments ?? []
+      );
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Could not load CRM summary.");
     } finally {
@@ -1701,11 +1735,38 @@ async function loadCompanyOwnerFilterData() {
     }
 
     try {
+      let importAuthorizationHeader: Record<string, string> = {};
+
+      if (importSelectedProjectListIds.length > 0) {
+        const supabase = getBrowserSupabaseClient();
+        const { data: sessionData, error: sessionError } =
+          await supabase.auth.getSession();
+
+        if (sessionError) {
+          throw new Error(
+            sessionError.message || "Could not read the signed-in session."
+          );
+        }
+
+        const accessToken = sessionData.session?.access_token;
+
+        if (!accessToken) {
+          throw new Error(
+            "A signed-in Admin session is required for import Project / List assignment."
+          );
+        }
+
+        importAuthorizationHeader = {
+          Authorization: `Bearer ${accessToken}`,
+        };
+      }
+
       const response = await fetch("/api/import-zoominfo", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           ...apiPermissionHeaders(),
+          ...importAuthorizationHeader,
         },
         body: JSON.stringify({
           fileName: csvData.fileName,
@@ -1722,6 +1783,7 @@ async function loadCompanyOwnerFilterData() {
           ],
           assignedSalespersonId: importAssignedSalespersonId,
           assignedSalesManagerId: importAssignedSalesManagerId,
+          selectedProjectListIds: importSelectedProjectListIds,
         }),
       });
 
@@ -1739,8 +1801,13 @@ async function loadCompanyOwnerFilterData() {
           ? ` Sales coverage assigned to ${data.companiesAssigned} companies. Salesperson / Rep: ${assignedSalespersonName}. Sales Manager: ${assignedSalesManagerName}.`
           : "";
 
+      const projectListAssignmentSummary =
+        data.projectListCompanyAssignments || data.projectListContactAssignments
+          ? ` Project / List assignments applied: ${data.projectListCompanyAssignments ?? 0} company memberships and ${data.projectListContactAssignments ?? 0} contact memberships.`
+          : "";
+
       setImportMessage(
-        `Import ${data.status}: ${data.processedCount} processed, ${data.duplicateCount} possible duplicates/reused companies, ${data.errorCount} row errors.${assignmentSummary}`
+        `Import ${data.status}: ${data.processedCount} processed, ${data.duplicateCount} possible duplicates/reused companies, ${data.errorCount} row errors.${assignmentSummary}${projectListAssignmentSummary}`
       );
 
       await loadCrmSummary();
@@ -1945,12 +2012,48 @@ async function handleAnalyzeProspect() {
   function clearImportAssignments() {
     setImportAssignedSalespersonId("");
     setImportAssignedSalesManagerId("");
+    setImportSelectedProjectListIds([]);
   }
   function importAssignmentUserName(userId?: string | null) {
     if (!userId) return "Not selected";
     const user = roleTestUsers.find((candidate) => candidate.id === userId);
     return user?.display_name || user?.email || userId;
   }
+
+  async function loadImportProjectLists() {
+    setIsLoadingImportProjectLists(true);
+    setImportProjectListError("");
+
+    try {
+      const response = await fetch("/api/projects-lists");
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Could not load Projects / Lists.");
+      }
+
+      setImportProjectListOptions(
+        Array.isArray(data.projectsLists)
+          ? data.projectsLists.filter((item: any) => item.status === "active")
+          : []
+      );
+    } catch (error) {
+      setImportProjectListOptions([]);
+      setImportProjectListError(
+        error instanceof Error
+          ? error.message
+          : "Could not load Projects / Lists."
+      );
+    } finally {
+      setIsLoadingImportProjectLists(false);
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === "import") {
+      loadImportProjectLists();
+    }
+  }, [activeTab]);
 
   async function handleBulkCompanyAssignment() {
     if (!currentPermissions.canAssignSalesCoverage) {
@@ -2429,6 +2532,18 @@ async function handleAnalyzeProspect() {
             setCompanyAccountTypeFilter={setCompanyAccountTypeFilter}
             companyBuyerPersonaFilter={companyBuyerPersonaFilter}
             setCompanyBuyerPersonaFilter={setCompanyBuyerPersonaFilter}
+            companyProjectListFilter={companyProjectListFilter}
+            setCompanyProjectListFilter={setCompanyProjectListFilter}
+            companyProjectListOptions={Array.from(
+              new Map(
+                allCompanyProjectAssignments
+                  .filter((assignment) => assignment.crm_projects)
+                  .map((assignment) => [
+                    String(assignment.project_id),
+                    assignment.crm_projects,
+                  ])
+              ).values()
+            )}
             companyAccountTypeOverrides={companyAccountTypeOverrides}
             setCompanyAccountTypeOverrides={setCompanyAccountTypeOverrides}
             apiPermissionHeaders={apiPermissionHeaders}
@@ -2517,6 +2632,7 @@ async function handleAnalyzeProspect() {
             }
             apiPermissionHeaders={apiPermissionHeaders}
             canMoveOpportunityStages={currentPermissions.canMoveOpportunityStages}
+            canManageProjectsLists={currentPermissions.canManageAdminSettings}
           />
         )}
 
@@ -2637,6 +2753,103 @@ async function handleAnalyzeProspect() {
                       Clear import assignment
                     </button>
                   </div>
+                </div>
+
+                <div className="max-w-full overflow-hidden rounded-2xl border border-violet-200 bg-violet-50 p-5">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <h3 className="text-lg font-bold text-violet-950">
+                        Import Project / List Assignment
+                      </h3>
+                      <p className="mt-2 text-sm leading-6 text-violet-900">
+                        Admin only: add every company and contact created or reused by this import to one or more active Projects / Lists.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={loadImportProjectLists}
+                      disabled={isLoadingImportProjectLists}
+                      className="w-fit rounded-xl bg-white px-4 py-2 text-sm font-semibold text-violet-800 shadow-sm ring-1 ring-violet-200 hover:bg-violet-100 disabled:text-slate-400"
+                    >
+                      {isLoadingImportProjectLists
+                        ? "Refreshing..."
+                        : "Refresh Projects / Lists"}
+                    </button>
+                  </div>
+
+                  {importProjectListError && (
+                    <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                      {importProjectListError}
+                    </div>
+                  )}
+
+                  {currentPermissions.canManageAdminSettings ? (
+                    <div className="mt-4 grid gap-2 md:grid-cols-2">
+                      {importProjectListOptions.length === 0 ? (
+                        <p className="text-sm text-violet-800">
+                          No active Projects / Lists are available.
+                        </p>
+                      ) : (
+                        importProjectListOptions.map((item: any) => {
+                          const itemId = String(item.id || "");
+                          const isSelected = importSelectedProjectListIds.includes(itemId);
+
+                          return (
+                            <label
+                              key={itemId}
+                              className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm ${
+                                isSelected
+                                  ? "border-violet-400 bg-white text-violet-950"
+                                  : "border-violet-200 bg-violet-100/60 text-violet-900 hover:bg-white"
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => {
+                                  setImportSelectedProjectListIds((current) =>
+                                    isSelected
+                                      ? current.filter((id) => id !== itemId)
+                                      : [...current, itemId]
+                                  );
+                                }}
+                                className="mt-1 h-4 w-4 rounded border-violet-300 text-violet-700 focus:ring-violet-600"
+                              />
+
+                              <span>
+                                <span className="font-semibold">
+                                  {item.project_kind === "list" ? "List" : "Project"}:{" "}
+                                  {item.project_name}
+                                </span>
+                                {item.description && (
+                                  <span className="mt-1 block text-xs leading-5 text-violet-700">
+                                    {item.description}
+                                  </span>
+                                )}
+                              </span>
+                            </label>
+                          );
+                        })
+                      )}
+                    </div>
+                  ) : (
+                    <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">
+                      Project / List assignment during import is restricted to CRM Admin users.
+                    </p>
+                  )}
+
+                  {importSelectedProjectListIds.length > 0 && (
+                    <div className="mt-4 rounded-xl border border-violet-300 bg-white p-3 text-sm text-violet-900">
+                      <p className="font-semibold">
+                        {importSelectedProjectListIds.length} Project / List assignment
+                        {importSelectedProjectListIds.length === 1 ? "" : "s"} selected.
+                      </p>
+                      <p className="mt-1 text-xs text-violet-700">
+                        These memberships will be applied to every imported or reused company and contact.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex flex-wrap justify-start gap-3">
@@ -8389,6 +8602,28 @@ function HelpSection() {
 function ReleaseNotesSection() {
   const releases = [
     {
+      version: "Version 3.04",
+      title: "Project / List Assignments",
+      date: "July 17, 2026",
+      summary:
+        "Completes company and contact membership workflows for Projects and Lists across import, company detail, contact detail, and company search.",
+      changes: [
+        "Added protected company and contact Project / List assignment APIs with verified signed-in CRM Admin write protection.",
+        "Added company-level Project / List controls on Company Detail, including add, remove, archived-item visibility, and read-only behavior for non-Admins.",
+        "Added contact-level Project / List controls inside Company Detail contact cards with verified Admin-only add and remove actions.",
+        "Added optional import-time Project / List assignment so imported or reused companies and contacts can be added to selected active Projects or Lists.",
+        "Added a company Project / List filter to the Companies screen, including saved filter preferences and archived assignment visibility.",
+        "Added a read-only company assignment summary endpoint used by the Companies filter.",
+      ],
+      testNotes: [
+        "Confirm an Admin can add and remove company and contact Project / List assignments and that they persist after refresh.",
+        "Confirm archived assigned Projects or Lists remain visible but are not offered for new assignments.",
+        "Confirm Sales Managers and Sales Reps can view assignments but cannot change them.",
+        "Confirm imports can assign created or reused companies and contacts to selected active Projects or Lists.",
+        "Confirm the Companies Project / List filter returns only matching assigned companies and is restored after refresh.",
+      ],
+    },
+    {
       version: "Version 3.03",
       title: "Projects / Lists Foundation",
       date: "July 17, 2026",
@@ -9258,6 +9493,9 @@ function CompaniesSection({
   setCompanyAccountTypeFilter = () => {},
   companyBuyerPersonaFilter = "All",
   setCompanyBuyerPersonaFilter = () => {},
+  companyProjectListFilter = "All",
+  setCompanyProjectListFilter = () => {},
+  companyProjectListOptions = [],
   companyAccountTypeOverrides = {},
   setCompanyAccountTypeOverrides = () => {},
   apiPermissionHeaders = () => ({}),
@@ -9317,6 +9555,9 @@ function CompaniesSection({
   setCompanyAccountTypeFilter?: (value: string) => void;
   companyBuyerPersonaFilter?: string;
   setCompanyBuyerPersonaFilter?: (value: string) => void;
+  companyProjectListFilter?: string;
+  setCompanyProjectListFilter?: (value: string) => void;
+  companyProjectListOptions?: any[];
   companyAccountTypeOverrides?: Record<string, CompanyAccountTypeLens>;
   setCompanyAccountTypeOverrides?: (
     value:
@@ -9788,6 +10029,24 @@ function CompaniesSection({
                 </button>
               </div>
             </div>
+            <div>
+              <label className="text-sm font-semibold text-slate-700">Project / List</label>
+              <select
+                value={companyProjectListFilter}
+                onChange={(event) => setCompanyProjectListFilter(event.target.value)}
+                className="mt-2 w-full max-w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              >
+                <option value="All">All Projects / Lists</option>
+                {companyProjectListOptions.map((item: any) => (
+                  <option key={String(item.id)} value={String(item.id)}>
+                    {item.project_kind === "list" ? "List" : "Project"}:{" "}
+                    {item.project_name}
+                    {item.status === "archived" ? " (Archived)" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div>
               <label className="text-sm font-semibold text-slate-700">Primary Industry</label>
               <select
@@ -10342,6 +10601,7 @@ function CompanyDetailSection({
   onBack,
   salesCoverageCanEdit = true,
   canMoveOpportunityStages = true,
+  canManageProjectsLists = false,
   apiPermissionHeaders = () => ({}),
 }: {
   detail: CompanyDetail | null;
@@ -10359,6 +10619,7 @@ function CompanyDetailSection({
   onBack: () => void;
   salesCoverageCanEdit?: boolean;
   canMoveOpportunityStages?: boolean;
+  canManageProjectsLists?: boolean;
   apiPermissionHeaders?: any;
 }) {
   const [companyActivityHistoryFilter, setCompanyActivityHistoryFilter] = useState<
@@ -11383,6 +11644,11 @@ function CompanyDetailSection({
         </DetailCard>
       </div>      <CompanyIndustryEnrichmentPanel company={detail.company} />
 
+      <CompanyProjectListManager
+        companyId={String(detail.company.id)}
+        canManageProjectsLists={canManageProjectsLists}
+      />
+
       <CompanyTagManager
         companyId={String(detail.company.id)}
         apiPermissionHeaders={apiPermissionHeaders}
@@ -12060,6 +12326,11 @@ function CompanyDetailSection({
                   <p>Mobile: {displayValue(contact.mobile_phone)}</p>
                   <p>Function: {displayValue(contact.function_area || contact.department)}</p>
                 </div>
+
+                <ContactProjectListManager
+                  contactId={String(contact.id)}
+                  canManageProjectsLists={canManageProjectsLists}
+                />
 
                 <ContactTagManager
                   contactId={String(contact.id)}
@@ -14113,6 +14384,361 @@ function CompanyOpportunityPanel({
   );
 }
 
+function CompanyProjectListManager({
+  companyId,
+  canManageProjectsLists = false,
+}: {
+  companyId: string;
+  canManageProjectsLists?: boolean;
+}) {
+  const [projectsLists, setProjectsLists] = useState<any[]>([]);
+  const [assignments, setAssignments] = useState<any[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+
+  async function getVerifiedAdminHeaders() {
+    const supabase = getBrowserSupabaseClient();
+    const { data, error } = await supabase.auth.getSession();
+
+    if (error) {
+      throw new Error(
+        error.message || "Could not read the signed-in session."
+      );
+    }
+
+    const accessToken = data.session?.access_token;
+
+    if (!accessToken) {
+      throw new Error("A signed-in Supabase session is required.");
+    }
+
+    return {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    };
+  }
+
+  async function loadCompanyProjectAssignments() {
+    setIsLoading(true);
+    setErrorMessage("");
+
+    try {
+      const [projectsResponse, assignmentsResponse] = await Promise.all([
+        fetch("/api/projects-lists"),
+        fetch(
+          `/api/company-project-assignments?companyId=${encodeURIComponent(
+            companyId
+          )}`
+        ),
+      ]);
+
+      const projectsData = await projectsResponse.json();
+      const assignmentsData = await assignmentsResponse.json();
+
+      if (!projectsResponse.ok) {
+        throw new Error(
+          projectsData.error || "Could not load Projects / Lists."
+        );
+      }
+
+      if (!assignmentsResponse.ok) {
+        throw new Error(
+          assignmentsData.error ||
+            "Could not load company Project / List assignments."
+        );
+      }
+
+      setProjectsLists(
+        Array.isArray(projectsData.projectsLists)
+          ? projectsData.projectsLists
+          : []
+      );
+
+      setAssignments(
+        Array.isArray(assignmentsData.companyProjectAssignments)
+          ? assignmentsData.companyProjectAssignments
+          : []
+      );
+    } catch (error) {
+      setProjectsLists([]);
+      setAssignments([]);
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not load company Project / List assignments."
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadCompanyProjectAssignments();
+  }, [companyId]);
+
+  const assignedProjectIds = useMemo(
+    () =>
+      new Set(
+        assignments.map((assignment) =>
+          String(assignment.project_id || "")
+        )
+      ),
+    [assignments]
+  );
+
+  const availableProjectsLists = useMemo(
+    () =>
+      projectsLists.filter(
+        (item) =>
+          item.status === "active" &&
+          !assignedProjectIds.has(String(item.id))
+      ),
+    [projectsLists, assignedProjectIds]
+  );
+
+  async function addAssignment() {
+    if (!selectedProjectId || isSaving) return;
+
+    setIsSaving(true);
+    setMessage("");
+    setErrorMessage("");
+
+    try {
+      const headers = await getVerifiedAdminHeaders();
+      const response = await fetch("/api/company-project-assignments", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          companyId,
+          projectId: selectedProjectId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Could not add Project / List assignment."
+        );
+      }
+
+      setSelectedProjectId("");
+      setMessage("Project / List assignment added.");
+      await loadCompanyProjectAssignments();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not add Project / List assignment."
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function removeAssignment(projectId: string) {
+    if (!projectId || isSaving) return;
+
+    setIsSaving(true);
+    setMessage("");
+    setErrorMessage("");
+
+    try {
+      const headers = await getVerifiedAdminHeaders();
+      const response = await fetch("/api/company-project-assignments", {
+        method: "DELETE",
+        headers,
+        body: JSON.stringify({
+          companyId,
+          projectId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Could not remove Project / List assignment."
+        );
+      }
+
+      setMessage("Project / List assignment removed.");
+      await loadCompanyProjectAssignments();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not remove Project / List assignment."
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <section className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+          <h3 className="text-xl font-bold">Projects / Lists</h3>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+            Add this company to active sales projects, campaigns, initiatives,
+            and reusable CRM lists.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={loadCompanyProjectAssignments}
+          disabled={isLoading}
+          className="w-fit rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
+        >
+          {isLoading ? "Refreshing..." : "Refresh Assignments"}
+        </button>
+      </div>
+
+      {(message || errorMessage) && (
+        <div className="mt-4 grid gap-2">
+          {message && (
+            <div className="rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+              {message}
+            </div>
+          )}
+          {errorMessage && (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+              {errorMessage}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <p className="text-sm font-semibold text-slate-800">
+          Assigned Projects / Lists
+        </p>
+
+        {assignments.length === 0 ? (
+          <p className="mt-3 text-sm text-slate-600">
+            This company is not assigned to any Projects or Lists.
+          </p>
+        ) : (
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            {assignments.map((assignment) => {
+              const project = assignment.crm_projects;
+              const projectId = String(
+                assignment.project_id || project?.id || ""
+              );
+              const isArchived = project?.status === "archived";
+
+              return (
+                <div
+                  key={String(assignment.id)}
+                  className="rounded-xl border border-slate-200 bg-white p-4"
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                            project?.project_kind === "list"
+                              ? "bg-violet-100 text-violet-800"
+                              : "bg-blue-100 text-blue-800"
+                          }`}
+                        >
+                          {project?.project_kind === "list"
+                            ? "List"
+                            : "Project"}
+                        </span>
+
+                        {isArchived && (
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                            Archived
+                          </span>
+                        )}
+                      </div>
+
+                      <p className="mt-2 font-semibold text-slate-950">
+                        {project?.project_name || "Unknown Project / List"}
+                      </p>
+
+                      {project?.description && (
+                        <p className="mt-1 text-sm leading-5 text-slate-600">
+                          {project.description}
+                        </p>
+                      )}
+                    </div>
+
+                    {canManageProjectsLists && (
+                      <button
+                        type="button"
+                        onClick={() => removeAssignment(projectId)}
+                        disabled={isSaving}
+                        className="w-fit rounded-lg bg-white px-3 py-2 text-xs font-semibold text-red-700 shadow-sm ring-1 ring-red-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-slate-400"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {canManageProjectsLists ? (
+        <div className="mt-4 rounded-2xl border border-blue-200 bg-blue-50 p-4">
+          <label className="text-sm font-semibold text-blue-950">
+            Add to Project / List
+          </label>
+
+          <div className="mt-2 flex flex-col gap-3 md:flex-row">
+            <select
+              value={selectedProjectId}
+              onChange={(event) =>
+                setSelectedProjectId(event.target.value)
+              }
+              disabled={isLoading || isSaving}
+              className="w-full rounded-xl border border-blue-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            >
+              <option value="">Choose an active Project or List</option>
+              {availableProjectsLists.map((item) => (
+                <option key={String(item.id)} value={String(item.id)}>
+                  {item.project_kind === "list" ? "List" : "Project"}:{" "}
+                  {item.project_name}
+                </option>
+              ))}
+            </select>
+
+            <button
+              type="button"
+              onClick={addAssignment}
+              disabled={!selectedProjectId || isLoading || isSaving}
+              className="rounded-xl bg-blue-700 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+            >
+              {isSaving ? "Saving..." : "Add Assignment"}
+            </button>
+          </div>
+
+          {availableProjectsLists.length === 0 && !isLoading && (
+            <p className="mt-3 text-xs text-blue-800">
+              No additional active Projects or Lists are available.
+            </p>
+          )}
+        </div>
+      ) : (
+        <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">
+          Your current role can view Project / List membership but cannot
+          change assignments.
+        </p>
+      )}
+    </section>
+  );
+}
+
+
 function CompanyTagManager({
   companyId,
   apiPermissionHeaders = () => ({}),
@@ -14429,6 +15055,279 @@ function TagAssignmentColumn({
   );
 }
 
+
+function ContactProjectListManager({
+  contactId,
+  canManageProjectsLists = false,
+}: {
+  contactId: string;
+  canManageProjectsLists?: boolean;
+}) {
+  const [projectsLists, setProjectsLists] = useState<any[]>([]);
+  const [assignments, setAssignments] = useState<any[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+
+  async function loadContactProjectsLists() {
+    setIsLoading(true);
+    setErrorMessage("");
+
+    try {
+      const [projectsResponse, assignmentsResponse] = await Promise.all([
+        fetch("/api/projects-lists?includeInactive=true"),
+        fetch(`/api/contact-project-assignments?contactId=${encodeURIComponent(contactId)}`),
+      ]);
+
+      const projectsData = await projectsResponse.json();
+      const assignmentsData = await assignmentsResponse.json();
+
+      if (!projectsResponse.ok) {
+        throw new Error(projectsData.error || "Could not load Projects / Lists.");
+      }
+
+      if (!assignmentsResponse.ok) {
+        throw new Error(
+          assignmentsData.error ||
+            "Could not load contact Project / List assignments."
+        );
+      }
+
+      setProjectsLists(projectsData.projectsLists ?? []);
+      setAssignments(assignmentsData.contactProjectAssignments ?? []);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not load contact Project / List assignments."
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadContactProjectsLists();
+  }, [contactId]);
+
+  const assignedProjectIds = useMemo(
+    () => new Set(assignments.map((assignment) => String(assignment.project_id))),
+    [assignments]
+  );
+
+  const availableProjectsLists = projectsLists.filter(
+    (item) =>
+      String(item.status || "active") === "active" &&
+      !assignedProjectIds.has(String(item.id))
+  );
+
+  async function getVerifiedAuthorizationHeader() {
+    const supabase = getBrowserSupabaseClient();
+    const { data, error } = await supabase.auth.getSession();
+
+    if (error) {
+      throw new Error(error.message || "Could not read the signed-in session.");
+    }
+
+    const accessToken = data.session?.access_token;
+
+    if (!accessToken) {
+      throw new Error("A signed-in Admin session is required.");
+    }
+
+    return { Authorization: `Bearer ${accessToken}` };
+  }
+
+  async function addProjectListAssignment() {
+    if (!selectedProjectId || !canManageProjectsLists) return;
+
+    setIsSaving(true);
+    setMessage("");
+    setErrorMessage("");
+
+    try {
+      const authorizationHeader = await getVerifiedAuthorizationHeader();
+      const response = await fetch("/api/contact-project-assignments", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...authorizationHeader,
+        },
+        body: JSON.stringify({
+          contactId,
+          projectId: selectedProjectId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Could not add Project / List assignment.");
+      }
+
+      setSelectedProjectId("");
+      setMessage("Project / List assignment added.");
+      await loadContactProjectsLists();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not add Project / List assignment."
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function removeProjectListAssignment(projectId: string) {
+    if (!canManageProjectsLists) return;
+
+    setIsSaving(true);
+    setMessage("");
+    setErrorMessage("");
+
+    try {
+      const authorizationHeader = await getVerifiedAuthorizationHeader();
+      const response = await fetch("/api/contact-project-assignments", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          ...authorizationHeader,
+        },
+        body: JSON.stringify({ contactId, projectId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Could not remove Project / List assignment.");
+      }
+
+      setMessage("Project / List assignment removed.");
+      await loadContactProjectsLists();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not remove Project / List assignment."
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <div className="mt-4 rounded-xl border border-violet-200 bg-violet-50 p-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h4 className="font-semibold text-violet-950">Contact Projects / Lists</h4>
+          <p className="mt-1 text-xs leading-5 text-violet-700">
+            Memberships assigned specifically to this contact.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={loadContactProjectsLists}
+          disabled={isLoading || isSaving}
+          className="w-fit rounded-lg bg-white px-3 py-2 text-xs font-semibold text-violet-800 shadow-sm ring-1 ring-violet-200 hover:bg-violet-100 disabled:text-slate-400"
+        >
+          {isLoading ? "Refreshing..." : "Refresh"}
+        </button>
+      </div>
+
+      {(message || errorMessage) && (
+        <div className="mt-3 grid gap-2">
+          {message && (
+            <div className="rounded-lg border border-green-200 bg-green-50 p-2 text-xs text-green-800">
+              {message}
+            </div>
+          )}
+          {errorMessage && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-2 text-xs text-red-800">
+              {errorMessage}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="mt-4 grid gap-2">
+        {assignments.length === 0 ? (
+          <p className="text-xs text-violet-700">No Projects / Lists assigned.</p>
+        ) : (
+          assignments.map((assignment) => {
+            const item = assignment.crm_projects;
+            const projectId = String(assignment.project_id);
+
+            return (
+              <div
+                key={String(assignment.id)}
+                className="flex flex-col gap-2 rounded-lg border border-violet-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div className="text-xs text-violet-950">
+                  <p className="font-semibold">
+                    {item?.project_kind === "list" ? "List" : "Project"}:{" "}
+                    {item?.project_name || projectId}
+                  </p>
+                  {item?.status === "archived" && (
+                    <span className="mt-1 inline-flex rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700">
+                      Archived
+                    </span>
+                  )}
+                </div>
+
+                {canManageProjectsLists && (
+                  <button
+                    type="button"
+                    onClick={() => removeProjectListAssignment(projectId)}
+                    disabled={isSaving}
+                    className="w-fit rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:text-slate-400"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {canManageProjectsLists ? (
+        <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]">
+          <select
+            value={selectedProjectId}
+            onChange={(event) => setSelectedProjectId(event.target.value)}
+            disabled={isSaving || availableProjectsLists.length === 0}
+            className="w-full rounded-lg border border-violet-200 bg-white px-3 py-2 text-xs shadow-sm disabled:bg-slate-100"
+          >
+            <option value="">Choose an active Project / List</option>
+            {availableProjectsLists.map((item) => (
+              <option key={String(item.id)} value={String(item.id)}>
+                {item.project_kind === "list" ? "List" : "Project"}:{" "}
+                {item.project_name}
+              </option>
+            ))}
+          </select>
+
+          <button
+            type="button"
+            onClick={addProjectListAssignment}
+            disabled={!selectedProjectId || isSaving}
+            className="rounded-lg bg-violet-700 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-800 disabled:bg-slate-300"
+          >
+            {isSaving ? "Saving..." : "Add"}
+          </button>
+        </div>
+      ) : (
+        <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs font-semibold text-amber-800">
+          Project / List memberships are read-only for your current role.
+        </p>
+      )}
+    </div>
+  );
+}
 
 function ContactTagManager({
   contactId,

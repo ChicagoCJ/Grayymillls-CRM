@@ -1,6 +1,7 @@
 ﻿import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { enforceApiPermission } from "../_shared/permissions";
+import { verifySignedInAdmin } from "../_shared/verified-auth";
 
 type ImportPayload = {
   fileName: string;
@@ -9,6 +10,7 @@ type ImportPayload = {
   mapping: Record<string, string>;
   assignedSalespersonId?: string | null;
   assignedSalesManagerId?: string | null;
+  selectedProjectListIds?: string[];
 };
 
 type CompanyInsert = {
@@ -705,6 +707,46 @@ async function findOrCreateContact(supabase: ReturnType<typeof getSupabaseAdmin>
   return insertedContact;
 }
 
+function normalizeProjectListIds(value: unknown) {
+  if (!Array.isArray(value)) return [];
+
+  return Array.from(
+    new Set(
+      value
+        .map((item) => (typeof item === "string" ? item.trim() : ""))
+        .filter(Boolean)
+    )
+  );
+}
+
+async function applyProjectListAssignments(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  tableName: "company_project_assignments" | "contact_project_assignments",
+  recordKey: "company_id" | "contact_id",
+  recordId: string,
+  projectListIds: string[]
+) {
+  if (!recordId || projectListIds.length === 0) return 0;
+
+  const rows = projectListIds.map((projectId) => ({
+    [recordKey]: recordId,
+    project_id: projectId,
+  }));
+
+  const conflictTarget =
+    recordKey === "company_id"
+      ? "project_id,company_id"
+      : "project_id,contact_id";
+
+  const { error } = await supabase
+    .from(tableName)
+    .upsert(rows, { onConflict: conflictTarget });
+
+  if (error) throw error;
+
+  return rows.length;
+}
+
 function collectSelectedImportTagIds(payload: any) {
   const ids = [
     ...(Array.isArray(payload.selectedImportTagIds) ? payload.selectedImportTagIds : []),
@@ -730,6 +772,17 @@ export async function POST(request: Request) {
 
 const payload = (await request.json()) as ImportPayload;
     const selectedImportTagIds = collectSelectedImportTagIds(payload);
+    const selectedProjectListIds = normalizeProjectListIds(
+      payload.selectedProjectListIds
+    );
+
+    if (selectedProjectListIds.length > 0) {
+      const verification = await verifySignedInAdmin(request);
+
+      if (verification.response) {
+        return verification.response;
+      }
+    }
 
     if (!payload.fileName || !Array.isArray(payload.rows) || payload.rows.length === 0) {
       return NextResponse.json(
@@ -760,6 +813,8 @@ const payload = (await request.json()) as ImportPayload;
     let errorCount = 0;
     const assignedCompanyIds = new Set<string>();
     let companiesAssigned = 0;
+    let projectListCompanyAssignments = 0;
+    let projectListContactAssignments = 0;
 
     for (let index = 0; index < payload.rows.length; index += 1) {
       const row = payload.rows[index];
@@ -900,6 +955,22 @@ const companyWasDuplicate = company.created_at !== company.updated_at;
         };
 
         const contact = await findOrCreateContact(supabase, contactBeforeInsert);
+
+        projectListCompanyAssignments += await applyProjectListAssignments(
+          supabase,
+          "company_project_assignments",
+          "company_id",
+          company.id,
+          selectedProjectListIds
+        );
+
+        projectListContactAssignments += await applyProjectListAssignments(
+          supabase,
+          "contact_project_assignments",
+          "contact_id",
+          contact.id,
+          selectedProjectListIds
+        );
 
         
         await applyImportTagsToCompany(supabase, company.id, selectedImportTagIds);
@@ -1172,6 +1243,9 @@ const industryFitScore = scoreIndustryFit(industry, naics);
       companiesAssigned: assignedCompanyIds.size,
       assignedSalespersonId: payload.assignedSalespersonId || undefined || null,
       assignedSalesManagerId: payload.assignedSalesManagerId || undefined || null,
+      selectedProjectListIds,
+      projectListCompanyAssignments,
+      projectListContactAssignments,
       status: finalStatus,
     });
   } catch (error) {
