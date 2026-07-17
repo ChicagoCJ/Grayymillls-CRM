@@ -5310,6 +5310,12 @@ function AdminUsersSection({
   const [userMessage, setUserMessage] = useState("");
   const [userError, setUserError] = useState("");
   const [editingUserId, setEditingUserId] = useState("");
+  const [authUsers, setAuthUsers] = useState<any[]>([]);
+  const [isLoadingAuthUsers, setIsLoadingAuthUsers] = useState(false);
+  const [isSavingAuthUser, setIsSavingAuthUser] = useState(false);
+  const [authMessage, setAuthMessage] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [temporaryPasswords, setTemporaryPasswords] = useState<Record<string, string>>({});
   const [form, setForm] = useState<any>({
     displayName: "",
     roleName: "",
@@ -5345,6 +5351,136 @@ function AdminUsersSection({
   useEffect(() => {
     loadUsers();
   }, []);
+
+  async function getVerifiedAuthHeaders() {
+    const supabase = getBrowserSupabaseClient();
+    const { data, error } = await supabase.auth.getSession();
+
+    if (error) {
+      throw new Error(error.message || "Could not read the signed-in session.");
+    }
+
+    const accessToken = data.session?.access_token;
+
+    if (!accessToken) {
+      throw new Error("A signed-in Supabase session is required.");
+    }
+
+    return {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    };
+  }
+
+  async function loadAuthUsers() {
+    if (!canEditCrmUsers) {
+      setAuthUsers([]);
+      return;
+    }
+
+    setIsLoadingAuthUsers(true);
+    setAuthError("");
+
+    try {
+      const headers = await getVerifiedAuthHeaders();
+
+      const response = await fetch("/api/auth-management", {
+        method: "GET",
+        headers,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Could not load authentication status.");
+      }
+
+      setAuthUsers(data.users ?? []);
+    } catch (error) {
+      setAuthError(
+        error instanceof Error
+          ? error.message
+          : "Could not load authentication status."
+      );
+    } finally {
+      setIsLoadingAuthUsers(false);
+    }
+  }
+
+  useEffect(() => {
+    loadAuthUsers();
+  }, [canEditCrmUsers]);
+
+  function authStatusForCrmUser(crmUserId: string) {
+    return authUsers.find(
+      (authUser) => authUser.crmUserId === crmUserId
+    );
+  }
+
+  function formatAuthDate(value: unknown) {
+    if (!value) return "Never";
+
+    const date = new Date(String(value));
+
+    if (Number.isNaN(date.getTime())) {
+      return "Unknown";
+    }
+
+    return date.toLocaleString();
+  }
+
+  async function createAuthLogin(user: CrmUser) {
+    if (!requireAdminPermission()) return;
+
+    const temporaryPassword =
+      temporaryPasswords[String(user.id)] || "";
+
+    setIsSavingAuthUser(true);
+    setAuthMessage("");
+    setAuthError("");
+
+    try {
+      if (!temporaryPassword) {
+        throw new Error("Enter a temporary password.");
+      }
+
+      const headers = await getVerifiedAuthHeaders();
+
+      const response = await fetch("/api/auth-management", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          crmUserId: user.id,
+          temporaryPassword,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Could not create the Auth login.");
+      }
+
+      setTemporaryPasswords((current) => ({
+        ...current,
+        [String(user.id)]: "",
+      }));
+
+      setAuthMessage(
+        `Authentication login created for ${user.display_name || user.email}.`
+      );
+
+      await loadAuthUsers();
+    } catch (error) {
+      setAuthError(
+        error instanceof Error
+          ? error.message
+          : "Could not create the Auth login."
+      );
+    } finally {
+      setIsSavingAuthUser(false);
+    }
+  }
 
   function formatCrmUserRoleLabel(role: string) {
     if (role === "admin") return "Admin";
@@ -5499,11 +5635,14 @@ function AdminUsersSection({
           </div>
 
           <button
-            onClick={loadUsers}
-            disabled={isLoadingUsers}
+            onClick={async () => {
+              await loadUsers();
+              await loadAuthUsers();
+            }}
+            disabled={isLoadingUsers || isLoadingAuthUsers}
             className="w-fit rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
           >
-            {isLoadingUsers ? "Refreshing..." : "Refresh Users"}
+            {isLoadingUsers || isLoadingAuthUsers ? "Refreshing..." : "Refresh Users"}
           </button>
         </div>
 
@@ -5561,16 +5700,26 @@ function AdminUsersSection({
 
         </div>
 
-        {(userMessage || userError) && (
+        {(userMessage || userError || authMessage || authError) && (
           <div className="mt-4 grid gap-2">
             {userMessage && (
               <div className="rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-800">
                 {userMessage}
               </div>
             )}
+            {authMessage && (
+              <div className="rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+                {authMessage}
+              </div>
+            )}
             {userError && (
               <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
                 {userError}
+              </div>
+            )}
+            {authError && (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                {authError}
               </div>
             )}
           </div>
@@ -5750,7 +5899,10 @@ function AdminUsersSection({
           <p className="mt-3 text-sm text-slate-600">No CRM users found.</p>
         ) : (
           <div className="mt-5 grid gap-3">
-            {users.map((user) => (
+            {users.map((user) => {
+              const authStatus = authStatusForCrmUser(String(user.id));
+
+              return (
               <div
                 key={user.id}
                 className={`rounded-xl border p-4 ${
@@ -5781,6 +5933,24 @@ function AdminUsersSection({
                       >
                         {formatCrmUserRoleLabel(user.user_role)}
                       </span>
+
+                      {canEditCrmUsers && (
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                            authStatus?.hasAuthLogin
+                              ? "bg-green-100 text-green-800"
+                              : "bg-amber-100 text-amber-800"
+                          }`}
+                        >
+                          {authStatus?.hasAuthLogin ? "Login exists" : "No login"}
+                        </span>
+                      )}
+
+                      {authStatus?.isCurrentAdmin && (
+                        <span className="rounded-full bg-purple-100 px-2.5 py-1 text-xs font-semibold text-purple-800">
+                          Current login
+                        </span>
+                      )}
                     </div>
 
                     <div className="mt-2 grid gap-1 text-sm text-slate-600">
@@ -5795,6 +5965,54 @@ function AdminUsersSection({
                     {user.notes && (
                       <p className="mt-3 text-sm leading-6 text-slate-700">{user.notes}</p>
                     )}
+
+                    {canEditCrmUsers && authStatus?.hasAuthLogin && (
+                      <div className="mt-4 rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-900">
+                        <p>
+                          Email confirmed: {authStatus.emailConfirmed ? "Yes" : "No"}
+                        </p>
+                        <p className="mt-1">
+                          Last sign-in: {formatAuthDate(authStatus.lastSignInAt)}
+                        </p>
+                      </div>
+                    )}
+
+                    {canEditCrmUsers &&
+                      user.status === "active" &&
+                      !authStatus?.hasAuthLogin && (
+                        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                          <label className="text-sm font-semibold text-amber-950">
+                            Temporary Password
+                          </label>
+                          <input
+                            type="password"
+                            autoComplete="new-password"
+                            value={temporaryPasswords[String(user.id)] || ""}
+                            onChange={(event) =>
+                              setTemporaryPasswords((current) => ({
+                                ...current,
+                                [String(user.id)]: event.target.value,
+                              }))
+                            }
+                            className="mt-2 w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm"
+                            placeholder="Minimum 8 characters"
+                          />
+                          <button
+                            onClick={() => createAuthLogin(user)}
+                            disabled={
+                              isSavingAuthUser ||
+                              !temporaryPasswords[String(user.id)] ||
+                              temporaryPasswords[String(user.id)].length < 8
+                            }
+                            className="mt-3 rounded-lg bg-blue-700 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                          >
+                            {isSavingAuthUser ? "Creating Login..." : "Create Auth Login"}
+                          </button>
+                          <p className="mt-2 text-xs leading-5 text-amber-900">
+                            The password is sent directly to Supabase and is not stored in the CRM.
+                          </p>
+                        </div>
+                      )}
                   </div>
 
                   <div className="flex flex-wrap gap-2">
@@ -5824,7 +6042,8 @@ function AdminUsersSection({
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
