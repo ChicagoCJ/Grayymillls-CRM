@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Version 3.04 - Project / List Assignments";
+const APP_VERSION = "Version 3.05 - Contact Project / List Filter";
 const REVISION_NOTE =
-  "Companies and contacts can now be assigned to Projects and Lists manually or during import, with company filtering and verified Admin-only assignment controls.";
+  "Contacts can now be filtered by assigned Project or List membership, with saved preferences, archived membership visibility, and Clear Contact Filters support.";
 
 type SignedInSessionStatus = {
   state: "checking" | "not_configured" | "signed_out" | "signed_in" | "error";
@@ -932,6 +932,8 @@ export default function Home() {
   const [contactSectorTagFilter, setContactSectorTagFilter] = useState("All");
   const [contactCategoryTagFilter, setContactCategoryTagFilter] = useState("All");
   const [allContactTags, setAllContactTags] = useState<ContactTagSummary[]>([]);
+  const [allContactProjectAssignments, setAllContactProjectAssignments] = useState<any[]>([]);
+  const [contactProjectListFilter, setContactProjectListFilter] = useState("All");
   const [selectedCompanyDetail, setSelectedCompanyDetail] = useState<CompanyDetail | null>(null);
   const [activityForm, setActivityForm] = useState<ActivityForm>({
     activityType: "note",
@@ -1132,20 +1134,31 @@ export default function Home() {
         contactCategoryTagFilter === "All" ||
         contactCategoryNames.includes(contactCategoryTagFilter);
 
+      const matchesProjectList =
+        contactProjectListFilter === "All" ||
+        allContactProjectAssignments.some(
+          (assignment) =>
+            String(assignment.contact_id) === String(contact.id) &&
+            String(assignment.project_id) === contactProjectListFilter
+        );
+
       return (matchesSearch &&
         matchesMarketTag &&
         matchesSectorTag &&
         matchesCategoryTag &&
+        matchesProjectList &&
         matchesContactRoleVisibility);
     });
     }, [
     crmSummary.contacts,
     crmSummary.companies,
     allContactTags,
+    allContactProjectAssignments,
     contactSearchTerm,
     contactMarketTagFilter,
     contactSectorTagFilter,
     contactCategoryTagFilter,
+    contactProjectListFilter,
     roleVisibilityEnabled,
     currentUserId,
     currentUserRole,
@@ -1374,6 +1387,7 @@ const companyBuyerPersonas = getCompanyEffectiveBuyerPersonas(
     setContactMarketTagFilter("All");
     setContactSectorTagFilter("All");
     setContactCategoryTagFilter("All");
+    setContactProjectListFilter("All");
   }
   
   useEffect(() => {
@@ -1407,6 +1421,7 @@ const companyBuyerPersonas = getCompanyEffectiveBuyerPersonas(
       if (typeof preferences.contactMarketTagFilter === "string") setContactMarketTagFilter(preferences.contactMarketTagFilter);
       if (typeof preferences.contactSectorTagFilter === "string") setContactSectorTagFilter(preferences.contactSectorTagFilter);
       if (typeof preferences.contactCategoryTagFilter === "string") setContactCategoryTagFilter(preferences.contactCategoryTagFilter);
+      if (typeof preferences.contactProjectListFilter === "string") setContactProjectListFilter(preferences.contactProjectListFilter);
     } catch {
       // Ignore malformed saved preferences.
     }
@@ -1436,6 +1451,7 @@ const companyBuyerPersonas = getCompanyEffectiveBuyerPersonas(
         contactMarketTagFilter,
         contactSectorTagFilter,
         contactCategoryTagFilter,
+        contactProjectListFilter,
       };
 
       window.localStorage.setItem("graymills-crm-view-preferences", JSON.stringify(preferences));
@@ -1464,6 +1480,7 @@ const companyBuyerPersonas = getCompanyEffectiveBuyerPersonas(
     contactMarketTagFilter,
     contactSectorTagFilter,
     contactCategoryTagFilter,
+    contactProjectListFilter,
   ]);
 
   function resetSavedViewPreferences() {
@@ -1496,6 +1513,7 @@ const companyBuyerPersonas = getCompanyEffectiveBuyerPersonas(
     setContactMarketTagFilter("All");
     setContactSectorTagFilter("All");
     setContactCategoryTagFilter("All");
+    setContactProjectListFilter("All");
 
     setSelectedCompanyIds([]);
     setBulkAssignedSalespersonId("");
@@ -1523,13 +1541,14 @@ async function loadCompanyOwnerFilterData() {
     setIsLoadingSummary(true);
 
     try {
-      const [summaryResponse, tagsResponse, companyTagsResponse, contactTagsResponse, companyProjectAssignmentsResponse] =
+      const [summaryResponse, tagsResponse, companyTagsResponse, contactTagsResponse, companyProjectAssignmentsResponse, contactProjectAssignmentsResponse] =
         await Promise.all([
           fetch("/api/crm-summary"),
           fetch("/api/tags"),
           fetch("/api/company-tag-summary"),
           fetch("/api/contact-tag-summary"),
           fetch("/api/company-project-assignment-summary"),
+        fetch("/api/contact-project-assignment-summary"),
         ]);
 
       const summaryData = await summaryResponse.json();
@@ -1537,6 +1556,7 @@ async function loadCompanyOwnerFilterData() {
       const companyTagsData = await companyTagsResponse.json();
       const contactTagsData = await contactTagsResponse.json();
       const companyProjectAssignmentsData = await companyProjectAssignmentsResponse.json();
+      const contactProjectAssignmentsData = await contactProjectAssignmentsResponse.json();
 
       if (!summaryResponse.ok) {
         throw new Error(summaryData.error || "Could not load CRM summary.");
@@ -1561,12 +1581,22 @@ async function loadCompanyOwnerFilterData() {
         );
       }
 
+      if (!contactProjectAssignmentsResponse.ok) {
+        throw new Error(
+          contactProjectAssignmentsData.error ||
+            "Could not load contact Project / List assignments."
+        );
+      }
+
       setCrmSummary(summaryData);
       setAllCrmTags(tagsData.tags ?? []);
       setAllCompanyTags(companyTagsData.companyTags ?? []);
       setAllContactTags(contactTagsData.contactTags ?? []);
       setAllCompanyProjectAssignments(
         companyProjectAssignmentsData.companyProjectAssignments ?? []
+      );
+      setAllContactProjectAssignments(
+        contactProjectAssignmentsData.contactProjectAssignments ?? []
       );
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Could not load CRM summary.");
@@ -2586,6 +2616,18 @@ async function handleAnalyzeProspect() {
               contactCategoryTagFilter={contactCategoryTagFilter}
               setContactCategoryTagFilter={setContactCategoryTagFilter}
               contactCategoryTagOptions={contactCategoryTagOptions}
+              contactProjectListFilter={contactProjectListFilter}
+              setContactProjectListFilter={setContactProjectListFilter}
+              contactProjectListOptions={Array.from(
+                new Map(
+                  allContactProjectAssignments
+                    .filter((assignment) => assignment.crm_projects)
+                    .map((assignment) => [
+                      String(assignment.project_id),
+                      assignment.crm_projects,
+                    ])
+                ).values()
+              )}
               clearContactFilters={clearContactFilters}
             />
 
@@ -8602,6 +8644,28 @@ function HelpSection() {
 function ReleaseNotesSection() {
   const releases = [
     {
+      version: "Version 3.05",
+      title: "Contact Project / List Filter",
+      date: "July 17, 2026",
+      summary:
+        "Adds Project / List membership filtering to the Contacts screen, completing filter parity with Companies.",
+      changes: [
+        "Added a read-only contact Project / List assignment summary endpoint.",
+        "Added Project / List membership filtering to the Contacts screen.",
+        "Included archived assigned Projects and Lists in the filter options with Archived labeling.",
+        "Added saved preference support for the selected contact Project / List filter.",
+        "Updated Clear Contact Filters and Reset Saved View Preferences to reset the new filter.",
+      ],
+      testNotes: [
+        "Confirm the Contacts screen includes a Project / List filter.",
+        "Confirm selecting a Project or List shows only assigned contacts.",
+        "Confirm All Projects / Lists restores the full contact list.",
+        "Confirm Clear Contact Filters resets the Project / List filter.",
+        "Confirm the selected filter persists after refresh.",
+        "Confirm archived assigned Projects or Lists appear with an Archived label.",
+      ],
+    },
+    {
       version: "Version 3.04",
       title: "Project / List Assignments",
       date: "July 17, 2026",
@@ -10426,6 +10490,9 @@ function ContactTagFilterPanel({
   contactCategoryTagFilter,
   setContactCategoryTagFilter,
   contactCategoryTagOptions,
+  contactProjectListFilter,
+  setContactProjectListFilter,
+  contactProjectListOptions,
   clearContactFilters,
 }: {
   contactSearchTerm: string;
@@ -10439,19 +10506,22 @@ function ContactTagFilterPanel({
   contactCategoryTagFilter: string;
   setContactCategoryTagFilter: (value: string) => void;
   contactCategoryTagOptions: string[];
+  contactProjectListFilter: string;
+  setContactProjectListFilter: (value: string) => void;
+  contactProjectListOptions: any[];
   clearContactFilters: () => void;
 }) {
 
   return (
     <section className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
       <div>
-        <h2 className="text-xl font-bold">Contact Search and Tag Filters</h2>
+        <h2 className="text-xl font-bold">Contact Search and Filters</h2>
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          Filter contacts by name, company, title, function, email, or assigned Market / Sector / Category tags.
+          Filter contacts by name, company, title, function, email, assigned tags, or Project / List membership.
         </p>
       </div>
 
-      <div className="mt-5 grid gap-4 lg:grid-cols-5">
+      <div className="mt-5 grid gap-4 lg:grid-cols-6">
         <div className="lg:col-span-2">
           <label className="text-sm font-semibold text-slate-700">Search Contacts</label>
           <input
@@ -10508,7 +10578,25 @@ function ContactTagFilterPanel({
           </select>
         </div>
 
-        <div className="lg:col-span-5 flex justify-start">
+        <div>
+          <label className="text-sm font-semibold text-slate-700">Project / List</label>
+          <select
+            value={contactProjectListFilter}
+            onChange={(event) => setContactProjectListFilter(event.target.value)}
+            className="mt-2 w-full max-w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+          >
+            <option value="All">All Projects / Lists</option>
+            {contactProjectListOptions.map((item: any) => (
+              <option key={String(item.id)} value={String(item.id)}>
+                {item.project_kind === "list" ? "List" : "Project"}:{" "}
+                {item.project_name}
+                {item.status === "archived" ? " (Archived)" : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="lg:col-span-6 flex justify-start">
           <button
             type="button"
             onClick={clearContactFilters}
