@@ -2,7 +2,7 @@
 
 
 import { getBrowserSupabaseClient, hasBrowserSupabaseConfig } from "../lib/supabase-browser";
-import { ChangeEvent, ReactNode, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 type TabKey = "dashboard" | "companies" | "contacts" | "funnel" | "import" | "help" | "releaseNotes" | "admin" | "companyDetail";
 
@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Version 3.0 - Production Release";
+const APP_VERSION = "Version 3.01 - Funnel Stage Edit Navigation";
 const REVISION_NOTE =
-  "Production CRM with authenticated user access, role-based permissions, sales coverage, funnel management, AI prospect analysis, backup export, and in-app Help."; 
+  "Clicking Edit Stage now scrolls directly to the editing form and focuses the Stage Name field."; 
 
   
 
@@ -3743,6 +3743,8 @@ function AdminFunnelStagesSection({
   const [stageMessage, setStageMessage] = useState("");
   const [stageError, setStageError] = useState("");
   const [editingStageId, setEditingStageId] = useState("");
+  const stageFormRef = useRef<HTMLDivElement | null>(null);
+  const stageNameInputRef = useRef<HTMLInputElement | null>(null);
   const [form, setForm] = useState<any>({
     stageName: "",
     stageKey: "",
@@ -3806,6 +3808,17 @@ function AdminFunnelStagesSection({
       isWonStage: Boolean(stage.is_won_stage),
       isLostStage: Boolean(stage.is_lost_stage),
       status: stage.status === "archived" ? "archived" : "active",
+    });
+
+    window.requestAnimationFrame(() => {
+      stageFormRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+
+      window.setTimeout(() => {
+        stageNameInputRef.current?.focus({ preventScroll: true });
+      }, 350);
     });
   }
 
@@ -3974,13 +3987,17 @@ function AdminFunnelStagesSection({
         )}
       </div>
 
-      <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+      <div
+        ref={stageFormRef}
+        className="scroll-mt-24 max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm"
+      >
         <h3 className="text-xl font-bold">{editingStageId ? "Edit Stage" : "Create Stage"}</h3>
 
         <div className="mt-5 grid gap-4 lg:grid-cols-6">
           <div className="lg:col-span-2">
             <label className="text-sm font-semibold text-slate-700">Stage Name</label>
             <input
+              ref={stageNameInputRef}
               type="text"
               value={form.stageName}
               onChange={(event) => setForm({ ...form, stageName: event.target.value })}
@@ -7512,6 +7529,25 @@ function HelpSection() {
 
 function ReleaseNotesSection() {
   const releases = [
+    {
+      version: "Version 3.01",
+      title: "Funnel Stage Edit Navigation",
+      date: "July 17, 2026",
+      summary:
+        "Improves Admin funnel-stage editing by moving users directly to the selected stage form.",
+      changes: [
+        "Clicking Edit Stage now scrolls smoothly to the Edit Stage form.",
+        "The Stage Name field receives keyboard focus after the form is shown.",
+        "Added scroll spacing so the sticky navigation does not cover the form heading.",
+      ],
+      testNotes: [
+        "Open Admin and scroll to the Funnel Stages list.",
+        "Click Edit Stage on a stage near the bottom of the list.",
+        "Confirm the page scrolls to the Edit Stage form.",
+        "Confirm the Stage Name field is focused and ready for editing.",
+        "Confirm Cancel Edit, Save Stage, Create Stage, Archive, and Reactivate still work.",
+      ],
+    },
     {
       version: "Version 3.0",
       title: "Production Release",
