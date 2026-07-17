@@ -5482,6 +5482,57 @@ function AdminUsersSection({
     }
   }
 
+  async function resetAuthPassword(user: CrmUser) {
+    if (!requireAdminPermission()) return;
+
+    const temporaryPassword =
+      temporaryPasswords[String(user.id)] || "";
+
+    setIsSavingAuthUser(true);
+    setAuthMessage("");
+    setAuthError("");
+
+    try {
+      if (!temporaryPassword) {
+        throw new Error("Enter a new temporary password.");
+      }
+
+      const headers = await getVerifiedAuthHeaders();
+
+      const response = await fetch("/api/auth-management", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          crmUserId: user.id,
+          temporaryPassword,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Could not reset the Auth password.");
+      }
+
+      setTemporaryPasswords((current) => ({
+        ...current,
+        [String(user.id)]: "",
+      }));
+
+      setAuthMessage(
+        `Password reset for ${user.display_name || user.email}.`
+      );
+    } catch (error) {
+      setAuthError(
+        error instanceof Error
+          ? error.message
+          : "Could not reset the Auth password."
+      );
+    } finally {
+      setIsSavingAuthUser(false);
+    }
+  }
+
   function formatCrmUserRoleLabel(role: string) {
     if (role === "admin") return "Admin";
     if (role === "sales_manager") return "Sales Manager";
@@ -5974,6 +6025,47 @@ function AdminUsersSection({
                         <p className="mt-1">
                           Last sign-in: {formatAuthDate(authStatus.lastSignInAt)}
                         </p>
+
+                        {user.status === "active" && !authStatus.isCurrentAdmin && (
+                          <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-3">
+                            <label className="text-sm font-semibold text-blue-950">
+                              New Temporary Password
+                            </label>
+                            <input
+                              type="password"
+                              autoComplete="new-password"
+                              value={temporaryPasswords[String(user.id)] || ""}
+                              onChange={(event) =>
+                                setTemporaryPasswords((current) => ({
+                                  ...current,
+                                  [String(user.id)]: event.target.value,
+                                }))
+                              }
+                              className="mt-2 w-full rounded-lg border border-blue-300 bg-white px-3 py-2 text-sm"
+                              placeholder="Minimum 8 characters"
+                            />
+                            <button
+                              onClick={() => resetAuthPassword(user)}
+                              disabled={
+                                isSavingAuthUser ||
+                                !temporaryPasswords[String(user.id)] ||
+                                temporaryPasswords[String(user.id)].length < 8
+                              }
+                              className="mt-3 rounded-lg bg-blue-700 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                            >
+                              {isSavingAuthUser ? "Resetting Password..." : "Reset Password"}
+                            </button>
+                            <p className="mt-2 text-xs leading-5 text-blue-900">
+                              The new password is sent directly to Supabase and is not stored in the CRM.
+                            </p>
+                          </div>
+                        )}
+
+                        {authStatus.isCurrentAdmin && (
+                          <p className="mt-3 rounded-lg border border-purple-200 bg-purple-50 p-2 text-xs font-semibold text-purple-800">
+                            Your own password cannot be reset from this Admin page.
+                          </p>
+                        )}
                       </div>
                     )}
 

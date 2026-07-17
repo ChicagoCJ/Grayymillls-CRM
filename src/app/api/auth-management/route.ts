@@ -318,3 +318,170 @@ export async function POST(request: Request) {
   }
 }
 
+export async function PATCH(request: Request) {
+  try {
+    const verification =
+      await verifySignedInAdmin(request);
+
+    if (verification.response) {
+      return verification.response;
+    }
+
+    const payload =
+      (await request.json()) as AuthManagementPayload;
+
+    const crmUserId = String(
+      payload.crmUserId || ""
+    ).trim();
+
+    const temporaryPassword = String(
+      payload.temporaryPassword || ""
+    );
+
+    if (!crmUserId) {
+      return NextResponse.json(
+        {
+          error: "CRM User ID is required.",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (temporaryPassword.length < 8) {
+      return NextResponse.json(
+        {
+          error:
+            "The temporary password must contain at least 8 characters.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const supabase = getSupabaseAdmin();
+
+    const {
+      data: crmUser,
+      error: crmUserError,
+    } = await supabase
+      .from("crm_users")
+      .select(
+        "id, display_name, email, status"
+      )
+      .eq("id", crmUserId)
+      .maybeSingle();
+
+    if (crmUserError) {
+      throw crmUserError;
+    }
+
+    if (!crmUser) {
+      return NextResponse.json(
+        {
+          error: "The CRM Users record was not found.",
+        },
+        { status: 404 }
+      );
+    }
+
+    const crmStatus = String(
+      crmUser.status || ""
+    )
+      .trim()
+      .toLowerCase();
+
+    if (crmStatus !== "active") {
+      return NextResponse.json(
+        {
+          error:
+            "Passwords can only be reset for active CRM Users.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const email = normalizeEmail(crmUser.email);
+
+    if (!email) {
+      return NextResponse.json(
+        {
+          error:
+            "The CRM Users record does not have an email address.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const authUsers =
+      await listAllAuthUsers(supabase);
+
+    const authUser = authUsers.find(
+      (user) =>
+        normalizeEmail(user.email) === email
+    );
+
+    if (!authUser) {
+      return NextResponse.json(
+        {
+          error:
+            "No Supabase Auth login exists for this CRM User.",
+        },
+        { status: 404 }
+      );
+    }
+
+    if (
+      authUser.id ===
+      verification.context.authUserId
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "You cannot reset your own password from the Admin user-management page.",
+        },
+        { status: 403 }
+      );
+    }
+
+    const {
+      data: updatedAuthData,
+      error: updateAuthError,
+    } = await supabase.auth.admin.updateUserById(
+      authUser.id,
+      {
+        password: temporaryPassword,
+      }
+    );
+
+    if (updateAuthError) {
+      throw updateAuthError;
+    }
+
+    if (!updatedAuthData.user) {
+      throw new Error(
+        "Supabase did not return the updated Auth user."
+      );
+    }
+
+    return NextResponse.json({
+      status: "password_reset",
+      user: {
+        crmUserId: crmUser.id,
+        displayName:
+          crmUser.display_name || email,
+        email,
+        authUserId: updatedAuthData.user.id,
+      },
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Could not reset the authentication password.",
+      },
+      { status: 500 }
+    );
+  }
+}
+
