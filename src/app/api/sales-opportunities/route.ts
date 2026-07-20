@@ -20,6 +20,7 @@ type OpportunityPayload = {
   probability?: number | string | null;
   expectedCloseDate?: string | null;
   nextStep?: string | null;
+  nextStepDueDate?: string | null;
   customerNeed?: string | null;
   businessCase?: string | null;
   competitiveSituation?: string | null;
@@ -241,6 +242,51 @@ export async function POST(request: Request) {
       );
     }
 
+    const nextStep = cleanText(payload.nextStep);
+
+
+    const nextStepDueDate = cleanDate(payload.nextStepDueDate);
+
+
+
+    if (!nextStep) {
+
+
+      return NextResponse.json(
+
+
+        { error: "nextStep is required for an open opportunity." },
+
+
+        { status: 400 }
+
+
+      );
+
+
+    }
+
+
+
+    if (!nextStepDueDate) {
+
+
+      return NextResponse.json(
+
+
+        { error: "nextStepDueDate is required for an open opportunity." },
+
+
+        { status: 400 }
+
+
+      );
+
+
+    }
+
+
+
     const defaultStageId = await getDefaultStageId(supabase);
     const stageId = payload.stageId || defaultStageId;
 
@@ -273,7 +319,9 @@ export async function POST(request: Request) {
         estimated_value: cleanNumber(payload.estimatedValue),
         probability,
         expected_close_date: cleanDate(payload.expectedCloseDate),
-        next_step: cleanText(payload.nextStep),
+        next_step: nextStep,
+
+        next_step_due_date: nextStepDueDate,
         customer_need: cleanText(payload.customerNeed),
         business_case: cleanText(payload.businessCase),
         competitive_situation: cleanText(payload.competitiveSituation),
@@ -342,6 +390,93 @@ export async function PATCH(request: Request) {
     if (payload.probability !== undefined) update.probability = cleanProbability(payload.probability);
     if (payload.expectedCloseDate !== undefined) update.expected_close_date = cleanDate(payload.expectedCloseDate);
     if (payload.nextStep !== undefined) update.next_step = cleanText(payload.nextStep);
+
+    if (payload.nextStepDueDate !== undefined) {
+
+      update.next_step_due_date = cleanDate(payload.nextStepDueDate);
+
+    }
+
+
+    const isEditingNextStep =
+
+      payload.nextStep !== undefined || payload.nextStepDueDate !== undefined;
+
+
+    if (isEditingNextStep) {
+
+      const { data: currentOpportunity, error: currentOpportunityError } = await supabase
+
+        .from("sales_opportunities")
+
+        .select("status, next_step, next_step_due_date")
+
+        .eq("id", payload.id)
+
+        .maybeSingle();
+
+
+      if (currentOpportunityError) throw currentOpportunityError;
+
+
+      if (!currentOpportunity) {
+
+        return NextResponse.json(
+
+          { error: "Opportunity not found." },
+
+          { status: 404 }
+
+        );
+
+      }
+
+
+      const resultingStatus = payload.status ?? currentOpportunity.status;
+
+      const resultingNextStep =
+
+        payload.nextStep !== undefined
+
+          ? cleanText(payload.nextStep)
+
+          : cleanText(currentOpportunity.next_step);
+
+      const resultingNextStepDueDate =
+
+        payload.nextStepDueDate !== undefined
+
+          ? cleanDate(payload.nextStepDueDate)
+
+          : cleanDate(currentOpportunity.next_step_due_date);
+
+
+      if (resultingStatus === "open" && !resultingNextStep) {
+
+        return NextResponse.json(
+
+          { error: "nextStep is required for an open opportunity." },
+
+          { status: 400 }
+
+        );
+
+      }
+
+
+      if (resultingStatus === "open" && !resultingNextStepDueDate) {
+
+        return NextResponse.json(
+
+          { error: "nextStepDueDate is required for an open opportunity." },
+
+          { status: 400 }
+
+        );
+
+      }
+
+    }
     if (payload.customerNeed !== undefined) update.customer_need = cleanText(payload.customerNeed);
     if (payload.businessCase !== undefined) update.business_case = cleanText(payload.businessCase);
     if (payload.competitiveSituation !== undefined) update.competitive_situation = cleanText(payload.competitiveSituation);

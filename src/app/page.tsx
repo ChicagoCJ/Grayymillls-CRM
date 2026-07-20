@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 
 import { getBrowserSupabaseClient, hasBrowserSupabaseConfig } from "../lib/supabase-browser";
@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Version 3.08 - My Sales Workspace";
+const APP_VERSION = "Version 3.09 - Mandatory Next Step";
 const REVISION_NOTE =
-  "The Dashboard now includes a secure, role-aware My Sales Workspace with prioritized activities and open opportunities for the signed-in CRM user.";
+  "Open opportunities now require a next step and due date, with missing and overdue action warnings across company details, My Sales Workspace, and Funnel views.";
 
 type SignedInSessionStatus = {
   state: "checking" | "not_configured" | "signed_out" | "signed_in" | "error";
@@ -2447,8 +2447,8 @@ async function handleAnalyzeProspect() {
                 </h2>
                 <p className="mt-1 text-sm leading-6 text-green-900">
                   Current user: <span className="font-semibold">{currentUserDisplayName}</span>
-                  {" "}Â· Role: <span className="font-semibold">{formatAppUserRole(currentUserRole)}</span>
-                  {" "}Â· Status: <span className="font-semibold">{signedInProductionUser.status || "Not detected"}</span>
+                  {" "}Ã‚Â· Role: <span className="font-semibold">{formatAppUserRole(currentUserRole)}</span>
+                  {" "}Ã‚Â· Status: <span className="font-semibold">{signedInProductionUser.status || "Not detected"}</span>
                 </p>
                 <p className="mt-1 text-xs leading-5 text-green-800">
                   {signedInProductionUser.message}
@@ -4500,7 +4500,7 @@ function AdminProjectsListsSection({
                       </div>
 
                       <p className="mt-2 text-sm text-slate-600">
-                        Owner: {ownerName} Â· Sort order:{" "}
+                        Owner: {ownerName} Ã‚Â· Sort order:{" "}
                         {item.sort_order ?? 100}
                       </p>
 
@@ -8276,8 +8276,8 @@ const filteredOpportunities = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (Number.isNaN(closeDay.getTime())) return { label: formatDate(closeDate), className: "text-slate-600" };
-    if (closeDay.getTime() < today.getTime()) return { label: `Overdue · ${formatDate(closeDate)}`, className: "font-semibold text-red-700" };
-    if (closeDay.getTime() === today.getTime()) return { label: `Due today · ${formatDate(closeDate)}`, className: "font-semibold text-amber-700" };
+    if (closeDay.getTime() < today.getTime()) return { label: `Overdue Â· ${formatDate(closeDate)}`, className: "font-semibold text-red-700" };
+    if (closeDay.getTime() === today.getTime()) return { label: `Due today Â· ${formatDate(closeDate)}`, className: "font-semibold text-amber-700" };
     return { label: formatDate(closeDate), className: "text-slate-600" };
   }
 
@@ -8628,6 +8628,14 @@ const filteredOpportunities = useMemo(() => {
                           const value = Number(opportunity.estimated_value ?? 0);
                           const closeDateStatus = getCloseDateStatus(opportunity.expected_close_date);
 
+                          const nextStepMissing = !opportunity.next_step || !opportunity.next_step_due_date;
+
+                          const nextStepOverdue =
+
+                            !nextStepMissing &&
+
+                            String(opportunity.next_step_due_date) < new Date().toISOString().slice(0, 10);
+
                           return (
                             <article
                               key={opportunity.id}
@@ -8670,7 +8678,7 @@ const filteredOpportunities = useMemo(() => {
                                   title="Drag opportunity to another stage"
                                   className="shrink-0 cursor-grab rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 active:cursor-grabbing disabled:cursor-not-allowed"
                                 >
-                                  ⋮⋮
+                                  â‹®â‹®
                                 </button>
                               </div>
 
@@ -8702,9 +8710,17 @@ const filteredOpportunities = useMemo(() => {
                                   <span className="font-semibold">Close:</span>{" "}
                                   {closeDateStatus.label}
                                 </p>
-                                <p className="mt-1 break-words">
+                                <p className={`mt-1 break-words ${
+                                  nextStepMissing
+                                    ? "font-semibold text-red-700"
+                                    : nextStepOverdue
+                                      ? "font-semibold text-amber-700"
+                                      : ""
+                                }`}>
                                   <span className="font-semibold">Next:</span>{" "}
-                                  {displayValue(opportunity.next_step)}
+                                  {opportunity.next_step || "Missing"}
+                                  {" Â· "}
+                                  {opportunity.next_step_due_date ? formatDate(opportunity.next_step_due_date) : "No due date"}
                                 </p>
                               </div>
                             </article>
@@ -8772,7 +8788,16 @@ const filteredOpportunities = useMemo(() => {
                       <td className="py-3 pr-4">{formatCurrency(weighted)}</td>
                       <td className="py-3 pr-4">{formatDate(opportunity.expected_close_date)}</td>
                       <td className="max-w-[320px] py-3 pr-4 text-slate-700">
-                        {displayValue(opportunity.next_step)}
+                        <div className={
+                          !opportunity.next_step || !opportunity.next_step_due_date
+                            ? "font-semibold text-red-700"
+                            : String(opportunity.next_step_due_date) < new Date().toISOString().slice(0, 10)
+                              ? "font-semibold text-amber-700"
+                              : ""
+                        }>
+                          <p>{opportunity.next_step || "Missing"}</p>
+                          <p className="mt-1 text-xs">Due: {opportunity.next_step_due_date ? formatDate(opportunity.next_step_due_date) : "Missing"}</p>
+                        </div>
                       </td>
                       <td className="py-3 pr-4">
                         {companyId ? (
@@ -9544,6 +9569,8 @@ type MySalesWorkspacePayload = {
   };
   opportunities?: {
     open?: any[];
+    missingNextStep?: any[];
+    overdueNextStep?: any[];
   };
   generatedAt?: string;
 };
@@ -9610,6 +9637,8 @@ function MySalesWorkspaceSection({
   const dueToday = workspace?.activities?.dueToday ?? [];
   const upcoming = workspace?.activities?.upcoming ?? [];
   const openOpportunities = workspace?.opportunities?.open ?? [];
+  const missingNextStepOpportunities = workspace?.opportunities?.missingNextStep ?? [];
+  const overdueNextStepOpportunities = workspace?.opportunities?.overdueNextStep ?? [];
 
   function activityList(
     title: string,
@@ -9685,7 +9714,7 @@ function MySalesWorkspaceSection({
           </p>
           {workspace?.user?.displayName && (
             <p className="mt-2 text-xs font-semibold text-slate-500">
-              {workspace.user.displayName} · {formatTitleFromKey(workspace.user.role || "")}
+              {workspace.user.displayName} Â· {formatTitleFromKey(workspace.user.role || "")}
             </p>
           )}
         </div>
@@ -9719,6 +9748,8 @@ function MySalesWorkspaceSection({
             <MetricCard label="Due today" value={dueToday.length.toString()} note="Open activities due today" />
             <MetricCard label="Upcoming" value={upcoming.length.toString()} note="Future dated activities" />
             <MetricCard label="Open opportunities" value={openOpportunities.length.toString()} note="Role-visible active pipeline" />
+            <MetricCard label="Missing next step" value={missingNextStepOpportunities.length.toString()} note="Open opportunities needing action details" />
+            <MetricCard label="Overdue next step" value={overdueNextStepOpportunities.length.toString()} note="Open opportunities past due" />
           </div>
 
           <div className="mt-5 grid gap-4 xl:grid-cols-3">
@@ -9759,7 +9790,8 @@ function MySalesWorkspaceSection({
                       <p><span className="font-semibold">Value:</span> {Number(opportunity.estimated_value || 0).toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })}</p>
                       <p><span className="font-semibold">Probability:</span> {Number(opportunity.probability || 0)}%</p>
                       <p><span className="font-semibold">Close date:</span> {formatDate(opportunity.expected_close_date || null)}</p>
-                      <p><span className="font-semibold">Next step:</span> {opportunity.next_step || "Not entered"}</p>
+                      <p><span className="font-semibold">Next step:</span> {opportunity.next_step || "Missing"}</p>
+                      <p><span className="font-semibold">Next step due:</span> {opportunity.next_step_due_date ? formatDate(opportunity.next_step_due_date) : "Missing"}</p>
                     </div>
 
                     {opportunity.company_id && (
@@ -14370,6 +14402,7 @@ function CompanyOpportunityPanel({
     probability: "",
     expectedCloseDate: "",
     nextStep: "",
+    nextStepDueDate: "",
     customerNeed: "",
     businessCase: "",
     owner: "",
@@ -14392,6 +14425,7 @@ function CompanyOpportunityPanel({
     probability: "",
     expectedCloseDate: "",
     nextStep: "",
+    nextStepDueDate: "",
     customerNeed: "",
     businessCase: "",
     owner: "",
@@ -14466,6 +14500,14 @@ function CompanyOpportunityPanel({
         throw new Error("Opportunity name is required.");
       }
 
+      if (!form.nextStep.trim()) {
+        throw new Error("Next step is required for an open opportunity.");
+      }
+
+      if (!form.nextStepDueDate) {
+        throw new Error("Next step due date is required for an open opportunity.");
+      }
+
       const response = await fetch("/api/sales-opportunities", {
         method: "POST",
         headers: {
@@ -14486,6 +14528,7 @@ function CompanyOpportunityPanel({
           probability: form.probability,
           expectedCloseDate: form.expectedCloseDate || null,
           nextStep: form.nextStep,
+          nextStepDueDate: form.nextStepDueDate || null,
           customerNeed: form.customerNeed,
           businessCase: form.businessCase,
           owner: form.owner,
@@ -14514,6 +14557,7 @@ function CompanyOpportunityPanel({
         probability: "",
         expectedCloseDate: "",
         nextStep: "",
+    nextStepDueDate: "",
         customerNeed: "",
         businessCase: "",
         owner: "",
@@ -14548,6 +14592,7 @@ function CompanyOpportunityPanel({
           : "",
       expectedCloseDate: opportunity.expected_close_date ?? "",
       nextStep: opportunity.next_step ?? "",
+      nextStepDueDate: opportunity.next_step_due_date ?? "",
       customerNeed: opportunity.customer_need ?? "",
       businessCase: opportunity.business_case ?? "",
       owner: opportunity.owner ?? "",
@@ -14566,6 +14611,7 @@ function CompanyOpportunityPanel({
       probability: "",
       expectedCloseDate: "",
       nextStep: "",
+    nextStepDueDate: "",
       customerNeed: "",
       businessCase: "",
       owner: "",
@@ -14582,6 +14628,14 @@ function CompanyOpportunityPanel({
     try {
       if (!editForm.opportunityName.trim()) {
         throw new Error("Opportunity name is required.");
+      }
+
+      if (!editForm.nextStep.trim()) {
+        throw new Error("Next step is required for an open opportunity.");
+      }
+
+      if (!editForm.nextStepDueDate) {
+        throw new Error("Next step due date is required for an open opportunity.");
       }
 
       const response = await fetch("/api/sales-opportunities", {
@@ -14601,6 +14655,7 @@ function CompanyOpportunityPanel({
           probability: editForm.probability,
           expectedCloseDate: editForm.expectedCloseDate || null,
           nextStep: editForm.nextStep,
+          nextStepDueDate: editForm.nextStepDueDate || null,
           customerNeed: editForm.customerNeed,
           businessCase: editForm.businessCase,
           owner: editForm.owner,
@@ -14856,11 +14911,21 @@ function CompanyOpportunityPanel({
             </div>
 
             <div className="lg:col-span-4">
-              <label className="text-sm font-semibold text-slate-700">Next Step</label>
+              <label className="text-sm font-semibold text-slate-700">Next Step <span className="text-red-600">*</span></label>
               <textarea
                 rows={3}
                 value={form.nextStep}
                 onChange={(event) => setForm({ ...form, nextStep: event.target.value })}
+                className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
+              />
+            </div>
+
+            <div className="lg:col-span-2">
+              <label className="text-sm font-semibold text-slate-700">Next Step Due Date <span className="text-red-600">*</span></label>
+              <input
+                type="date"
+                value={form.nextStepDueDate}
+                onChange={(event) => setForm({ ...form, nextStepDueDate: event.target.value })}
                 className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
               />
             </div>
@@ -14952,11 +15017,16 @@ function CompanyOpportunityPanel({
                       </p>
                     </div>
 
-                    {opportunity.next_step && (
-                      <div className="mt-4 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-700">
-                        <span className="font-semibold">Next step:</span> {opportunity.next_step}
-                      </div>
-                    )}
+                    <div className={`mt-4 rounded-xl p-4 text-sm leading-6 ${
+                      !opportunity.next_step || !opportunity.next_step_due_date
+                        ? "border border-red-200 bg-red-50 text-red-800"
+                        : String(opportunity.next_step_due_date) < new Date().toISOString().slice(0, 10)
+                          ? "border border-amber-200 bg-amber-50 text-amber-900"
+                          : "bg-slate-50 text-slate-700"
+                    }`}>
+                      <p><span className="font-semibold">Next step:</span> {opportunity.next_step || "Missing"}</p>
+                      <p><span className="font-semibold">Due:</span> {opportunity.next_step_due_date ? formatDate(opportunity.next_step_due_date) : "Missing"}</p>
+                    </div>
                   </div>
 
                   <div className="grid gap-2 lg:min-w-[240px]">
@@ -15096,12 +15166,24 @@ function CompanyOpportunityPanel({
                           </div>
 
                           <div className="lg:col-span-4">
-                            <label className="text-sm font-semibold text-slate-700">Next Step</label>
+                            <label className="text-sm font-semibold text-slate-700">Next Step <span className="text-red-600">*</span></label>
                             <textarea
                               rows={3}
                               value={editForm.nextStep}
                               onChange={(event) =>
                                 setEditForm({ ...editForm, nextStep: event.target.value })
+                              }
+                              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
+                            />
+                          </div>
+
+                          <div className="lg:col-span-2">
+                            <label className="text-sm font-semibold text-slate-700">Next Step Due Date <span className="text-red-600">*</span></label>
+                            <input
+                              type="date"
+                              value={editForm.nextStepDueDate}
+                              onChange={(event) =>
+                                setEditForm({ ...editForm, nextStepDueDate: event.target.value })
                               }
                               className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
                             />
@@ -15864,7 +15946,7 @@ function TagAssignmentColumn({
                 aria-label={`Remove ${tag.crm_tags?.tag_name || "tag"}`}
                 title={`Remove ${tag.crm_tags?.tag_name || "tag"}`}
               >
-                Ã—
+                Ãƒâ€”
               </button>
             </span>
           ))}
@@ -16451,7 +16533,7 @@ function ContactTagAssignmentRow({
                 aria-label={`Remove ${tag.crm_tags?.tag_name || "tag"}`}
                 title={`Remove ${tag.crm_tags?.tag_name || "tag"}`}
               >
-                Ã—
+                Ãƒâ€”
               </button>
             </span>
           ))}

@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+﻿import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { verifySignedInCrmUser } from "../_shared/verified-auth";
 
@@ -70,6 +70,7 @@ export async function GET(request: Request) {
       probability,
       expected_close_date,
       next_step,
+      next_step_due_date,
       status,
       created_at,
       updated_at,
@@ -150,6 +151,17 @@ export async function GET(request: Request) {
       (opportunity: any) =>
         companyIsVisibleToUser(opportunity.companies, crmRole, crmUserId)
     );
+    const opportunitiesMissingNextStep = visibleOpportunities.filter(
+      (opportunity: any) =>
+        !String(opportunity.next_step || "").trim() ||
+        !String(opportunity.next_step_due_date || "").trim()
+    );
+    const opportunitiesWithOverdueNextStep = visibleOpportunities.filter(
+      (opportunity: any) =>
+        String(opportunity.next_step || "").trim() &&
+        String(opportunity.next_step_due_date || "").trim() &&
+        String(opportunity.next_step_due_date) < today
+    );
 
     return NextResponse.json({
       user: {
@@ -164,6 +176,8 @@ export async function GET(request: Request) {
       },
       opportunities: {
         open: visibleOpportunities,
+        missingNextStep: opportunitiesMissingNextStep,
+        overdueNextStep: opportunitiesWithOverdueNextStep,
       },
       generatedAt: new Date().toISOString(),
     });
