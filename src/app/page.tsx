@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Version 3.06 - Contact Filter Result Count";
+const APP_VERSION = "Version 3.07 - Drag-and-Drop Funnel Board";
 const REVISION_NOTE =
-  "The Contacts filter block now shows filtered and role-visible totals as X of Y Contacts, updating immediately as filters change.";
+  "The Funnel now includes a secure drag-and-drop board with sticky controls, card-density options, undo, and close-date status highlighting.";
 
 type SignedInSessionStatus = {
   state: "checking" | "not_configured" | "signed_out" | "signed_in" | "error";
@@ -2653,6 +2653,10 @@ async function handleAnalyzeProspect() {
 
         {activeTab === "funnel" && (
           <FunnelDashboardSection
+            funnelApplyRoleVisibility={roleVisibilityEnabled}
+            funnelCurrentUserId={currentUserId}
+            funnelCurrentUserRole={currentUserRole}
+            funnelCurrentUserDisplayName={currentUserDisplayName}
             onOpenCompany={(companyId) => {
               loadCompanyDetail(companyId);
 
@@ -7919,6 +7923,23 @@ function FunnelDashboardSection({
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [funnelError, setFunnelError] = useState("");
+  const [funnelViewMode, setFunnelViewMode] = useState<"board" | "list">("board");
+  const [funnelCardDensity, setFunnelCardDensity] = useState<"comfortable" | "compact">(
+    "comfortable"
+  );
+  const [draggedOpportunityId, setDraggedOpportunityId] = useState("");
+  const [dragOverStageId, setDragOverStageId] = useState("");
+  const [isMovingOpportunity, setIsMovingOpportunity] = useState(false);
+  const [stageMoveMessage, setStageMoveMessage] = useState("");
+  const [lastStageMove, setLastStageMove] = useState<{
+    opportunityId: string;
+    opportunityName: string;
+    fromStageId: string;
+    fromStageName: string;
+    toStageId: string;
+    toStageName: string;
+  } | null>(null);
+  const [isUndoingStageMove, setIsUndoingStageMove] = useState(false);
 
   async function loadFunnelDashboard() {
     setIsLoading(true);
@@ -8122,6 +8143,158 @@ const filteredOpportunities = useMemo(() => {
     setSearchTerm("");
   }
 
+  async function getVerifiedStageMoveHeaders() {
+    if (!hasBrowserSupabaseConfig()) {
+      throw new Error("Browser Supabase configuration is not available.");
+    }
+
+    const supabase = getBrowserSupabaseClient();
+    const { data, error } = await supabase.auth.getSession();
+
+    if (error) {
+      throw new Error(error.message || "Could not read the signed-in session.");
+    }
+
+    const accessToken = data.session?.access_token;
+
+    if (!accessToken) {
+      throw new Error("A signed-in Supabase session is required.");
+    }
+
+    return {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    };
+  }
+
+  async function moveOpportunityToStage(opportunityId: string, stageId: string) {
+    const opportunity = opportunities.find((item) => String(item.id) === opportunityId);
+
+    if (!opportunity || String(opportunity.stage_id || "") === stageId) {
+      setDraggedOpportunityId("");
+      setDragOverStageId("");
+      return;
+    }
+
+    const previousOpportunities = opportunities;
+    const previousStageId = String(opportunity.stage_id || "");
+    const previousStage = stages.find((stage) => String(stage.id) === previousStageId);
+    const destinationStage = stages.find((stage) => String(stage.id) === stageId);
+
+    setFunnelError("");
+    setStageMoveMessage("");
+    setIsMovingOpportunity(true);
+
+    setOpportunities((current) =>
+      current.map((item) =>
+        String(item.id) === opportunityId
+          ? {
+              ...item,
+              stage_id: stageId,
+              sales_funnel_stages: destinationStage
+                ? {
+                    ...(item.sales_funnel_stages ?? {}),
+                    ...destinationStage,
+                  }
+                : item.sales_funnel_stages,
+            }
+          : item
+      )
+    );
+
+    try {
+      const headers = await getVerifiedStageMoveHeaders();
+      const response = await fetch("/api/sales-opportunity-stage-move", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ opportunityId, stageId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Could not move opportunity.");
+      }
+
+      setLastStageMove({
+        opportunityId,
+        opportunityName: opportunity.opportunity_name,
+        fromStageId: previousStageId,
+        fromStageName: previousStage?.stage_name || "the previous stage",
+        toStageId: stageId,
+        toStageName: destinationStage?.stage_name || "the selected stage",
+      });
+      setStageMoveMessage(
+        `Moved ${opportunity.opportunity_name} to ${
+          destinationStage?.stage_name || "the selected stage"
+        }.`
+      );
+      await loadFunnelDashboard();
+    } catch (error) {
+      setOpportunities(previousOpportunities);
+      setFunnelError(
+        error instanceof Error ? error.message : "Could not move opportunity."
+      );
+    } finally {
+      setDraggedOpportunityId("");
+      setDragOverStageId("");
+      setIsMovingOpportunity(false);
+    }
+  }
+
+  async function undoLastStageMove() {
+    if (!lastStageMove || isUndoingStageMove) return;
+
+    setFunnelError("");
+    setStageMoveMessage("");
+    setIsUndoingStageMove(true);
+
+    try {
+      const headers = await getVerifiedStageMoveHeaders();
+      const response = await fetch("/api/sales-opportunity-stage-move", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ opportunityId: lastStageMove.opportunityId, stageId: lastStageMove.fromStageId }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not undo the stage move.");
+      setStageMoveMessage(`Returned ${lastStageMove.opportunityName} to ${lastStageMove.fromStageName}.`);
+      setLastStageMove(null);
+      await loadFunnelDashboard();
+    } catch (error) {
+      setFunnelError(error instanceof Error ? error.message : "Could not undo the stage move.");
+    } finally {
+      setIsUndoingStageMove(false);
+    }
+  }
+
+  function getCloseDateStatus(closeDate: string | null | undefined) {
+    if (!closeDate) return { label: "No close date", className: "text-slate-500" };
+    const closeDay = new Date(`${closeDate}T00:00:00`);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (Number.isNaN(closeDay.getTime())) return { label: formatDate(closeDate), className: "text-slate-600" };
+    if (closeDay.getTime() < today.getTime()) return { label: `Overdue · ${formatDate(closeDate)}`, className: "font-semibold text-red-700" };
+    if (closeDay.getTime() === today.getTime()) return { label: `Due today · ${formatDate(closeDate)}`, className: "font-semibold text-amber-700" };
+    return { label: formatDate(closeDate), className: "text-slate-600" };
+  }
+
+  function handleOpportunityDragStart(event: any, opportunityId: string) {
+    setDraggedOpportunityId(opportunityId);
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", opportunityId);
+  }
+
+  function handleStageDrop(event: any, stageId: string) {
+    event.preventDefault();
+    const opportunityId =
+      event.dataTransfer.getData("text/plain") || draggedOpportunityId;
+
+    if (opportunityId) {
+      void moveOpportunityToStage(opportunityId, stageId);
+    }
+  }
+
   return (
     <section className="grid gap-6">
       <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
@@ -8148,6 +8321,12 @@ const filteredOpportunities = useMemo(() => {
         {funnelError && (
           <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
             {funnelError}
+          </div>
+        )}
+
+        {stageMoveMessage && (
+          <div className="mt-4 rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+            {stageMoveMessage}
           </div>
         )}
       </div>
@@ -8192,16 +8371,86 @@ const filteredOpportunities = useMemo(() => {
         </div>
       )}
 
-      <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
-        <h3 className="text-xl font-bold">Funnel Filters</h3>
+      <div className="sticky top-2 z-30 max-w-full overflow-hidden rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div>
+            <h3 className="text-lg font-bold">Funnel Controls</h3>
+            <p className="mt-1 text-xs text-slate-500">
+              Filters and board controls remain visible while you scroll.
+            </p>
+          </div>
 
-        <div className="mt-5 grid gap-4 lg:grid-cols-5">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex rounded-xl bg-slate-100 p-1 ring-1 ring-slate-200">
+              <button
+                type="button"
+                onClick={() => setFunnelViewMode("board")}
+                className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${
+                  funnelViewMode === "board"
+                    ? "bg-white text-blue-800 shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Board
+              </button>
+              <button
+                type="button"
+                onClick={() => setFunnelViewMode("list")}
+                className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${
+                  funnelViewMode === "list"
+                    ? "bg-white text-blue-800 shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                List
+              </button>
+            </div>
+
+            {funnelViewMode === "board" && (
+              <div className="inline-flex rounded-xl bg-slate-100 p-1 ring-1 ring-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setFunnelCardDensity("comfortable")}
+                  className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${
+                    funnelCardDensity === "comfortable"
+                      ? "bg-white text-blue-800 shadow-sm"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  Comfortable
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFunnelCardDensity("compact")}
+                  className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${
+                    funnelCardDensity === "compact"
+                      ? "bg-white text-blue-800 shadow-sm"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  Compact
+                </button>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={loadFunnelDashboard}
+              disabled={isLoading}
+              className="rounded-xl bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
+            >
+              {isLoading ? "Refreshing..." : "Refresh"}
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-3 lg:grid-cols-5">
 <div>
             <label className="text-sm font-semibold text-slate-700">Status</label>
             <select
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value)}
-              className="mt-2 w-full max-w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              className="mt-1.5 w-full max-w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
             >
               <option value="open">Open</option>
               <option value="won">Won</option>
@@ -8216,7 +8465,7 @@ const filteredOpportunities = useMemo(() => {
             <select
               value={stageFilter}
               onChange={(event) => setStageFilter(event.target.value)}
-              className="mt-2 w-full max-w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              className="mt-1.5 w-full max-w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
             >
               <option value="All">All</option>
               {stages.map((stage) => (
@@ -8232,7 +8481,7 @@ const filteredOpportunities = useMemo(() => {
             <select
               value={typeFilter}
               onChange={(event) => setTypeFilter(event.target.value)}
-              className="mt-2 w-full max-w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              className="mt-1.5 w-full max-w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
             >
               {typeOptions.map((typeOption) => (
                 <option key={typeOption} value={typeOption}>
@@ -8249,14 +8498,14 @@ const filteredOpportunities = useMemo(() => {
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
               placeholder="Search company, opportunity, product path, contact, next step..."
-              className="mt-2 w-full max-w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              className="mt-1.5 w-full max-w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
             />
           </div>
 
           <div className="lg:col-span-5 flex justify-start">
             <button
               onClick={clearFunnelFilters}
-              className="rounded-xl bg-slate-800 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-slate-900"
+              className="rounded-xl bg-slate-800 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-slate-900"
             >
               Clear Funnel Filters
             </button>
@@ -8303,20 +8552,177 @@ const filteredOpportunities = useMemo(() => {
       />
 
       <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
             <h3 className="text-xl font-bold">Opportunities</h3>
             <p className="mt-2 text-sm text-slate-600">
               Showing {visibleFunnelOpportunityCount} of {totalFunnelOpportunityCount} opportunities under the current filters and role visibility scope.
             </p>
           </div>
+
+          {lastStageMove && (
+            <button
+              type="button"
+              onClick={undoLastStageMove}
+              disabled={isUndoingStageMove || isMovingOpportunity}
+              className="w-fit rounded-xl bg-green-50 px-4 py-2 text-xs font-bold text-green-800 shadow-sm ring-1 ring-green-300 hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isUndoingStageMove ? "Undoing..." : `Undo to ${lastStageMove.fromStageName}`}
+            </button>
+          )}
         </div>
 
-        {displayedFunnelOpportunities.length === 0 ? (
-          <p className="mt-3 text-sm text-slate-600">
-            No opportunities match the current filter.
-          </p>
-        ) : (
+        {funnelViewMode === "board" && (
+          <div className="mt-5 max-w-full overflow-x-auto pb-3">
+            <div className="flex min-w-max gap-4">
+              {stageSummaries.map((summary) => {
+                const stageOpportunities = displayedFunnelOpportunities.filter(
+                  (opportunity) => String(opportunity.stage_id || "") === String(summary.stage.id)
+                );
+
+                return (
+                  <section
+                    key={summary.stage.id}
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                      setDragOverStageId(String(summary.stage.id));
+                    }}
+                    onDragLeave={() => setDragOverStageId("")}
+                    onDrop={(event) => handleStageDrop(event, String(summary.stage.id))}
+                    className={`shrink-0 rounded-2xl border transition ${
+                      funnelCardDensity === "compact" ? "w-[275px] p-2" : "w-[310px] p-3"
+                    } ${
+                      dragOverStageId === String(summary.stage.id)
+                        ? "border-blue-400 bg-blue-50"
+                        : "border-slate-200 bg-slate-50"
+                    }`}
+                  >
+                    <div className={`rounded-xl bg-white shadow-sm ring-1 ring-slate-200 ${
+                      funnelCardDensity === "compact" ? "p-2" : "p-3"
+                    }`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h4 className="font-bold text-slate-900">{summary.stage.stage_name}</h4>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {summary.count} opportunities
+                          </p>
+                        </div>
+                        <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-800">
+                          {formatCurrency(summary.value)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className={`grid min-h-[120px] ${
+                      funnelCardDensity === "compact" ? "mt-2 gap-2" : "mt-3 gap-3"
+                    }`}>
+                      {stageOpportunities.length === 0 ? (
+                        <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-center text-xs text-slate-500">
+                          Drop an opportunity here
+                        </div>
+                      ) : (
+                        stageOpportunities.map((opportunity) => {
+                          const companyId = opportunity.companies?.id;
+                          const value = Number(opportunity.estimated_value ?? 0);
+                          const closeDateStatus = getCloseDateStatus(opportunity.expected_close_date);
+
+                          return (
+                            <article
+                              key={opportunity.id}
+                              onClick={() => {
+                                if (companyId) onOpenCompany(String(companyId));
+                              }}
+                              className={`rounded-xl border bg-white shadow-sm transition hover:border-blue-300 hover:shadow-md ${
+                                funnelCardDensity === "compact" ? "p-3" : "p-4"
+                              } ${
+                                companyId ? "cursor-pointer" : "cursor-default"
+                              } ${
+                                draggedOpportunityId === String(opportunity.id)
+                                  ? "opacity-50"
+                                  : "opacity-100"
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <p className="break-words font-bold text-slate-900">
+                                    {opportunity.opportunity_name}
+                                  </p>
+                                  <p className="mt-1 break-words text-xs text-slate-500">
+                                    {displayValue(opportunity.companies?.company_name)}
+                                  </p>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  draggable={!isMovingOpportunity}
+                                  onDragStart={(event) => {
+                                    event.stopPropagation();
+                                    handleOpportunityDragStart(event, String(opportunity.id));
+                                  }}
+                                  onDragEnd={() => {
+                                    setDraggedOpportunityId("");
+                                    setDragOverStageId("");
+                                  }}
+                                  onClick={(event) => event.stopPropagation()}
+                                  disabled={isMovingOpportunity}
+                                  title="Drag opportunity to another stage"
+                                  className="shrink-0 cursor-grab rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 active:cursor-grabbing disabled:cursor-not-allowed"
+                                >
+                                  ⋮⋮
+                                </button>
+                              </div>
+
+                              <div className={`flex flex-wrap gap-2 ${
+                                funnelCardDensity === "compact" ? "mt-2" : "mt-3"
+                              }`}>
+                                <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-800">
+                                  {formatCurrency(value)}
+                                </span>
+                                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                                  {opportunity.probability ?? 0}%
+                                </span>
+                              </div>
+
+                              <p className={`break-words text-xs text-slate-600 ${
+                                funnelCardDensity === "compact" ? "mt-2 leading-4" : "mt-3 leading-5"
+                              }`}>
+                                {displayValue(
+                                  opportunity.likely_product_path ||
+                                    opportunity.product_line ||
+                                    opportunity.opportunity_type
+                                )}
+                              </p>
+
+                              <div className={`border-t border-slate-100 text-xs text-slate-600 ${
+                                funnelCardDensity === "compact" ? "mt-2 pt-2" : "mt-3 pt-3"
+                              }`}>
+                                <p className={closeDateStatus.className}>
+                                  <span className="font-semibold">Close:</span>{" "}
+                                  {closeDateStatus.label}
+                                </p>
+                                <p className="mt-1 break-words">
+                                  <span className="font-semibold">Next:</span>{" "}
+                                  {displayValue(opportunity.next_step)}
+                                </p>
+                              </div>
+                            </article>
+                          );
+                        })
+                      )}
+                    </div>
+                  </section>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {funnelViewMode === "list" && (
+          displayedFunnelOpportunities.length === 0 ? (
+            <p className="mt-3 text-sm text-slate-600">
+              No opportunities match the current filter.
+            </p>
+          ) : (
           <div className="mt-5 overflow-x-auto">
             <table className="w-full min-w-[1200px] border-collapse text-left text-sm">
               <thead>
@@ -8384,6 +8790,7 @@ const filteredOpportunities = useMemo(() => {
               </tbody>
             </table>
           </div>
+          )
         )}
       </div>
     </section>
@@ -8656,6 +9063,32 @@ function HelpSection() {
 
 function ReleaseNotesSection() {
   const releases = [
+    {
+      version: "Version 3.07",
+      title: "Drag-and-Drop Funnel Board",
+      date: "July 20, 2026",
+      summary:
+        "Adds a secure, role-aware drag-and-drop funnel board designed for faster pipeline management.",
+      changes: [
+        "Added Board and List views for sales opportunities.",
+        "Added native drag-and-drop stage movement with optimistic updates and rollback on failure.",
+        "Added a verified Supabase bearer-token endpoint for secure stage changes.",
+        "Restricted Sales Reps to moving opportunities tied to companies assigned to them.",
+        "Added sticky Funnel controls with filters, view selection, refresh, and Comfortable or Compact card density.",
+        "Added stage counts, stage value totals, horizontal board scrolling, and full-card company navigation.",
+        "Added one-step secure Undo for the most recent stage move.",
+        "Added red overdue, amber due-today, and neutral future or missing close-date states.",
+      ],
+      testNotes: [
+        "Confirm Board is the default Funnel view and List remains available.",
+        "Confirm opportunities can be dragged between active stages and persist after refresh.",
+        "Confirm Undo returns the most recently moved opportunity to its prior stage.",
+        "Confirm Sales Reps only see and move opportunities within their assigned-company scope.",
+        "Confirm sticky controls, Refresh, filters, Comfortable mode, and Compact mode work.",
+        "Confirm clicking a card body opens the related company without interfering with the drag handle.",
+        "Confirm overdue dates appear red, due-today dates appear amber, and future or missing dates remain neutral.",
+      ],
+    },
     {
       version: "Version 3.06",
       title: "Contact Filter Result Count",
