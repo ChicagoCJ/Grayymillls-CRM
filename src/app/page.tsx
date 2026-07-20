@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Version 3.05 - Contact Project / List Filter";
+const APP_VERSION = "Version 3.06 - Contact Filter Result Count";
 const REVISION_NOTE =
-  "Contacts can now be filtered by assigned Project or List membership, with saved preferences, archived membership visibility, and Clear Contact Filters support.";
+  "The Contacts filter block now shows filtered and role-visible totals as X of Y Contacts, updating immediately as filters change.";
 
 type SignedInSessionStatus = {
   state: "checking" | "not_configured" | "signed_out" | "signed_in" | "error";
@@ -1083,6 +1083,17 @@ export default function Home() {
 
     return true;
   }
+  const roleVisibleContacts = useMemo(
+    () => crmSummary.contacts.filter(contactMatchesRoleVisibility),
+    [
+      crmSummary.contacts,
+      crmSummary.companies,
+      roleVisibilityEnabled,
+      currentUserId,
+      currentUserRole,
+    ]
+  );
+
   const filteredContacts = useMemo(() => {
     const search = normalizeForSearch(contactSearchTerm);
 
@@ -2628,6 +2639,8 @@ async function handleAnalyzeProspect() {
                     ])
                 ).values()
               )}
+              filteredContactCount={filteredContacts.length}
+              totalVisibleContactCount={roleVisibleContacts.length}
               clearContactFilters={clearContactFilters}
             />
 
@@ -8644,6 +8657,27 @@ function HelpSection() {
 function ReleaseNotesSection() {
   const releases = [
     {
+      version: "Version 3.06",
+      title: "Contact Filter Result Count",
+      date: "July 20, 2026",
+      summary:
+        "Adds an at-a-glance contact result count to the Contacts filter block while respecting role visibility.",
+      changes: [
+        "Added an X of Y Contacts count to the Contact Search and Filters panel.",
+        "Defined X as the number of contacts currently passing all active contact filters.",
+        "Defined Y as the total number of contacts visible to the signed-in user before contact filters are applied.",
+        "Made the count update immediately as search, tag, and Project / List filters change.",
+        "Kept role visibility intact so Sales Reps do not see totals that include hidden contacts.",
+      ],
+      testNotes: [
+        "Confirm the Contacts filter block shows X of Y Contacts.",
+        "Confirm X changes as search, tag, or Project / List filters are applied.",
+        "Confirm Y remains the role-visible contact total.",
+        "Confirm Clear Contact Filters restores X to Y.",
+        "Confirm Sales Reps do not see totals that include hidden contacts.",
+      ],
+    },
+    {
       version: "Version 3.05",
       title: "Contact Project / List Filter",
       date: "July 17, 2026",
@@ -10493,6 +10527,8 @@ function ContactTagFilterPanel({
   contactProjectListFilter,
   setContactProjectListFilter,
   contactProjectListOptions,
+  filteredContactCount,
+  totalVisibleContactCount,
   clearContactFilters,
 }: {
   contactSearchTerm: string;
@@ -10509,16 +10545,24 @@ function ContactTagFilterPanel({
   contactProjectListFilter: string;
   setContactProjectListFilter: (value: string) => void;
   contactProjectListOptions: any[];
+  filteredContactCount: number;
+  totalVisibleContactCount: number;
   clearContactFilters: () => void;
 }) {
 
   return (
     <section className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
-      <div>
-        <h2 className="text-xl font-bold">Contact Search and Filters</h2>
-        <p className="mt-2 text-sm leading-6 text-slate-600">
-          Filter contacts by name, company, title, function, email, assigned tags, or Project / List membership.
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-xl font-bold">Contact Search and Filters</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Filter contacts by name, company, title, function, email, assigned tags, or Project / List membership.
+          </p>
+        </div>
+
+        <div className="w-fit rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-900">
+          {filteredContactCount} of {totalVisibleContactCount} Contacts
+        </div>
       </div>
 
       <div className="mt-5 grid gap-4 lg:grid-cols-6">
