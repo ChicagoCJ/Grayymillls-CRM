@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Version 3.09 - Mandatory Next Step";
+const APP_VERSION = "Version 3.10 - Funnel Card Quick Actions";
 const REVISION_NOTE =
-  "Open opportunities now require a next step and due date, with missing and overdue action warnings across company details, My Sales Workspace, and Funnel views.";
+  "Funnel Board and List views now include secure quick actions to open the company, mark opportunities won or lost, and edit the next step and due date inline.";
 
 type SignedInSessionStatus = {
   state: "checking" | "not_configured" | "signed_out" | "signed_in" | "error";
@@ -7942,6 +7942,11 @@ function FunnelDashboardSection({
     toStageName: string;
   } | null>(null);
   const [isUndoingStageMove, setIsUndoingStageMove] = useState(false);
+  const [quickActionOpportunityId, setQuickActionOpportunityId] = useState("");
+  const [quickActionMessage, setQuickActionMessage] = useState("");
+  const [editingNextStepOpportunityId, setEditingNextStepOpportunityId] = useState("");
+  const [quickActionNextStep, setQuickActionNextStep] = useState("");
+  const [quickActionNextStepDueDate, setQuickActionNextStepDueDate] = useState("");
 
   async function loadFunnelDashboard() {
     setIsLoading(true);
@@ -8169,6 +8174,99 @@ const filteredOpportunities = useMemo(() => {
     };
   }
 
+  function startQuickNextStepEdit(opportunity: SalesOpportunity) {
+    setEditingNextStepOpportunityId(String(opportunity.id));
+    setQuickActionNextStep(String(opportunity.next_step || ""));
+    setQuickActionNextStepDueDate(String(opportunity.next_step_due_date || ""));
+    setQuickActionMessage("");
+    setFunnelError("");
+  }
+
+  function cancelQuickNextStepEdit() {
+    setEditingNextStepOpportunityId("");
+    setQuickActionNextStep("");
+    setQuickActionNextStepDueDate("");
+  }
+
+  async function applyOpportunityQuickAction(
+    opportunity: SalesOpportunity,
+    action: "mark_won" | "mark_lost" | "update_next_step"
+  ) {
+    const opportunityId = String(opportunity.id);
+    const actionLabel =
+      action === "mark_won"
+        ? "mark this opportunity won"
+        : action === "mark_lost"
+          ? "mark this opportunity lost"
+          : "update the next step";
+
+    if (
+      (action === "mark_won" || action === "mark_lost") &&
+      typeof window !== "undefined" &&
+      !window.confirm(`Are you sure you want to ${actionLabel}?`)
+    ) {
+      return;
+    }
+
+    if (
+      action === "update_next_step" &&
+      (!quickActionNextStep.trim() || !quickActionNextStepDueDate)
+    ) {
+      setFunnelError("Next step and next step due date are required.");
+      return;
+    }
+
+    setQuickActionOpportunityId(opportunityId);
+    setQuickActionMessage("");
+    setStageMoveMessage("");
+    setFunnelError("");
+
+    try {
+      const headers = await getVerifiedStageMoveHeaders();
+      const response = await fetch("/api/sales-opportunity-quick-action", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          opportunityId,
+          action,
+          ...(action === "update_next_step"
+            ? {
+                nextStep: quickActionNextStep.trim(),
+                nextStepDueDate: quickActionNextStepDueDate,
+              }
+            : {}),
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Could not apply the opportunity quick action.");
+      }
+
+      setQuickActionMessage(
+        action === "mark_won"
+          ? `${opportunity.opportunity_name} marked won.`
+          : action === "mark_lost"
+            ? `${opportunity.opportunity_name} marked lost.`
+            : `Next step updated for ${opportunity.opportunity_name}.`
+      );
+
+      if (action === "update_next_step") {
+        cancelQuickNextStepEdit();
+      }
+
+      await loadFunnelDashboard();
+    } catch (error) {
+      setFunnelError(
+        error instanceof Error
+          ? error.message
+          : "Could not apply the opportunity quick action."
+      );
+    } finally {
+      setQuickActionOpportunityId("");
+    }
+  }
+
   async function moveOpportunityToStage(opportunityId: string, stageId: string) {
     const opportunity = opportunities.find((item) => String(item.id) === opportunityId);
 
@@ -8329,6 +8427,12 @@ const filteredOpportunities = useMemo(() => {
         {stageMoveMessage && (
           <div className="mt-4 rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-800">
             {stageMoveMessage}
+          </div>
+        )}
+
+        {quickActionMessage && (
+          <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+            {quickActionMessage}
           </div>
         )}
       </div>
@@ -8723,6 +8827,92 @@ const filteredOpportunities = useMemo(() => {
                                   {opportunity.next_step_due_date ? formatDate(opportunity.next_step_due_date) : "No due date"}
                                 </p>
                               </div>
+
+                              <div
+                                className={`flex flex-wrap gap-2 border-t border-slate-100 ${
+                                  funnelCardDensity === "compact" ? "mt-2 pt-2" : "mt-3 pt-3"
+                                }`}
+                                onClick={(event) => event.stopPropagation()}
+                              >
+                                {companyId && (
+                                  <button
+                                    type="button"
+                                    onClick={() => onOpenCompany(String(companyId))}
+                                    className="rounded-lg bg-blue-700 px-2.5 py-2 text-xs font-semibold text-white hover:bg-blue-800"
+                                  >
+                                    Open Company
+                                  </button>
+                                )}
+
+                                {opportunity.status === "open" && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => applyOpportunityQuickAction(opportunity, "mark_won")}
+                                      disabled={quickActionOpportunityId === String(opportunity.id)}
+                                      className="rounded-lg bg-green-700 px-2.5 py-2 text-xs font-semibold text-white hover:bg-green-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                                    >
+                                      Mark Won
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => applyOpportunityQuickAction(opportunity, "mark_lost")}
+                                      disabled={quickActionOpportunityId === String(opportunity.id)}
+                                      className="rounded-lg bg-red-700 px-2.5 py-2 text-xs font-semibold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                                    >
+                                      Mark Lost
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => startQuickNextStepEdit(opportunity)}
+                                      disabled={quickActionOpportunityId === String(opportunity.id)}
+                                      className="rounded-lg bg-white px-2.5 py-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
+                                    >
+                                      Edit Next Step
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+
+                              {editingNextStepOpportunityId === String(opportunity.id) && (
+                                <div
+                                  className="mt-3 grid gap-2 rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200"
+                                  onClick={(event) => event.stopPropagation()}
+                                >
+                                  <input
+                                    value={quickActionNextStep}
+                                    onChange={(event) => setQuickActionNextStep(event.target.value)}
+                                    placeholder="Next step"
+                                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                                  />
+                                  <input
+                                    type="date"
+                                    value={quickActionNextStepDueDate}
+                                    onChange={(event) => setQuickActionNextStepDueDate(event.target.value)}
+                                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                                  />
+                                  <div className="flex flex-wrap gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => applyOpportunityQuickAction(opportunity, "update_next_step")}
+                                      disabled={quickActionOpportunityId === String(opportunity.id)}
+                                      className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                                    >
+                                      {quickActionOpportunityId === String(opportunity.id)
+                                        ? "Saving..."
+                                        : "Save Next Step"}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={cancelQuickNextStepEdit}
+                                      disabled={quickActionOpportunityId === String(opportunity.id)}
+                                      className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
                             </article>
                           );
                         })
@@ -8799,16 +8989,85 @@ const filteredOpportunities = useMemo(() => {
                           <p className="mt-1 text-xs">Due: {opportunity.next_step_due_date ? formatDate(opportunity.next_step_due_date) : "Missing"}</p>
                         </div>
                       </td>
-                      <td className="py-3 pr-4">
-                        {companyId ? (
-                          <button
-                            onClick={() => onOpenCompany(String(companyId))}
-                            className="rounded-lg bg-blue-700 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-800"
-                          >
-                            Open Company
-                          </button>
-                        ) : (
-                          <span className="text-xs text-slate-500">No company</span>
+                      <td className="min-w-[250px] py-3 pr-4">
+                        <div className="flex flex-wrap gap-2">
+                          {companyId ? (
+                            <button
+                              type="button"
+                              onClick={() => onOpenCompany(String(companyId))}
+                              className="rounded-lg bg-blue-700 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-800"
+                            >
+                              Open Company
+                            </button>
+                          ) : (
+                            <span className="text-xs text-slate-500">No company</span>
+                          )}
+
+                          {opportunity.status === "open" && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => applyOpportunityQuickAction(opportunity, "mark_won")}
+                                disabled={quickActionOpportunityId === String(opportunity.id)}
+                                className="rounded-lg bg-green-700 px-3 py-2 text-xs font-semibold text-white hover:bg-green-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                              >
+                                Mark Won
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => applyOpportunityQuickAction(opportunity, "mark_lost")}
+                                disabled={quickActionOpportunityId === String(opportunity.id)}
+                                className="rounded-lg bg-red-700 px-3 py-2 text-xs font-semibold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                              >
+                                Mark Lost
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => startQuickNextStepEdit(opportunity)}
+                                disabled={quickActionOpportunityId === String(opportunity.id)}
+                                className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
+                              >
+                                Edit Next Step
+                              </button>
+                            </>
+                          )}
+                        </div>
+
+                        {editingNextStepOpportunityId === String(opportunity.id) && (
+                          <div className="mt-2 grid gap-2 rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200">
+                            <input
+                              value={quickActionNextStep}
+                              onChange={(event) => setQuickActionNextStep(event.target.value)}
+                              placeholder="Next step"
+                              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                            />
+                            <input
+                              type="date"
+                              value={quickActionNextStepDueDate}
+                              onChange={(event) => setQuickActionNextStepDueDate(event.target.value)}
+                              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                            />
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => applyOpportunityQuickAction(opportunity, "update_next_step")}
+                                disabled={quickActionOpportunityId === String(opportunity.id)}
+                                className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                              >
+                                {quickActionOpportunityId === String(opportunity.id)
+                                  ? "Saving..."
+                                  : "Save"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={cancelQuickNextStepEdit}
+                                disabled={quickActionOpportunityId === String(opportunity.id)}
+                                className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -9090,6 +9349,50 @@ function HelpSection() {
 
 function ReleaseNotesSection() {
   const releases = [
+    {
+      version: "Version 3.10",
+      title: "Funnel Card Quick Actions",
+      date: "July 20, 2026",
+      summary:
+        "Adds secure, role-aware quick actions directly to Funnel Board cards and List rows for faster opportunity management.",
+      changes: [
+        "Added a protected /api/sales-opportunity-quick-action endpoint using verified Supabase bearer-token authentication.",
+        "Added Mark Won and Mark Lost actions with confirmation prompts and automatic status, probability, timestamp, and funnel-stage updates.",
+        "Added inline Next Step and Next Step Due Date editing in both Board and List views.",
+        "Added Open Company actions without interfering with full-card navigation.",
+        "Restricted Sales Reps to opportunities attached to companies assigned to them, while Admins and Sales Managers retain broader access.",
+        "Added success and error feedback near the Funnel controls.",
+      ],
+      testNotes: [
+        "Confirm Open Company works from Board and List views.",
+        "Confirm Mark Won moves the opportunity to the Won stage and sets probability to 100%.",
+        "Confirm Mark Lost moves the opportunity to the Lost stage and sets probability to 0%.",
+        "Confirm inline Next Step edits require both the step and due date and persist after refresh.",
+        "Confirm quick-action button clicks do not accidentally open the company card.",
+        "Confirm drag-and-drop stage movement and Undo continue to work.",
+      ],
+    },
+    {
+      version: "Version 3.09",
+      title: "Mandatory Next Step",
+      date: "July 20, 2026",
+      summary:
+        "Requires open opportunities to include a next step and due date and surfaces missing or overdue action warnings throughout the CRM.",
+      changes: [
+        "Added the next_step_due_date field and supporting database index.",
+        "Required Next Step and Next Step Due Date when creating or editing open opportunities.",
+        "Added missing and overdue next-step warnings in Company Detail, Funnel Board, Funnel List, and My Sales Workspace.",
+        "Added missing and overdue next-step counts to My Sales Workspace.",
+        "Preserved legacy opportunities and existing stage or status quick updates without forcing unrelated edits.",
+      ],
+      testNotes: [
+        "Confirm new open opportunities require both next-step fields.",
+        "Confirm edits persist after refresh.",
+        "Confirm missing and overdue warnings display correctly.",
+        "Confirm My Sales Workspace counts match the visible records.",
+        "Confirm Funnel stage movement and Won or Lost actions remain functional.",
+      ],
+    },
     {
       version: "Version 3.08",
       title: "My Sales Workspace",
