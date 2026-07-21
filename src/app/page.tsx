@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Version 3.10 - Funnel Card Quick Actions";
+const APP_VERSION = "Version 3.11 - Unified Activity Timeline";
 const REVISION_NOTE =
-  "Funnel Board and List views now include secure quick actions to open the company, mark opportunities won or lost, and edit the next step and due date inline.";
+  "Company Detail now includes a secure unified activity timeline combining company and opportunity activities, plus improved section ordering below Contacts.";
 
 type SignedInSessionStatus = {
   state: "checking" | "not_configured" | "signed_out" | "signed_in" | "error";
@@ -9350,6 +9350,29 @@ function HelpSection() {
 function ReleaseNotesSection() {
   const releases = [
     {
+      version: "Version 3.11",
+      title: "Unified Activity Timeline",
+      date: "July 21, 2026",
+      summary:
+        "Adds a secure, role-aware unified activity timeline to Company Detail and improves the placement of company assignment controls.",
+      changes: [
+        "Added a protected /api/company-activity-timeline endpoint using verified Supabase bearer-token authentication.",
+        "Combined company activities and opportunity activities into one chronological Company Detail timeline.",
+        "Added timeline search, source filters, status filters, counts, and manual refresh controls.",
+        "Displayed related opportunity names and source labels on opportunity activity entries.",
+        "Preserved the existing Company Activity History controls for editing and completing company activities.",
+        "Moved company Projects / Lists and Market / Sector / Category Tags below Contacts.",
+      ],
+      testNotes: [
+        "Confirm the unified timeline loads company and opportunity activities together.",
+        "Confirm search, source filters, status filters, counts, and Refresh Timeline work.",
+        "Confirm opportunity activity entries display the related opportunity name.",
+        "Confirm Company Activity History still supports editing and completing company activities.",
+        "Confirm Sales Reps cannot load timelines for companies not assigned to them.",
+        "Confirm Contacts appears before company Projects / Lists and Market / Sector / Category Tags.",
+      ],
+    },
+    {
       version: "Version 3.10",
       title: "Funnel Card Quick Actions",
       date: "July 20, 2026",
@@ -11819,6 +11842,70 @@ function CompanyDetailSection({
   const [companyDetailBuyerPersonaDefinitions, setCompanyDetailBuyerPersonaDefinitions] = useState<any[]>([]);
   const [companyDetailBuyerPersonaDefinitionError, setCompanyDetailBuyerPersonaDefinitionError] = useState("");
   const [showAiAnalysisHistory, setShowAiAnalysisHistory] = useState(false);
+  const [unifiedTimeline, setUnifiedTimeline] = useState<any[]>([]);
+  const [isLoadingUnifiedTimeline, setIsLoadingUnifiedTimeline] = useState(false);
+  const [unifiedTimelineError, setUnifiedTimelineError] = useState("");
+  const [unifiedTimelineSourceFilter, setUnifiedTimelineSourceFilter] = useState<
+    "all" | "company" | "opportunity"
+  >("all");
+  const [unifiedTimelineStatusFilter, setUnifiedTimelineStatusFilter] = useState<
+    "all" | "open" | "completed"
+  >("all");
+  const [unifiedTimelineSearch, setUnifiedTimelineSearch] = useState("");
+
+  async function loadUnifiedTimeline() {
+    const companyId = String(detail?.company?.id || "").trim();
+    if (!companyId) return;
+
+    setIsLoadingUnifiedTimeline(true);
+    setUnifiedTimelineError("");
+
+    try {
+      if (!hasBrowserSupabaseConfig()) {
+        throw new Error("Browser Supabase configuration is not available.");
+      }
+
+      const supabase = getBrowserSupabaseClient();
+      const { data, error } = await supabase.auth.getSession();
+
+      if (error) {
+        throw new Error(error.message || "Could not read the signed-in session.");
+      }
+
+      const accessToken = data.session?.access_token;
+      if (!accessToken) {
+        throw new Error("A signed-in Supabase session is required.");
+      }
+
+      const response = await fetch(
+        `/api/company-activity-timeline?companyId=${encodeURIComponent(companyId)}`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error || "Could not load the unified activity timeline.");
+      }
+
+      setUnifiedTimeline(payload.timeline ?? []);
+    } catch (error) {
+      setUnifiedTimeline([]);
+      setUnifiedTimelineError(
+        error instanceof Error ? error.message : "Could not load the unified activity timeline."
+      );
+    } finally {
+      setIsLoadingUnifiedTimeline(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadUnifiedTimeline();
+  }, [detail?.company?.id]);
 
   function getEditableCompanyActivityType(activityType: unknown): ActivityForm["activityType"] {
     const allowedActivityTypes: ActivityForm["activityType"][] = [
@@ -11995,6 +12082,45 @@ function CompanyDetailSection({
 
 
   const company = detail.company;
+
+  const normalizedUnifiedTimelineSearch = normalizeForSearch(unifiedTimelineSearch);
+  const filteredUnifiedTimeline = unifiedTimeline.filter((item: any) => {
+    const matchesSource =
+      unifiedTimelineSourceFilter === "all" || item.source === unifiedTimelineSourceFilter;
+    const matchesStatus =
+      unifiedTimelineStatusFilter === "all" ||
+      (unifiedTimelineStatusFilter === "open"
+        ? !item.completed_at
+        : Boolean(item.completed_at));
+    const searchableText = [
+      item.source_label,
+      item.activity_type,
+      item.subject,
+      item.notes,
+      item.opportunity_name,
+      item.contact?.full_name,
+      item.contact?.email,
+    ]
+      .map(normalizeForSearch)
+      .join("  ".trim());
+    const matchesSearch =
+      !normalizedUnifiedTimelineSearch ||
+      searchableText.includes(normalizedUnifiedTimelineSearch);
+
+    return matchesSource && matchesStatus && matchesSearch;
+  });
+  const unifiedTimelineCompanyCount = unifiedTimeline.filter(
+    (item: any) => item.source === "company"
+  ).length;
+  const unifiedTimelineOpportunityCount = unifiedTimeline.filter(
+    (item: any) => item.source === "opportunity"
+  ).length;
+  const unifiedTimelineOpenCount = unifiedTimeline.filter(
+    (item: any) => !item.completed_at
+  ).length;
+  const unifiedTimelineCompletedCount = unifiedTimeline.filter(
+    (item: any) => Boolean(item.completed_at)
+  ).length;
 
   const companyActivityToday = getLocalDateInputValueOffset(0);
   const companyActivities = detail.activities ?? [];
@@ -12821,16 +12947,6 @@ function CompanyDetailSection({
         </DetailCard>
       </div>      <CompanyIndustryEnrichmentPanel company={detail.company} />
 
-      <CompanyProjectListManager
-        companyId={String(detail.company.id)}
-        canManageProjectsLists={canManageProjectsLists}
-      />
-
-      <CompanyTagManager
-        companyId={String(detail.company.id)}
-        apiPermissionHeaders={apiPermissionHeaders}
-      />
-
       <div id="company-detail-funnel" className="scroll-mt-80"></div>
       <CompanyOpportunityPanel
         canMoveOpportunityStages={canMoveOpportunityStages}
@@ -13068,9 +13184,206 @@ function CompanyDetailSection({
       </div>
 
       <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h3 className="text-xl font-bold">Unified Activity Timeline</h3>
+            <p className="mt-2 text-sm text-slate-600">
+              Review company and opportunity activities together in one chronological view.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={loadUnifiedTimeline}
+            disabled={isLoadingUnifiedTimeline}
+            className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-wait disabled:bg-slate-100"
+          >
+            {isLoadingUnifiedTimeline ? "Refreshing..." : "Refresh Timeline"}
+          </button>
+        </div>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-4">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">All</p>
+            <p className="mt-1 text-2xl font-bold text-slate-900">{unifiedTimeline.length}</p>
+          </div>
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-blue-700">Company</p>
+            <p className="mt-1 text-2xl font-bold text-blue-800">{unifiedTimelineCompanyCount}</p>
+          </div>
+          <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-indigo-700">Opportunity</p>
+            <p className="mt-1 text-2xl font-bold text-indigo-800">{unifiedTimelineOpportunityCount}</p>
+          </div>
+          <div className="rounded-xl border border-green-200 bg-green-50 p-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-green-700">Completed</p>
+            <p className="mt-1 text-2xl font-bold text-green-800">{unifiedTimelineCompletedCount}</p>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_auto_auto]">
+          <input
+            type="search"
+            value={unifiedTimelineSearch}
+            onChange={(event) => setUnifiedTimelineSearch(event.target.value)}
+            placeholder="Search timeline..."
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
+          />
+          <select
+            value={unifiedTimelineSourceFilter}
+            onChange={(event) =>
+              setUnifiedTimelineSourceFilter(
+                event.target.value as "all" | "company" | "opportunity"
+              )
+            }
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
+          >
+            <option value="all">All sources</option>
+            <option value="company">Company activities</option>
+            <option value="opportunity">Opportunity activities</option>
+          </select>
+          <select
+            value={unifiedTimelineStatusFilter}
+            onChange={(event) =>
+              setUnifiedTimelineStatusFilter(
+                event.target.value as "all" | "open" | "completed"
+              )
+            }
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
+          >
+            <option value="all">All statuses</option>
+            <option value="open">Open</option>
+            <option value="completed">Completed</option>
+          </select>
+        </div>
+
+        <div className="mt-3 text-xs text-slate-500">
+          Showing {filteredUnifiedTimeline.length} of {unifiedTimeline.length} timeline items
+          {" · "}
+          {unifiedTimelineOpenCount} open
+        </div>
+
+        {unifiedTimelineError && (
+          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+            {unifiedTimelineError}
+          </div>
+        )}
+
+        {!unifiedTimelineError && isLoadingUnifiedTimeline && unifiedTimeline.length === 0 ? (
+          <p className="mt-4 text-sm text-slate-500">Loading unified timeline...</p>
+        ) : !unifiedTimelineError && filteredUnifiedTimeline.length === 0 ? (
+          <p className="mt-4 text-sm text-slate-500">
+            No timeline items match the current controls.
+          </p>
+        ) : (
+          <div className="mt-4 grid gap-3">
+            {filteredUnifiedTimeline.map((item: any) => {
+              const isTimelineOverdue =
+                !item.completed_at &&
+                item.due_date &&
+                String(item.due_date) < companyActivityToday;
+
+              return (
+                <div
+                  key={item.timeline_id}
+                  className={`rounded-xl border p-4 ${
+                    item.completed_at
+                      ? "border-green-200 bg-green-50"
+                      : isTimelineOverdue
+                        ? "border-red-200 bg-red-50"
+                        : "border-slate-200 bg-white"
+                  }`}
+                >
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className={
+                            item.source === "opportunity"
+                              ? "rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-semibold text-indigo-800"
+                              : "rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800"
+                          }
+                        >
+                          {item.source_label}
+                        </span>
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                          {getActivityLabel(item.activity_type)}
+                        </span>
+                        {item.completed_at ? (
+                          <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-800">
+                            Completed
+                          </span>
+                        ) : isTimelineOverdue ? (
+                          <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-800">
+                            Overdue
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                            Open
+                          </span>
+                        )}
+                      </div>
+
+                      {item.opportunity_name && (
+                        <p className="mt-2 text-xs font-bold uppercase tracking-wide text-indigo-700">
+                          Opportunity: {item.opportunity_name}
+                        </p>
+                      )}
+
+                      <p className="mt-2 font-semibold text-slate-900">
+                        {item.subject || "No subject"}
+                      </p>
+                      {item.notes && (
+                        <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+                          {item.notes}
+                        </p>
+                      )}
+                      {item.contact?.full_name && (
+                        <p className="mt-2 text-xs text-slate-500">
+                          Contact: {item.contact.full_name}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="grid min-w-44 gap-2 rounded-xl bg-slate-50 p-3 text-xs text-slate-600 ring-1 ring-slate-200">
+                      <div className="flex justify-between gap-3">
+                        <span className="font-semibold uppercase tracking-wide text-slate-500">
+                          Created
+                        </span>
+                        <span className="font-bold text-slate-900">
+                          {formatDate(item.created_at)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <span className="font-semibold uppercase tracking-wide text-slate-500">
+                          Due
+                        </span>
+                        <span className={isTimelineOverdue ? "font-bold text-red-700" : "font-bold text-slate-900"}>
+                          {item.due_date ? formatDate(item.due_date) : "No due date"}
+                        </span>
+                      </div>
+                      {item.completed_at && (
+                        <div className="flex justify-between gap-3">
+                          <span className="font-semibold uppercase tracking-wide text-slate-500">
+                            Completed
+                          </span>
+                          <span className="font-bold text-green-700">
+                            {formatDate(item.completed_at)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
-            <h3 className="text-xl font-bold">Activity History</h3>
+            <h3 className="text-xl font-bold">Company Activity History</h3>
             <p className="mt-2 text-sm text-slate-600">
               Review saved follow-ups, filter by status, and complete open items from this company record.
             </p>
@@ -13518,6 +13831,16 @@ function CompanyDetailSection({
           </div>
         )}
       </div>
+
+      <CompanyProjectListManager
+        companyId={String(detail.company.id)}
+        canManageProjectsLists={canManageProjectsLists}
+      />
+
+      <CompanyTagManager
+        companyId={String(detail.company.id)}
+        apiPermissionHeaders={apiPermissionHeaders}
+      />
 
       {hasAiAnalysis ? (
         <>
