@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Version 3.12 - Controlled Sales Workflow Automations";
+const APP_VERSION = "Version 3.13 - Saved Funnel Views and Filters";
 const REVISION_NOTE =
-  "Adds secure, Admin-controlled sales workflow automations with stage previews, confirmation, follow-up activity creation, duplicate prevention, Undo suppression, and required Lost Reason support.";
+  "Adds secure, user-specific saved Funnel views with named filter combinations, Board/List mode, card density, default restoration, rename, update, and delete controls.";
 
 type SignedInSessionStatus = {
   state: "checking" | "not_configured" | "signed_out" | "signed_in" | "error";
@@ -8337,6 +8337,15 @@ function FunnelDashboardSection({
   const [funnelCardDensity, setFunnelCardDensity] = useState<"comfortable" | "compact">(
     "comfortable"
   );
+  const [savedFunnelViews, setSavedFunnelViews] = useState<any[]>([]);
+  const [selectedSavedFunnelViewId, setSelectedSavedFunnelViewId] = useState("");
+  const [savedFunnelViewName, setSavedFunnelViewName] = useState("");
+  const [savedFunnelViewIsDefault, setSavedFunnelViewIsDefault] = useState(false);
+  const [isLoadingSavedFunnelViews, setIsLoadingSavedFunnelViews] = useState(false);
+  const [isSavingSavedFunnelView, setIsSavingSavedFunnelView] = useState(false);
+  const [savedFunnelViewMessage, setSavedFunnelViewMessage] = useState("");
+  const [savedFunnelViewError, setSavedFunnelViewError] = useState("");
+  const [showSavedFunnelViewManager, setShowSavedFunnelViewManager] = useState(false);
   const [draggedOpportunityId, setDraggedOpportunityId] = useState("");
   const [dragOverStageId, setDragOverStageId] = useState("");
   const [isMovingOpportunity, setIsMovingOpportunity] = useState(false);
@@ -8392,6 +8401,10 @@ function FunnelDashboardSection({
   useEffect(() => {
     loadFunnelDashboard();
   }, [statusFilter]);
+
+  useEffect(() => {
+    void loadSavedFunnelViews(true);
+  }, []);
 
   const typeOptions = useMemo(() => {
     return [
@@ -8559,6 +8572,242 @@ const filteredOpportunities = useMemo(() => {
     setStageFilter("All");
     setTypeFilter("All");
     setSearchTerm("");
+    setSelectedSavedFunnelViewId("");
+  }
+
+  function applySavedFunnelView(savedView: any) {
+    setStatusFilter(String(savedView?.status_filter || "open"));
+    setStageFilter(String(savedView?.stage_filter || "All"));
+    setTypeFilter(String(savedView?.type_filter || "All"));
+    setSearchTerm(String(savedView?.search_term || ""));
+    setFunnelViewMode(savedView?.view_mode === "list" ? "list" : "board");
+    setFunnelCardDensity(
+      savedView?.card_density === "compact" ? "compact" : "comfortable"
+    );
+    setSelectedSavedFunnelViewId(String(savedView?.id || ""));
+    setSavedFunnelViewMessage(
+      savedView?.view_name
+        ? `Applied saved Funnel view: ${savedView.view_name}.`
+        : "Applied saved Funnel view."
+    );
+    setSavedFunnelViewError("");
+  }
+
+  async function loadSavedFunnelViews(applyDefault = false) {
+    setIsLoadingSavedFunnelViews(true);
+    setSavedFunnelViewError("");
+
+    try {
+      const headers = await getVerifiedStageMoveHeaders();
+      const response = await fetch("/api/saved-funnel-views", {
+        method: "GET",
+        headers,
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Could not load saved Funnel views.");
+      }
+
+      const loadedViews = Array.isArray(data.savedViews) ? data.savedViews : [];
+      setSavedFunnelViews(loadedViews);
+
+      if (applyDefault) {
+        const defaultView = loadedViews.find((savedView: any) =>
+          Boolean(savedView.is_default)
+        );
+
+        if (defaultView) {
+          applySavedFunnelView(defaultView);
+        }
+      }
+    } catch (error) {
+      setSavedFunnelViews([]);
+      setSavedFunnelViewError(
+        error instanceof Error
+          ? error.message
+          : "Could not load saved Funnel views."
+      );
+    } finally {
+      setIsLoadingSavedFunnelViews(false);
+    }
+  }
+
+  async function saveCurrentFunnelView() {
+    const viewName = savedFunnelViewName.trim();
+
+    if (!viewName) {
+      setSavedFunnelViewError("Enter a name for the saved Funnel view.");
+      return;
+    }
+
+    setIsSavingSavedFunnelView(true);
+    setSavedFunnelViewMessage("");
+    setSavedFunnelViewError("");
+
+    try {
+      const headers = await getVerifiedStageMoveHeaders();
+      const response = await fetch("/api/saved-funnel-views", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          viewName,
+          isDefault: savedFunnelViewIsDefault,
+          viewMode: funnelViewMode,
+          cardDensity: funnelCardDensity,
+          statusFilter,
+          stageFilter,
+          typeFilter,
+          searchTerm,
+        }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Could not save the Funnel view.");
+      }
+
+      setSavedFunnelViewName("");
+      setSavedFunnelViewIsDefault(false);
+      setSavedFunnelViewMessage(`Saved Funnel view: ${viewName}.`);
+      await loadSavedFunnelViews(false);
+      setSelectedSavedFunnelViewId(String(data.savedView?.id || ""));
+    } catch (error) {
+      setSavedFunnelViewError(
+        error instanceof Error
+          ? error.message
+          : "Could not save the Funnel view."
+      );
+    } finally {
+      setIsSavingSavedFunnelView(false);
+    }
+  }
+
+  async function renameSavedFunnelView(savedView: any) {
+    const currentName = String(savedView?.view_name || "");
+    const nextName =
+      typeof window !== "undefined"
+        ? window.prompt("Rename saved Funnel view:", currentName)
+        : null;
+
+    if (nextName === null) return;
+
+    const cleanedName = nextName.trim();
+
+    if (!cleanedName) {
+      setSavedFunnelViewError("Saved Funnel view names cannot be blank.");
+      return;
+    }
+
+    await updateSavedFunnelView(savedView, {
+      viewName: cleanedName,
+    });
+  }
+
+  async function updateSavedFunnelView(
+    savedView: any,
+    patch: Record<string, unknown>
+  ) {
+    setIsSavingSavedFunnelView(true);
+    setSavedFunnelViewMessage("");
+    setSavedFunnelViewError("");
+
+    try {
+      const headers = await getVerifiedStageMoveHeaders();
+      const response = await fetch("/api/saved-funnel-views", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          id: savedView.id,
+          ...patch,
+        }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Could not update the saved Funnel view.");
+      }
+
+      setSavedFunnelViewMessage(
+        `Updated saved Funnel view: ${data.savedView?.view_name || savedView.view_name}.`
+      );
+      await loadSavedFunnelViews(false);
+    } catch (error) {
+      setSavedFunnelViewError(
+        error instanceof Error
+          ? error.message
+          : "Could not update the saved Funnel view."
+      );
+    } finally {
+      setIsSavingSavedFunnelView(false);
+    }
+  }
+
+  async function saveCurrentSettingsToExistingView(savedView: any) {
+    await updateSavedFunnelView(savedView, {
+      viewMode: funnelViewMode,
+      cardDensity: funnelCardDensity,
+      statusFilter,
+      stageFilter,
+      typeFilter,
+      searchTerm,
+    });
+  }
+
+  async function setDefaultSavedFunnelView(savedView: any) {
+    await updateSavedFunnelView(savedView, {
+      isDefault: !Boolean(savedView.is_default),
+    });
+  }
+
+  async function deleteSavedFunnelView(savedView: any) {
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(
+        `Delete saved Funnel view "${String(savedView?.view_name || "")}"?`
+      )
+    ) {
+      return;
+    }
+
+    setIsSavingSavedFunnelView(true);
+    setSavedFunnelViewMessage("");
+    setSavedFunnelViewError("");
+
+    try {
+      const headers = await getVerifiedStageMoveHeaders();
+      const response = await fetch(
+        `/api/saved-funnel-views?id=${encodeURIComponent(
+          String(savedView.id)
+        )}`,
+        {
+          method: "DELETE",
+          headers,
+        }
+      );
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Could not delete the saved Funnel view.");
+      }
+
+      if (selectedSavedFunnelViewId === String(savedView.id)) {
+        setSelectedSavedFunnelViewId("");
+      }
+
+      setSavedFunnelViewMessage(
+        `Deleted saved Funnel view: ${String(savedView.view_name || "")}.`
+      );
+      await loadSavedFunnelViews(false);
+    } catch (error) {
+      setSavedFunnelViewError(
+        error instanceof Error
+          ? error.message
+          : "Could not delete the saved Funnel view."
+      );
+    } finally {
+      setIsSavingSavedFunnelView(false);
+    }
   }
 
   async function getVerifiedStageMoveHeaders() {
@@ -8975,6 +9224,130 @@ const filteredOpportunities = useMemo(() => {
           </div>
         )}
 
+        {showSavedFunnelViewManager && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="saved-funnel-view-manager-title"
+          >
+            <div className="max-h-[85vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
+                    Funnel Preferences
+                  </p>
+                  <h3
+                    id="saved-funnel-view-manager-title"
+                    className="mt-1 text-xl font-bold text-slate-900"
+                  >
+                    Manage Saved Funnel Views
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowSavedFunnelViewManager(false)}
+                  className="rounded-xl bg-white px-3 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50"
+                >
+                  Close
+                </button>
+              </div>
+
+              {savedFunnelViews.length === 0 ? (
+                <p className="mt-5 rounded-xl bg-slate-50 p-4 text-sm text-slate-600">
+                  No saved Funnel views yet.
+                </p>
+              ) : (
+                <div className="mt-5 grid gap-3">
+                  {savedFunnelViews.map((savedView: any) => (
+                    <div
+                      key={savedView.id}
+                      className="rounded-xl border border-slate-200 bg-slate-50 p-4"
+                    >
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h4 className="font-bold text-slate-900">
+                              {savedView.view_name}
+                            </h4>
+                            {savedView.is_default && (
+                              <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-800">
+                                Default
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-1 text-xs text-slate-600">
+                            {savedView.view_mode === "list" ? "List" : "Board"} ·{" "}
+                            {savedView.card_density === "compact"
+                              ? "Compact"
+                              : "Comfortable"}{" "}
+                            · Status: {savedView.status_filter} · Stage:{" "}
+                            {savedView.stage_filter} · Type: {savedView.type_filter}
+                          </p>
+                          {savedView.search_term && (
+                            <p className="mt-1 text-xs text-slate-600">
+                              Search: {savedView.search_term}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              applySavedFunnelView(savedView);
+                              setShowSavedFunnelViewManager(false);
+                            }}
+                            className="rounded-lg bg-blue-700 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-800"
+                          >
+                            Apply
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              saveCurrentSettingsToExistingView(savedView)
+                            }
+                            disabled={isSavingSavedFunnelView}
+                            className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-300 hover:bg-slate-100 disabled:bg-slate-100"
+                          >
+                            Update from Current
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => renameSavedFunnelView(savedView)}
+                            disabled={isSavingSavedFunnelView}
+                            className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-300 hover:bg-slate-100 disabled:bg-slate-100"
+                          >
+                            Rename
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDefaultSavedFunnelView(savedView)}
+                            disabled={isSavingSavedFunnelView}
+                            className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-300 hover:bg-slate-100 disabled:bg-slate-100"
+                          >
+                            {savedView.is_default
+                              ? "Clear Default"
+                              : "Make Default"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteSavedFunnelView(savedView)}
+                            disabled={isSavingSavedFunnelView}
+                            className="rounded-lg bg-red-700 px-3 py-2 text-xs font-semibold text-white hover:bg-red-800 disabled:bg-slate-400"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {pendingStageAutomation && (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4"
@@ -9275,14 +9648,102 @@ const filteredOpportunities = useMemo(() => {
             />
           </div>
 
-          <div className="lg:col-span-5 flex justify-start">
+          <div className="lg:col-span-5 flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <div className="min-w-[220px] flex-1">
+              <label className="text-sm font-semibold text-slate-700">
+                Saved Funnel View
+              </label>
+              <select
+                value={selectedSavedFunnelViewId}
+                onChange={(event) => {
+                  const nextId = event.target.value;
+                  setSelectedSavedFunnelViewId(nextId);
+                  const savedView = savedFunnelViews.find(
+                    (item: any) => String(item.id) === nextId
+                  );
+                  if (savedView) applySavedFunnelView(savedView);
+                }}
+                disabled={isLoadingSavedFunnelViews}
+                className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
+              >
+                <option value="">
+                  {isLoadingSavedFunnelViews
+                    ? "Loading saved views..."
+                    : "Choose a saved view"}
+                </option>
+                {savedFunnelViews.map((savedView: any) => (
+                  <option key={savedView.id} value={savedView.id}>
+                    {savedView.is_default ? "Default: " : ""}
+                    {savedView.view_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="min-w-[220px] flex-1">
+              <label className="text-sm font-semibold text-slate-700">
+                Save Current View As
+              </label>
+              <input
+                type="text"
+                value={savedFunnelViewName}
+                onChange={(event) => setSavedFunnelViewName(event.target.value)}
+                placeholder="Example: Open Quotes"
+                className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
+              />
+            </div>
+
+            <label className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
+              <input
+                type="checkbox"
+                checked={savedFunnelViewIsDefault}
+                onChange={(event) =>
+                  setSavedFunnelViewIsDefault(event.target.checked)
+                }
+              />
+              Make default
+            </label>
+
             <button
+              type="button"
+              onClick={saveCurrentFunnelView}
+              disabled={isSavingSavedFunnelView}
+              className="rounded-xl bg-blue-700 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+            >
+              {isSavingSavedFunnelView ? "Saving..." : "Save View"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowSavedFunnelViewManager(true)}
+              className="rounded-xl bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-100"
+            >
+              Manage Views
+            </button>
+
+            <button
+              type="button"
               onClick={clearFunnelFilters}
               className="rounded-xl bg-slate-800 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-slate-900"
             >
               Clear Funnel Filters
             </button>
           </div>
+
+          {(savedFunnelViewMessage || savedFunnelViewError) && (
+            <div className="lg:col-span-5">
+              {savedFunnelViewMessage && (
+                <p className="text-sm font-semibold text-green-700">
+                  {savedFunnelViewMessage}
+                </p>
+              )}
+              {savedFunnelViewError && (
+                <p className="text-sm font-semibold text-red-700">
+                  {savedFunnelViewError}
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -10016,6 +10477,24 @@ function HelpSection() {
 
 function ReleaseNotesSection() {
   const releases = [
+    {
+      version: "Version 3.13",
+      title: "Saved Funnel Views and Filters",
+      date: "July 21, 2026",
+      summary:
+        "Adds secure, user-specific saved Funnel views that preserve Funnel filters, search, Board/List mode, and card density across sessions.",
+      changes: [
+        "Save the current Funnel configuration under a reusable name.",
+        "Apply, rename, update, set as default, clear default, or delete saved views.",
+        "Automatically restore the signed-in user’s default Funnel view.",
+        "Protect all saved-view reads and writes with verified Supabase authentication and server-side ownership enforcement.",
+      ],
+      testNotes: [
+        "Verified creation, application, rename, update, default restoration, and deletion of saved Funnel views.",
+        "Verified Funnel Board/List modes, card density, drag-and-drop, workflow previews, and quick actions remain functional.",
+        "Verified the production build passes with the secure saved-funnel-views API route.",
+      ],
+    },
     {
       version: "Version 3.12",
       title: "Controlled Sales Workflow Automations",
