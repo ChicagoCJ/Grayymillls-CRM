@@ -87,9 +87,9 @@ type ActivityForm = {
   dueDate: string;
 };
 
-const APP_VERSION = "Version 3.11 - Unified Activity Timeline";
+const APP_VERSION = "Version 3.12 - Controlled Sales Workflow Automations";
 const REVISION_NOTE =
-  "Company Detail now includes a secure unified activity timeline combining company and opportunity activities, plus improved section ordering below Contacts.";
+  "Adds secure, Admin-controlled sales workflow automations with stage previews, confirmation, follow-up activity creation, duplicate prevention, Undo suppression, and required Lost Reason support.";
 
 type SignedInSessionStatus = {
   state: "checking" | "not_configured" | "signed_out" | "signed_in" | "error";
@@ -2707,6 +2707,9 @@ async function handleAnalyzeProspect() {
             <AdminProjectsListsSection
               canManageProjectsLists={currentPermissions.canManageAdminSettings}
             />
+            <AdminWorkflowAutomationRulesSection
+              canManageWorkflowAutomations={currentPermissions.canManageAdminSettings}
+            />
             <AdminFunnelStagesSection
               canManageFunnelStages={currentPermissions.canManageFunnelStages}
               apiPermissionHeaders={apiPermissionHeaders}
@@ -4549,6 +4552,411 @@ function AdminProjectsListsSection({
         )}
       </div>
     </section>
+  );
+}
+
+function AdminWorkflowAutomationRulesSection({
+  canManageWorkflowAutomations = false,
+}: {
+  canManageWorkflowAutomations?: boolean;
+}) {
+  const [rules, setRules] = useState<any[]>([]);
+  const [drafts, setDrafts] = useState<Record<string, any>>({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [savingRuleId, setSavingRuleId] = useState("");
+  const [message, setMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+
+  async function getVerifiedAdminHeaders() {
+    if (!hasBrowserSupabaseConfig()) {
+      throw new Error("Browser Supabase configuration is not available.");
+    }
+
+    const supabase = getBrowserSupabaseClient();
+    const { data, error } = await supabase.auth.getSession();
+
+    if (error) {
+      throw new Error(error.message || "Could not read the signed-in session.");
+    }
+
+    const accessToken = data.session?.access_token;
+
+    if (!accessToken) {
+      throw new Error("A signed-in Admin session is required.");
+    }
+
+    return {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    };
+  }
+
+  function toDraft(rule: any) {
+    return {
+      enabled: Boolean(rule.enabled),
+      requireConfirmation: Boolean(rule.require_confirmation),
+      createActivity: Boolean(rule.create_activity),
+      requireLostReason: Boolean(rule.require_lost_reason),
+      activityType: String(rule.activity_type || "task"),
+      activitySubject: String(rule.activity_subject || ""),
+      activityNotes: String(rule.activity_notes || ""),
+      dueBusinessDays: String(rule.due_business_days ?? 0),
+    };
+  }
+
+  async function loadRules() {
+    setIsLoading(true);
+    setMessage("");
+    setErrorMessage("");
+
+    try {
+      const headers = await getVerifiedAdminHeaders();
+      const response = await fetch("/api/sales-workflow-automation-rules", {
+        headers,
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Could not load workflow automation rules.");
+      }
+
+      const loadedRules = data.rules ?? [];
+      setRules(loadedRules);
+      setDrafts(
+        Object.fromEntries(
+          loadedRules.map((rule: any) => [String(rule.id), toDraft(rule)])
+        )
+      );
+    } catch (error) {
+      setRules([]);
+      setDrafts({});
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not load workflow automation rules."
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (canManageWorkflowAutomations) {
+      void loadRules();
+    }
+  }, [canManageWorkflowAutomations]);
+
+  function updateDraft(ruleId: string, patch: Record<string, unknown>) {
+    setDrafts((current) => ({
+      ...current,
+      [ruleId]: {
+        ...(current[ruleId] ?? {}),
+        ...patch,
+      },
+    }));
+  }
+
+  async function saveRule(rule: any) {
+    const ruleId = String(rule.id);
+    const draft = drafts[ruleId];
+
+    if (!draft) return;
+
+    setSavingRuleId(ruleId);
+    setMessage("");
+    setErrorMessage("");
+
+    try {
+      const dueBusinessDays = Number(draft.dueBusinessDays);
+
+      if (
+        !Number.isInteger(dueBusinessDays) ||
+        dueBusinessDays < 0 ||
+        dueBusinessDays > 365
+      ) {
+        throw new Error("Due business days must be a whole number from 0 through 365.");
+      }
+
+      const headers = await getVerifiedAdminHeaders();
+      const response = await fetch("/api/sales-workflow-automation-rules", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          ruleId,
+          enabled: Boolean(draft.enabled),
+          requireConfirmation: Boolean(draft.requireConfirmation),
+          createActivity: Boolean(draft.createActivity),
+          requireLostReason: Boolean(draft.requireLostReason),
+          activityType: draft.activityType,
+          activitySubject: draft.activitySubject || null,
+          activityNotes: draft.activityNotes || null,
+          dueBusinessDays,
+        }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Could not save the workflow automation rule.");
+      }
+
+      setMessage(`${rule.rule_name} updated.`);
+      await loadRules();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not save the workflow automation rule."
+      );
+    } finally {
+      setSavingRuleId("");
+    }
+  }
+
+  function describeTrigger(rule: any) {
+    if (rule.trigger_stage_key) {
+      return `Enter stage: ${formatTitleFromKey(String(rule.trigger_stage_key))}`;
+    }
+
+    if (rule.trigger_outcome) {
+      return `Outcome: ${formatTitleFromKey(String(rule.trigger_outcome))}`;
+    }
+
+    return "No trigger configured";
+  }
+
+  return (
+    <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
+            Controlled Sales Workflow Automations
+          </p>
+          <h3 className="mt-2 text-xl font-bold">Workflow Automation Rules</h3>
+          <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
+            Configure the follow-up activity proposed when an opportunity enters a stage or closes.
+            Triggers are fixed; each rule remains inactive until explicitly enabled.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={loadRules}
+          disabled={isLoading || !canManageWorkflowAutomations}
+          className="w-fit rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
+        >
+          {isLoading ? "Refreshing..." : "Refresh Rules"}
+        </button>
+      </div>
+
+      {!canManageWorkflowAutomations && (
+        <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">
+          Only signed-in CRM Admin users can manage workflow automation rules.
+        </p>
+      )}
+
+      {message && (
+        <div className="mt-4 rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+          {message}
+        </div>
+      )}
+
+      {errorMessage && (
+        <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          {errorMessage}
+        </div>
+      )}
+
+      {canManageWorkflowAutomations && rules.length === 0 && !isLoading ? (
+        <p className="mt-5 text-sm text-slate-600">No workflow automation rules found.</p>
+      ) : (
+        <div className="mt-5 grid gap-4">
+          {rules.map((rule: any) => {
+            const ruleId = String(rule.id);
+            const draft = drafts[ruleId] ?? toDraft(rule);
+            const isLostRule = String(rule.trigger_outcome || "") === "lost";
+
+            return (
+              <section
+                key={ruleId}
+                className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+              >
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h4 className="font-bold text-slate-900">{rule.rule_name}</h4>
+                      <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800">
+                        {describeTrigger(rule)}
+                      </span>
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                          draft.enabled
+                            ? "bg-green-100 text-green-800"
+                            : "bg-slate-200 text-slate-700"
+                        }`}
+                      >
+                        {draft.enabled ? "Enabled" : "Disabled"}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      {rule.description || "No description provided."}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-4 lg:grid-cols-4">
+                  <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(draft.enabled)}
+                      onChange={(event) =>
+                        updateDraft(ruleId, { enabled: event.target.checked })
+                      }
+                    />
+                    Enable rule
+                  </label>
+
+                  <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(draft.requireConfirmation)}
+                      onChange={(event) =>
+                        updateDraft(ruleId, {
+                          requireConfirmation: event.target.checked,
+                        })
+                      }
+                    />
+                    Require confirmation
+                  </label>
+
+                  <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(draft.createActivity)}
+                      disabled={isLostRule && Boolean(draft.requireLostReason)}
+                      onChange={(event) =>
+                        updateDraft(ruleId, { createActivity: event.target.checked })
+                      }
+                    />
+                    Create activity
+                  </label>
+
+                  <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(draft.requireLostReason)}
+                      disabled={!isLostRule}
+                      onChange={(event) =>
+                        updateDraft(ruleId, {
+                          requireLostReason: event.target.checked,
+                          ...(event.target.checked ? { createActivity: false } : {}),
+                        })
+                      }
+                    />
+                    Require lost reason
+                  </label>
+                </div>
+
+                <div className="mt-4 grid gap-4 lg:grid-cols-4">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700">
+                      Activity Type
+                    </label>
+                    <select
+                      value={draft.activityType}
+                      disabled={!draft.createActivity}
+                      onChange={(event) =>
+                        updateDraft(ruleId, { activityType: event.target.value })
+                      }
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm disabled:bg-slate-100"
+                    >
+                      <option value="note">Note</option>
+                      <option value="call">Call</option>
+                      <option value="email">Email</option>
+                      <option value="meeting">Meeting</option>
+                      <option value="task">Task</option>
+                      <option value="quote_followup">Quote Follow-Up</option>
+                    </select>
+                  </div>
+
+                  <div className="lg:col-span-2">
+                    <label className="text-xs font-semibold text-slate-700">
+                      Activity Subject
+                    </label>
+                    <input
+                      type="text"
+                      value={draft.activitySubject}
+                      disabled={!draft.createActivity}
+                      onChange={(event) =>
+                        updateDraft(ruleId, { activitySubject: event.target.value })
+                      }
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm disabled:bg-slate-100"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700">
+                      Due Business Days
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="365"
+                      step="1"
+                      value={draft.dueBusinessDays}
+                      disabled={!draft.createActivity}
+                      onChange={(event) =>
+                        updateDraft(ruleId, { dueBusinessDays: event.target.value })
+                      }
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm disabled:bg-slate-100"
+                    />
+                  </div>
+
+                  <div className="lg:col-span-4">
+                    <label className="text-xs font-semibold text-slate-700">
+                      Activity Notes
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={draft.activityNotes}
+                      disabled={!draft.createActivity}
+                      onChange={(event) =>
+                        updateDraft(ruleId, { activityNotes: event.target.value })
+                      }
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm disabled:bg-slate-100"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => saveRule(rule)}
+                    disabled={savingRuleId === ruleId || !canManageWorkflowAutomations}
+                    className="rounded-xl bg-green-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                  >
+                    {savingRuleId === ruleId ? "Saving..." : "Save Rule"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setDrafts((current) => ({
+                        ...current,
+                        [ruleId]: toDraft(rule),
+                      }))
+                    }
+                    disabled={savingRuleId === ruleId}
+                    className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
+                  >
+                    Reset Changes
+                  </button>
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -7933,6 +8341,9 @@ function FunnelDashboardSection({
   const [dragOverStageId, setDragOverStageId] = useState("");
   const [isMovingOpportunity, setIsMovingOpportunity] = useState(false);
   const [stageMoveMessage, setStageMoveMessage] = useState("");
+  const [pendingStageAutomation, setPendingStageAutomation] = useState<any | null>(null);
+  const [pendingStageAutomationLostReason, setPendingStageAutomationLostReason] = useState("");
+  const [isConfirmingStageAutomation, setIsConfirmingStageAutomation] = useState(false);
   const [lastStageMove, setLastStageMove] = useState<{
     opportunityId: string;
     opportunityName: string;
@@ -8193,18 +8604,31 @@ const filteredOpportunities = useMemo(() => {
     action: "mark_won" | "mark_lost" | "update_next_step"
   ) {
     const opportunityId = String(opportunity.id);
-    const actionLabel =
-      action === "mark_won"
-        ? "mark this opportunity won"
-        : action === "mark_lost"
-          ? "mark this opportunity lost"
-          : "update the next step";
 
-    if (
-      (action === "mark_won" || action === "mark_lost") &&
-      typeof window !== "undefined" &&
-      !window.confirm(`Are you sure you want to ${actionLabel}?`)
-    ) {
+    if (action === "mark_won" || action === "mark_lost") {
+      const destinationStage = stages.find((stage) =>
+        action === "mark_won"
+          ? Boolean((stage as any).is_won_stage)
+          : Boolean((stage as any).is_lost_stage)
+      );
+
+      if (!destinationStage?.id) {
+        setFunnelError(
+          action === "mark_won"
+            ? "No active Won stage is available."
+            : "No active Lost stage is available."
+        );
+        return;
+      }
+
+      void moveOpportunityToStage(
+        opportunityId,
+        String(destinationStage.id),
+        {
+          forceConfirmation: true,
+          outcomeAction: action,
+        }
+      );
       return;
     }
 
@@ -8244,11 +8668,7 @@ const filteredOpportunities = useMemo(() => {
       }
 
       setQuickActionMessage(
-        action === "mark_won"
-          ? `${opportunity.opportunity_name} marked won.`
-          : action === "mark_lost"
-            ? `${opportunity.opportunity_name} marked lost.`
-            : `Next step updated for ${opportunity.opportunity_name}.`
+        `Next step updated for ${opportunity.opportunity_name}.`
       );
 
       if (action === "update_next_step") {
@@ -8267,15 +8687,13 @@ const filteredOpportunities = useMemo(() => {
     }
   }
 
-  async function moveOpportunityToStage(opportunityId: string, stageId: string) {
-    const opportunity = opportunities.find((item) => String(item.id) === opportunityId);
-
-    if (!opportunity || String(opportunity.stage_id || "") === stageId) {
-      setDraggedOpportunityId("");
-      setDragOverStageId("");
-      return;
-    }
-
+  async function executeOpportunityStageMove(
+    opportunity: any,
+    stageId: string,
+    confirmAutomation: boolean,
+    lostReason = ""
+  ) {
+    const opportunityId = String(opportunity.id);
     const previousOpportunities = opportunities;
     const previousStageId = String(opportunity.stage_id || "");
     const previousStage = stages.find((stage) => String(stage.id) === previousStageId);
@@ -8307,7 +8725,13 @@ const filteredOpportunities = useMemo(() => {
       const response = await fetch("/api/sales-opportunity-stage-move", {
         method: "PATCH",
         headers,
-        body: JSON.stringify({ opportunityId, stageId }),
+        body: JSON.stringify({
+          opportunityId,
+          stageId,
+          mode: "execute",
+          confirmAutomation,
+          lostReason: lostReason.trim() || undefined,
+        }),
       });
 
       const data = await response.json();
@@ -8324,11 +8748,18 @@ const filteredOpportunities = useMemo(() => {
         toStageId: stageId,
         toStageName: destinationStage?.stage_name || "the selected stage",
       });
+
+      const activityMessage = data.automation?.activityCreated
+        ? ` Follow-up activity created for ${formatDate(data.automation.dueDate)}.`
+        : "";
+
       setStageMoveMessage(
         `Moved ${opportunity.opportunity_name} to ${
           destinationStage?.stage_name || "the selected stage"
-        }.`
+        }.${activityMessage}`
       );
+
+      setPendingStageAutomation(null);
       await loadFunnelDashboard();
     } catch (error) {
       setOpportunities(previousOpportunities);
@@ -8339,7 +8770,110 @@ const filteredOpportunities = useMemo(() => {
       setDraggedOpportunityId("");
       setDragOverStageId("");
       setIsMovingOpportunity(false);
+      setIsConfirmingStageAutomation(false);
     }
+  }
+
+  async function moveOpportunityToStage(
+    opportunityId: string,
+    stageId: string,
+    options?: {
+      forceConfirmation?: boolean;
+      outcomeAction?: "mark_won" | "mark_lost";
+    }
+  ) {
+    const opportunity = opportunities.find((item) => String(item.id) === opportunityId);
+
+    if (!opportunity || String(opportunity.stage_id || "") === stageId) {
+      setDraggedOpportunityId("");
+      setDragOverStageId("");
+      return;
+    }
+
+    setFunnelError("");
+    setStageMoveMessage("");
+    setIsMovingOpportunity(true);
+
+    try {
+      const headers = await getVerifiedStageMoveHeaders();
+      const response = await fetch("/api/sales-opportunity-stage-move", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          opportunityId,
+          stageId,
+          mode: "preview",
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Could not preview opportunity move.");
+      }
+
+      if (
+        data.automation?.requireConfirmation ||
+        data.automation?.requireLostReason ||
+        options?.forceConfirmation
+      ) {
+        setPendingStageAutomationLostReason("");
+        setPendingStageAutomation({
+          opportunity,
+          opportunityId,
+          stageId,
+          destinationStageName: data.stage?.stageName || "the selected stage",
+          automation: data.automation,
+          outcomeAction: options?.outcomeAction || null,
+        });
+        return;
+      }
+
+      await executeOpportunityStageMove(
+        opportunity,
+        stageId,
+        Boolean(data.automation)
+      );
+    } catch (error) {
+      setFunnelError(
+        error instanceof Error
+          ? error.message
+          : "Could not preview opportunity move."
+      );
+    } finally {
+      setDraggedOpportunityId("");
+      setDragOverStageId("");
+      setIsMovingOpportunity(false);
+    }
+  }
+
+  async function confirmPendingStageAutomation() {
+    if (!pendingStageAutomation || isConfirmingStageAutomation) return;
+
+    if (
+      pendingStageAutomation.automation?.requireLostReason &&
+      !pendingStageAutomationLostReason.trim()
+    ) {
+      setFunnelError("Enter a lost reason before confirming this move.");
+      return;
+    }
+
+    setFunnelError("");
+    setIsConfirmingStageAutomation(true);
+
+    await executeOpportunityStageMove(
+      pendingStageAutomation.opportunity,
+      pendingStageAutomation.stageId,
+      Boolean(pendingStageAutomation.automation),
+      pendingStageAutomationLostReason
+    );
+  }
+
+  function cancelPendingStageAutomation() {
+    if (isConfirmingStageAutomation) return;
+    setPendingStageAutomation(null);
+    setPendingStageAutomationLostReason("");
+    setStageMoveMessage("Stage move cancelled.");
   }
 
   async function undoLastStageMove() {
@@ -8354,7 +8888,12 @@ const filteredOpportunities = useMemo(() => {
       const response = await fetch("/api/sales-opportunity-stage-move", {
         method: "PATCH",
         headers,
-        body: JSON.stringify({ opportunityId: lastStageMove.opportunityId, stageId: lastStageMove.fromStageId }),
+        body: JSON.stringify({
+          opportunityId: lastStageMove.opportunityId,
+          stageId: lastStageMove.fromStageId,
+          mode: "execute",
+          isUndo: true,
+        }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not undo the stage move.");
@@ -8433,6 +8972,134 @@ const filteredOpportunities = useMemo(() => {
         {quickActionMessage && (
           <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
             {quickActionMessage}
+          </div>
+        )}
+
+        {pendingStageAutomation && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="stage-automation-preview-title"
+          >
+            <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl">
+              <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
+                {pendingStageAutomation.automation
+                  ? "Workflow Automation Preview"
+                  : "Opportunity Outcome Confirmation"}
+              </p>
+              <h3
+                id="stage-automation-preview-title"
+                className="mt-2 text-xl font-bold text-slate-900"
+              >
+                Confirm move to {pendingStageAutomation.destinationStageName}
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Confirm this stage change for{" "}
+                <span className="font-semibold text-slate-900">
+                  {pendingStageAutomation.opportunity?.opportunity_name}
+                </span>.
+              </p>
+
+              {pendingStageAutomation.automation ? (
+                <div className="mt-5 grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+                  <div>
+                    <span className="font-semibold text-slate-700">Rule:</span>{" "}
+                    {pendingStageAutomation.automation.ruleName}
+                  </div>
+                  {pendingStageAutomation.automation.createActivity && (
+                    <>
+                      <div>
+                        <span className="font-semibold text-slate-700">Activity type:</span>{" "}
+                        {formatTitleFromKey(
+                          pendingStageAutomation.automation.activityType || "task"
+                        )}
+                      </div>
+                      <div>
+                        <span className="font-semibold text-slate-700">Subject:</span>{" "}
+                        {pendingStageAutomation.automation.activitySubject || "No subject"}
+                      </div>
+                      <div>
+                        <span className="font-semibold text-slate-700">Due date:</span>{" "}
+                        {pendingStageAutomation.automation.dueDate
+                          ? formatDate(pendingStageAutomation.automation.dueDate)
+                          : "No due date"}
+                      </div>
+                      {pendingStageAutomation.automation.activityNotes && (
+                        <div>
+                          <span className="font-semibold text-slate-700">Notes:</span>
+                          <p className="mt-1 whitespace-pre-wrap leading-6 text-slate-600">
+                            {pendingStageAutomation.automation.activityNotes}
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {!pendingStageAutomation.automation.createActivity && (
+                    <div className="text-slate-600">
+                      This rule changes the opportunity stage without creating an activity.
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                  No enabled workflow automation applies to this outcome.
+                </div>
+              )}
+
+              {pendingStageAutomation.automation?.requireLostReason && (
+                <div className="mt-5">
+                  <label
+                    htmlFor="pending-stage-lost-reason"
+                    className="text-sm font-semibold text-slate-700"
+                  >
+                    Lost Reason
+                  </label>
+                  <textarea
+                    id="pending-stage-lost-reason"
+                    rows={4}
+                    value={pendingStageAutomationLostReason}
+                    onChange={(event) =>
+                      setPendingStageAutomationLostReason(event.target.value)
+                    }
+                    placeholder="Explain why this opportunity was lost."
+                    className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
+                  />
+                  {!pendingStageAutomationLostReason.trim() && (
+                    <p className="mt-2 text-xs font-semibold text-red-700">
+                      Lost reason is required.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className="mt-6 flex flex-wrap justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={cancelPendingStageAutomation}
+                  disabled={isConfirmingStageAutomation}
+                  className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
+                >
+                  Cancel Move
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmPendingStageAutomation}
+                  disabled={
+                    isConfirmingStageAutomation ||
+                    (pendingStageAutomation.automation?.requireLostReason &&
+                      !pendingStageAutomationLostReason.trim())
+                  }
+                  className="rounded-xl bg-green-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+                >
+                  {isConfirmingStageAutomation
+                    ? "Confirming..."
+                    : pendingStageAutomation.automation?.createActivity
+                      ? "Confirm Move and Create Activity"
+                      : "Confirm Move"}
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -8782,7 +9449,7 @@ const filteredOpportunities = useMemo(() => {
                                   title="Drag opportunity to another stage"
                                   className="shrink-0 cursor-grab rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 active:cursor-grabbing disabled:cursor-not-allowed"
                                 >
-                                  â‹®â‹®
+                                  <span aria-hidden="true">Drag</span>
                                 </button>
                               </div>
 
@@ -9349,6 +10016,35 @@ function HelpSection() {
 
 function ReleaseNotesSection() {
   const releases = [
+    {
+      version: "Version 3.12",
+      title: "Controlled Sales Workflow Automations",
+      date: "July 21, 2026",
+      summary:
+        "Adds secure, configurable sales workflow automations that can preview and create follow-up activities when opportunities move through the Funnel.",
+      changes: [
+        "Added a protected workflow automation rules API using verified Supabase bearer-token authentication and Admin-only management.",
+        "Added fixed workflow triggers for Discovery, Solution / Quote, Technical / Commercial Review, Won, and Lost outcomes.",
+        "Added editable activity type, subject, notes, due-business-day offset, confirmation, activity creation, and Lost Reason controls.",
+        "Added secure pre-move previews and confirmation before enabled automations execute.",
+        "Added server-side follow-up activity creation with deterministic duplicate prevention and workflow audit notes.",
+        "Added explicit Undo suppression so reversing a stage move does not create another automated activity.",
+        "Routed Funnel Mark Won and Mark Lost through the secure stage-move workflow contract.",
+        "Added required Lost Reason entry and persistence when the enabled Lost rule requires it.",
+        "Replaced the corrupted Funnel drag-handle text with a stable Drag label.",
+      ],
+      testNotes: [
+        "Confirm only signed-in CRM Admin users can view and update workflow automation rules.",
+        "Confirm disabled rules do not interrupt ordinary stage moves.",
+        "Confirm enabled rules show the correct preview before moving the opportunity.",
+        "Confirm Cancel Move leaves the opportunity unchanged.",
+        "Confirm approved moves create no more than one follow-up activity.",
+        "Confirm Undo restores the prior stage without creating another automation activity.",
+        "Confirm Mark Won follows the configured Won rule.",
+        "Confirm Mark Lost requires and saves a Lost Reason when configured.",
+        "Confirm Edit Next Step remains functional in Board and List views.",
+      ],
+    },
     {
       version: "Version 3.11",
       title: "Unified Activity Timeline",
