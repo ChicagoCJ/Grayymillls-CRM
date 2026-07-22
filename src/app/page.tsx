@@ -107,9 +107,9 @@ type ManualContactForm = {
   isPrimary: boolean;
 };
 
-const APP_VERSION = "Version 3.16 - Activity Security and Contact Update Audit";
+const APP_VERSION = "Version 3.17 - Company Activity Permission Alignment";
 const REVISION_NOTE =
-  "Hardens company activity completion and editing with verified bearer authentication and preserves Primary and Related Contact changes during activity updates.";
+  "Aligns Company Detail activity controls with server-side role and company-assignment rules, including clear view-only messaging when activity management is unavailable.";
 
 type SignedInSessionStatus = {
   state: "checking" | "not_configured" | "signed_out" | "signed_in" | "error";
@@ -2723,6 +2723,13 @@ async function handleAnalyzeProspect() {
             onSaveActivity={handleSaveActivity}
             onUpdateActivity={handleUpdateActivity}
             onCompleteActivity={handleCompleteActivity}
+            canManageCompanyActivities={
+              currentUserRole === "admin" ||
+              currentUserRole === "sales_manager" ||
+              (currentUserRole === "sales_rep" &&
+                String(selectedCompanyDetail?.company?.assigned_salesperson_id || "") ===
+                  String(currentUserId || ""))
+            }
             onAnalyzeProspect={handleAnalyzeProspect}
             onRefreshCompanyDetail={loadCompanyDetail}
             isRefreshingCompanyDetail={isLoadingCompanyDetail}
@@ -10582,6 +10589,31 @@ function HelpSection() {
 function ReleaseNotesSection() {
   const releases = [
     {
+      version: "Version 3.17",
+      title: "Company Activity Permission Alignment",
+      date: "July 22, 2026",
+      summary:
+        "Aligns Company Detail activity controls with the existing server-side permission model for Admin, Sales Manager, and assigned Sales Rep users.",
+      changes: [
+        "Confirmed the activities API allows Admin and Sales Manager users to manage activities for all companies.",
+        "Confirmed Sales Rep users can manage activities only when assigned as the company Salesperson / Rep.",
+        "Added an assignment-aware Company Detail activity permission.",
+        "Disabled Add Activity, Edit, Save Edit, and Complete when activity management is unavailable.",
+        "Added clear view-only messaging explaining the role and assignment requirements.",
+        "Preserved Company Detail viewing and activity history access in view-only mode.",
+        "Preserved verified bearer authentication and server-side company access enforcement.",
+      ],
+      testNotes: [
+        "Confirm Admin users can add, edit, and complete activities for any company.",
+        "Confirm Sales Manager users can add, edit, and complete activities for any company.",
+        "Confirm assigned Sales Rep users can add, edit, and complete activities.",
+        "Confirm unassigned Sales Rep users see the view-only permission message.",
+        "Confirm Add Activity, Edit, Save Edit, and Complete are unavailable for an unassigned Sales Rep.",
+        "Confirm activity history remains visible in view-only mode.",
+        "Confirm the production build passes.",
+      ],
+    },
+    {
       version: "Version 3.16",
       title: "Activity Security and Contact Update Audit",
       date: "July 22, 2026",
@@ -13145,6 +13177,7 @@ function CompanyDetailSection({
   onSaveActivity,
   onUpdateActivity,
   onCompleteActivity,
+  canManageCompanyActivities = false,
   onAnalyzeProspect,
   onRefreshCompanyDetail,
   isRefreshingCompanyDetail = false,
@@ -13163,6 +13196,7 @@ function CompanyDetailSection({
   onSaveActivity: () => void;
   onUpdateActivity: (activityId: string, form: ActivityForm) => Promise<boolean>;
   onCompleteActivity: (activityId: string, companyId?: string | null) => void;
+  canManageCompanyActivities?: boolean;
   onAnalyzeProspect: () => void;
   onRefreshCompanyDetail: (companyId: string) => void;
   isRefreshingCompanyDetail?: boolean;
@@ -13489,7 +13523,7 @@ function CompanyDetailSection({
   }
 
   function startEditingCompanyActivity(activity: any) {
-    if (isSavingActivity) return;
+    if (!canManageCompanyActivities || isSavingActivity) return;
 
     setConfirmDiscardCompanyActivityEdit(false);
     setEditingCompanyActivityId(String(activity.id));
@@ -13530,7 +13564,7 @@ function CompanyDetailSection({
   }
 
   async function saveEditingCompanyActivity(activityId: string) {
-    if (isSavingActivity) return;
+    if (!canManageCompanyActivities || isSavingActivity) return;
 
     setConfirmDiscardCompanyActivityEdit(false);
 
@@ -14569,6 +14603,15 @@ function CompanyDetailSection({
           Save notes, calls, emails, meetings, tasks, and quote follow-ups directly to this company record.
         </p>
 
+        {!canManageCompanyActivities && (
+          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            <p className="font-semibold">Activity management is unavailable for this company.</p>
+            <p className="mt-1 text-xs leading-5">
+              Admin and Sales Manager users can manage all company activities. Sales Rep users can manage activities only for companies assigned to them as Salesperson / Rep.
+            </p>
+          </div>
+        )}
+
         <div className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50 p-3">
           <p className="text-xs font-bold uppercase tracking-wide text-emerald-800">Common follow-up presets</p>
           <p className="mt-1 text-xs leading-5 text-emerald-800">
@@ -14837,7 +14880,7 @@ function CompanyDetailSection({
         <div className="mt-4 flex flex-wrap justify-start gap-2">
           <button
             onClick={onSaveActivity}
-            disabled={isSavingActivity || !canSaveCompanyActivity}
+            disabled={!canManageCompanyActivities || isSavingActivity || !canSaveCompanyActivity}
             className="rounded-xl bg-green-700 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-green-800 disabled:cursor-not-allowed disabled:bg-slate-300"
           >
             {isSavingActivity ? "Saving..." : "Save Activity"}
@@ -15282,6 +15325,7 @@ function CompanyDetailSection({
                               type="button"
                               onClick={() => saveEditingCompanyActivity(String(activity.id))}
                               disabled={
+                                !canManageCompanyActivities ||
                                 isSavingActivity ||
                                 (!companyActivityEditForm.subject.trim() && !companyActivityEditForm.notes.trim()) ||
                                 !companyActivityEditHasChanges
@@ -15440,15 +15484,25 @@ function CompanyDetailSection({
                           <button
                             type="button"
                             onClick={() => startEditingCompanyActivity(activity)}
-                            disabled={isSavingActivity || (isEditingCompanyActivity && editingCompanyActivityId !== String(activity.id))}
+                            disabled={
+                              !canManageCompanyActivities ||
+                              isSavingActivity ||
+                              (isEditingCompanyActivity && editingCompanyActivityId !== String(activity.id))
+                            }
                             title={
-                              isEditingCompanyActivity && editingCompanyActivityId !== String(activity.id)
-                                ? "Finish or cancel the current edit before editing another activity."
-                                : "Edit this activity"
+                              !canManageCompanyActivities
+                                ? "Your role or company assignment does not allow activity editing."
+                                : isEditingCompanyActivity && editingCompanyActivityId !== String(activity.id)
+                                  ? "Finish or cancel the current edit before editing another activity."
+                                  : "Edit this activity"
                             }
                             className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                           >
-                            {isEditingCompanyActivity && editingCompanyActivityId !== String(activity.id) ? "Editing another" : "Edit"}
+                            {!canManageCompanyActivities
+                              ? "View only"
+                              : isEditingCompanyActivity && editingCompanyActivityId !== String(activity.id)
+                                ? "Editing another"
+                                : "Edit"}
                           </button>
                         </div>
                       </>
@@ -15493,11 +15547,28 @@ function CompanyDetailSection({
                     {!activity.completed_at && (
                       <button
                         onClick={() => onCompleteActivity(activity.id, activity.company_id)}
-                        disabled={isCompletingActivity === activity.id || isSavingActivity || isEditingCompanyActivity}
-                        title={isEditingCompanyActivity ? "Finish or cancel the current edit before completing an activity." : "Mark this activity complete"}
+                        disabled={
+                          !canManageCompanyActivities ||
+                          isCompletingActivity === activity.id ||
+                          isSavingActivity ||
+                          isEditingCompanyActivity
+                        }
+                        title={
+                          !canManageCompanyActivities
+                            ? "Your role or company assignment does not allow activity completion."
+                            : isEditingCompanyActivity
+                              ? "Finish or cancel the current edit before completing an activity."
+                              : "Mark this activity complete"
+                        }
                         className="mt-2 rounded-lg bg-green-700 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-green-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                       >
-                        {isCompletingActivity === activity.id ? "Completing..." : isEditingCompanyActivity ? "Finish edit first" : "Complete"}
+                        {!canManageCompanyActivities
+                          ? "View only"
+                          : isCompletingActivity === activity.id
+                            ? "Completing..."
+                            : isEditingCompanyActivity
+                              ? "Finish edit first"
+                              : "Complete"}
                       </button>
                     )}
                   </div>
