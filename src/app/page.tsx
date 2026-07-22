@@ -107,9 +107,9 @@ type ManualContactForm = {
   isPrimary: boolean;
 };
 
-const APP_VERSION = "Version 3.18 - Dashboard Activity Permission Alignment";
+const APP_VERSION = "Version 3.19 - Opportunity Activity Security Cleanup";
 const REVISION_NOTE =
-  "Aligns Dashboard follow-up metrics and guidance with existing role-visible activity filtering while preserving secure completion behavior.";
+  "Removes spoofable Opportunity Activities Dashboard permission headers and moves activity loading and completion to verified bearer authentication.";
 
 type SignedInSessionStatus = {
   state: "checking" | "not_configured" | "signed_out" | "signed_in" | "error";
@@ -8035,14 +8035,6 @@ function OpportunityActivitiesDashboard({
   const [activityMessage, setActivityMessage] = useState("");
   const [activityError, setActivityError] = useState("");
 
-  function activityApiPermissionHeaders() {
-    return {
-      "x-crm-user-id": String(opportunityActivityCurrentUserId || ""),
-      "x-crm-user-role": String(opportunityActivityCurrentUserRole || "sales_rep"),
-      "x-crm-user-name": String(opportunityActivityCurrentUserDisplayName || "Signed-in CRM user"),
-    };
-  }
-
   async function loadActivities() {
     setIsLoadingActivities(true);
     setActivityError("");
@@ -8053,7 +8045,12 @@ function OpportunityActivitiesDashboard({
       if (statusFilter !== "all") queryParams.set("status", statusFilter);
       if (dueFilter !== "all") queryParams.set("due", dueFilter);
 
-      const response = await fetch(`/api/sales-opportunity-activities?${queryParams.toString()}`);
+      const response = await fetch(
+        `/api/sales-opportunity-activities?${queryParams.toString()}`,
+        {
+          headers: await getVerifiedBearerHeaders(),
+        }
+      );
       const data = await response.json();
 
       if (!response.ok) {
@@ -8143,7 +8140,7 @@ function OpportunityActivitiesDashboard({
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          ...activityApiPermissionHeaders(),
+          ...(await getVerifiedBearerHeaders()),
         },
         body: JSON.stringify({
           activityId,
@@ -8184,6 +8181,11 @@ function OpportunityActivitiesDashboard({
           <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
             Review open tasks, calls, emails, meetings, and quote follow-ups tied to sales opportunities.
           </p>
+          {opportunityActivityRoleVisibilityActive && (
+            <p className="mt-2 max-w-4xl rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold leading-5 text-blue-900 ring-1 ring-blue-100">
+              Opportunity activities are loaded with verified authentication and filtered by the signed-in CRM role and related company assignment.
+            </p>
+          )}
         </div>
 
         <button
@@ -10612,6 +10614,31 @@ function HelpSection() {
 
 function ReleaseNotesSection() {
   const releases = [
+    {
+      version: "Version 3.19",
+      title: "Opportunity Activity Security Cleanup",
+      date: "July 22, 2026",
+      summary:
+        "Removes the remaining spoofable Opportunity Activities Dashboard permission headers and aligns activity loading and completion with verified signed-in CRM authentication.",
+      changes: [
+        "Confirmed the active and legacy opportunity activity API routes already verify the signed-in CRM user.",
+        "Confirmed server-side opportunity and company-assignment access enforcement remains active.",
+        "Removed the browser-generated x-crm-user-id, x-crm-user-role, and x-crm-user-name helper from Opportunity Activities Dashboard.",
+        "Updated Opportunity Activities Dashboard loading to send the verified Supabase bearer token.",
+        "Updated Opportunity Activities Dashboard completion to send the verified Supabase bearer token.",
+        "Added a clear verified-authentication and role-filtering explanation.",
+        "Preserved existing Funnel and Company Detail opportunity activity behavior.",
+      ],
+      testNotes: [
+        "Confirm Admin users can load and complete all visible opportunity activities.",
+        "Confirm Sales Manager users can load and complete all visible opportunity activities.",
+        "Confirm assigned Sales Rep users see and complete only assigned-company opportunity activities.",
+        "Confirm unassigned-company opportunity activities do not appear for Sales Rep users.",
+        "Confirm the verified-authentication note appears in Opportunity Follow-Ups.",
+        "Confirm Company Detail opportunity activities still load, save, edit, and complete.",
+        "Confirm the production build passes.",
+      ],
+    },
     {
       version: "Version 3.18",
       title: "Dashboard Activity Permission Alignment",
