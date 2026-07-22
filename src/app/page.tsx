@@ -107,9 +107,9 @@ type ManualContactForm = {
   isPrimary: boolean;
 };
 
-const APP_VERSION = "Version 3.14 - Contact Management and Multi-Contact Relationships";
+const APP_VERSION = "Version 3.15 - Company Detail Layout Cleanup";
 const REVISION_NOTE =
-  "Adds secure company contact management plus Primary and Related Contacts for company activities, sales opportunities, and opportunity activities, including editing, persistence, timeline display, and contact-aware search.";
+  "Moves Sales Coverage below the main Company Detail content and Company Industry Enrichment, preserving the Coverage shortcut, assignment behavior, and Funnel placement.";
 
 type SignedInSessionStatus = {
   state: "checking" | "not_configured" | "signed_out" | "signed_in" | "error";
@@ -10580,6 +10580,29 @@ function HelpSection() {
 function ReleaseNotesSection() {
   const releases = [
     {
+      version: "Version 3.15",
+      title: "Company Detail Layout Cleanup",
+      date: "July 22, 2026",
+      summary:
+        "Improves Company Detail organization by moving Sales Coverage below the main account detail content and Company Industry Enrichment.",
+      changes: [
+        "Moved the Sales Coverage panel below the main Company Detail cards.",
+        "Kept Company Industry Enrichment immediately before Sales Coverage.",
+        "Preserved the Coverage shortcut in the sticky Company Detail header.",
+        "Preserved Sales Coverage loading, editing, saving, and role-based behavior.",
+        "Kept the Funnel section directly below Sales Coverage.",
+        "Cleaned up the Company Detail JSX structure around the detail grid and enrichment panel.",
+      ],
+      testNotes: [
+        "Confirm Company Detail cards appear before Sales Coverage.",
+        "Confirm Company Industry Enrichment appears immediately before Sales Coverage.",
+        "Confirm the Coverage shortcut scrolls to the Sales Coverage panel.",
+        "Confirm Sales Coverage assignments still load and save.",
+        "Confirm the Funnel remains directly below Sales Coverage.",
+        "Confirm the production build passes.",
+      ],
+    },
+    {
       version: "Version 3.14",
       title: "Contact Management and Multi-Contact Relationships",
       date: "July 22, 2026",
@@ -13961,17 +13984,6 @@ function CompanyDetailSection({
         </div>
       </div>
 
-      <div
-        id="company-detail-sales-coverage"
-        className="scroll-mt-[260px]"
-      >
-        <CompanySalesAssignmentPanel
-          companyId={String(detail.company.id)}
-          canEditSalesCoverage={salesCoverageCanEdit}
-          apiPermissionHeaders={apiPermissionHeaders}
-        />
-      </div>
-
       {hasAiAnalysis && (
         <div
           className={`rounded-2xl border p-4 shadow-sm ${
@@ -14484,7 +14496,20 @@ function CompanyDetailSection({
             </p>
           )}
         </DetailCard>
-      </div>      <CompanyIndustryEnrichmentPanel company={detail.company} />
+      </div>
+
+      <CompanyIndustryEnrichmentPanel company={detail.company} />
+
+      <div
+        id="company-detail-sales-coverage"
+        className="scroll-mt-[260px]"
+      >
+        <CompanySalesAssignmentPanel
+          companyId={String(detail.company.id)}
+          canEditSalesCoverage={salesCoverageCanEdit}
+          apiPermissionHeaders={apiPermissionHeaders}
+        />
+      </div>
 
       <div id="company-detail-funnel" className="scroll-mt-80"></div>
       <CompanyOpportunityPanel
