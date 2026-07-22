@@ -39,6 +39,7 @@ export async function GET(request: Request) {
       .from("contacts")
       .select("*")
       .eq("company_id", companyId)
+      .is("archived_at", null)
       .order("is_primary", { ascending: false })
       .order("created_at", { ascending: false });
 
@@ -74,13 +75,38 @@ export async function GET(request: Request) {
 
     const { data: activities, error: activitiesError } = await supabase
       .from("activities")
-      .select("*")
+      .select(`
+        *,
+        contacts (
+          id,
+          full_name,
+          title,
+          email
+        ),
+        activity_contact_assignments (
+          contact_id,
+          contacts (
+            id,
+            full_name,
+            title,
+            email
+          )
+        )
+      `)
       .eq("company_id", companyId)
       .is("archived_at", null)
       .order("created_at", { ascending: false })
       .limit(50);
 
     if (activitiesError) throw activitiesError;
+
+    const normalizedActivities = (activities ?? []).map((activity: any) => ({
+      ...activity,
+      contact: activity.contacts ?? null,
+      related_contacts: (activity.activity_contact_assignments ?? [])
+        .map((assignment: any) => assignment.contacts)
+        .filter(Boolean),
+    }));
 
     return NextResponse.json({
       company,
@@ -89,7 +115,7 @@ export async function GET(request: Request) {
       primaryProspect,
       intelligence,
       intelligenceHistory,
-      activities: activities ?? [],
+      activities: normalizedActivities,
     });
   } catch (error) {
     return NextResponse.json(

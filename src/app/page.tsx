@@ -85,11 +85,31 @@ type ActivityForm = {
   subject: string;
   notes: string;
   dueDate: string;
+  primaryContactId: string;
+  relatedContactIds: string[];
 };
 
-const APP_VERSION = "Version 3.13 - Saved Funnel Views and Filters";
+type ManualContactForm = {
+  firstName: string;
+  lastName: string;
+  title: string;
+  managementLevel: string;
+  department: string;
+  functionArea: string;
+  email: string;
+  directPhone: string;
+  mobilePhone: string;
+  personCity: string;
+  personState: string;
+  personCountry: string;
+  linkedinUrl: string;
+  buyingRoleHypothesis: string;
+  isPrimary: boolean;
+};
+
+const APP_VERSION = "Version 3.14 - Contact Management and Multi-Contact Relationships";
 const REVISION_NOTE =
-  "Adds secure, user-specific saved Funnel views with named filter combinations, Board/List mode, card density, default restoration, rename, update, and delete controls.";
+  "Adds secure company contact management plus Primary and Related Contacts for company activities, sales opportunities, and opportunity activities, including editing, persistence, timeline display, and contact-aware search.";
 
 type SignedInSessionStatus = {
   state: "checking" | "not_configured" | "signed_out" | "signed_in" | "error";
@@ -940,6 +960,8 @@ export default function Home() {
     subject: "",
     notes: "",
     dueDate: "",
+    primaryContactId: "",
+    relatedContactIds: [],
   });
   const [crmSummary, setCrmSummary] = useState<CrmSummary>({
     companies: [],
@@ -1910,18 +1932,35 @@ async function handleAnalyzeProspect() {
       }
 
 
-      const primaryContact = selectedCompanyDetail.contacts?.[0];
+      if (!hasBrowserSupabaseConfig()) {
+        throw new Error("Browser Supabase configuration is not available.");
+      }
+
+      const supabase = getBrowserSupabaseClient();
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        throw new Error(sessionError.message || "Could not read the signed-in session.");
+      }
+
+      const accessToken = sessionData.session?.access_token;
+
+      if (!accessToken) {
+        throw new Error("A signed-in Supabase session is required.");
+      }
+
       const primaryProspect = selectedCompanyDetail.primaryProspect;
 
       const response = await fetch("/api/activities", {
         method: "POST",
         headers: {
+          Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json",
-          ...apiPermissionHeaders(),
         },
         body: JSON.stringify({
           companyId: selectedCompanyDetail.company.id,
-          contactId: primaryContact?.id ?? null,
+          primaryContactId: activityForm.primaryContactId || null,
+          relatedContactIds: activityForm.relatedContactIds,
           prospectId: primaryProspect?.id ?? null,
           activityType: activityForm.activityType,
           subject: activityForm.subject,
@@ -1943,6 +1982,8 @@ async function handleAnalyzeProspect() {
         subject: "",
         notes: "",
         dueDate: "",
+        primaryContactId: "",
+        relatedContactIds: [],
       });
 
       await loadCompanyDetail(String(selectedCompanyDetail.company.id));
@@ -2447,8 +2488,8 @@ async function handleAnalyzeProspect() {
                 </h2>
                 <p className="mt-1 text-sm leading-6 text-green-900">
                   Current user: <span className="font-semibold">{currentUserDisplayName}</span>
-                  {" "}Ã‚Â· Role: <span className="font-semibold">{formatAppUserRole(currentUserRole)}</span>
-                  {" "}Ã‚Â· Status: <span className="font-semibold">{signedInProductionUser.status || "Not detected"}</span>
+                  {" "}· Role: <span className="font-semibold">{formatAppUserRole(currentUserRole)}</span>
+                  {" "}· Status: <span className="font-semibold">{signedInProductionUser.status || "Not detected"}</span>
                 </p>
                 <p className="mt-1 text-xs leading-5 text-green-800">
                   {signedInProductionUser.message}
@@ -4503,7 +4544,7 @@ function AdminProjectsListsSection({
                       </div>
 
                       <p className="mt-2 text-sm text-slate-600">
-                        Owner: {ownerName} Ã‚Â· Sort order:{" "}
+                        Owner: {ownerName} · Sort order:{" "}
                         {item.sort_order ?? 100}
                       </p>
 
@@ -8312,6 +8353,29 @@ function OpportunityActivitiesDashboard({
   );
 }
 
+async function getVerifiedBearerHeaders() {
+  if (!hasBrowserSupabaseConfig()) {
+    throw new Error("Browser Supabase configuration is not available.");
+  }
+
+  const supabase = getBrowserSupabaseClient();
+  const { data, error } = await supabase.auth.getSession();
+
+  if (error) {
+    throw new Error(error.message || "Could not read the signed-in session.");
+  }
+
+  const accessToken = data.session?.access_token;
+
+  if (!accessToken) {
+    throw new Error("A signed-in Supabase session is required.");
+  }
+
+  return {
+    Authorization: `Bearer ${accessToken}`,
+  };
+}
+
 function FunnelDashboardSection({
   onOpenCompany,
   funnelApplyRoleVisibility = false,
@@ -8373,9 +8437,12 @@ function FunnelDashboardSection({
     setFunnelError("");
 
     try {
+      const verifiedHeaders = await getVerifiedBearerHeaders();
       const [stagesResponse, opportunitiesResponse] = await Promise.all([
         fetch("/api/funnel-stages"),
-        fetch(`/api/sales-opportunities?status=${statusFilter}`),
+        fetch(`/api/sales-opportunities?status=${statusFilter}`, {
+          headers: verifiedHeaders,
+        }),
       ]);
 
       const stagesData = await stagesResponse.json();
@@ -8450,6 +8517,13 @@ const filteredOpportunities = useMemo(() => {
         opportunity.status,
         opportunity.companies?.company_name,
         opportunity.contacts?.full_name,
+        opportunity.contacts?.email,
+        ...(Array.isArray(opportunity.related_contacts)
+          ? opportunity.related_contacts.flatMap((contact: any) => [
+              contact?.full_name,
+              contact?.email,
+            ])
+          : []),
         opportunity.sales_funnel_stages?.stage_name,
       ]
         .map(normalizeForSearch)
@@ -9162,8 +9236,8 @@ const filteredOpportunities = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (Number.isNaN(closeDay.getTime())) return { label: formatDate(closeDate), className: "text-slate-600" };
-    if (closeDay.getTime() < today.getTime()) return { label: `Overdue Â· ${formatDate(closeDate)}`, className: "font-semibold text-red-700" };
-    if (closeDay.getTime() === today.getTime()) return { label: `Due today Â· ${formatDate(closeDate)}`, className: "font-semibold text-amber-700" };
+    if (closeDay.getTime() < today.getTime()) return { label: `Overdue · ${formatDate(closeDate)}`, className: "font-semibold text-red-700" };
+    if (closeDay.getTime() === today.getTime()) return { label: `Due today · ${formatDate(closeDate)}`, className: "font-semibold text-amber-700" };
     return { label: formatDate(closeDate), className: "text-slate-600" };
   }
 
@@ -9935,6 +10009,34 @@ const filteredOpportunities = useMemo(() => {
                                 )}
                               </p>
 
+                              {(opportunity.contact?.full_name ||
+                                opportunity.contacts?.full_name ||
+                                (Array.isArray(opportunity.related_contacts) &&
+                                  opportunity.related_contacts.length > 0)) && (
+                                <div className={`rounded-lg bg-slate-50 text-xs text-slate-600 ${
+                                  funnelCardDensity === "compact" ? "mt-2 p-2" : "mt-3 p-3"
+                                }`}>
+                                  <p>
+                                    <span className="font-semibold">Primary:</span>{" "}
+                                    {opportunity.contact?.full_name ||
+                                      opportunity.contacts?.full_name ||
+                                      "None selected"}
+                                  </p>
+                                  <p className="mt-1 break-words">
+                                    <span className="font-semibold">Related:</span>{" "}
+                                    {Array.isArray(opportunity.related_contacts) &&
+                                    opportunity.related_contacts.length > 0
+                                      ? opportunity.related_contacts
+                                          .map((contact: any) =>
+                                            String(contact?.full_name || contact?.email || "")
+                                          )
+                                          .filter(Boolean)
+                                          .join(", ")
+                                      : "None selected"}
+                                  </p>
+                                </div>
+                              )}
+
                               <div className={`border-t border-slate-100 text-xs text-slate-600 ${
                                 funnelCardDensity === "compact" ? "mt-2 pt-2" : "mt-3 pt-3"
                               }`}>
@@ -9951,7 +10053,7 @@ const filteredOpportunities = useMemo(() => {
                                 }`}>
                                   <span className="font-semibold">Next:</span>{" "}
                                   {opportunity.next_step || "Missing"}
-                                  {" Â· "}
+                                  {" · "}
                                   {opportunity.next_step_due_date ? formatDate(opportunity.next_step_due_date) : "No due date"}
                                 </p>
                               </div>
@@ -10477,6 +10579,29 @@ function HelpSection() {
 
 function ReleaseNotesSection() {
   const releases = [
+    {
+      version: "Version 3.14",
+      title: "Contact Management and Multi-Contact Relationships",
+      date: "July 22, 2026",
+      summary:
+        "Adds secure company contact management and supports one Primary Contact plus multiple Related Contacts across company activities, sales opportunities, and opportunity activities.",
+      changes: [
+        "Added secure creation, editing, and archiving of company contacts from Company Detail.",
+        "Added Primary and Related Contact assignments for company activities, sales opportunities, and opportunity activities while preserving legacy single-contact records.",
+        "Added database assignment tables with foreign keys, uniqueness constraints, indexes, row-level security, and cascade cleanup.",
+        "Added verified bearer-token protection and role-aware access to the new and revised contact-related API routes.",
+        "Added contact selectors, editing controls, persistence, card display, and contact-aware search across Company Detail, Funnel views, Opportunity Activities, and the Unified Activity Timeline.",
+        "Improved the opportunity card layout so Documents and Activities use the full available width.",
+      ],
+      testNotes: [
+        "Verified company contact creation, editing, archiving, and active-contact filtering.",
+        "Verified Primary and multiple Related Contacts can be created, edited, refreshed, completed, and preserved for all supported record types.",
+        "Verified Primary Contacts are excluded from Related Contact assignment rows.",
+        "Verified legacy single-contact records continue to display correctly.",
+        "Verified Unified Activity Timeline display and search include opportunity activity Primary and Related Contacts.",
+        "Verified secure API behavior, browser workflows, database persistence, and the production build.",
+      ],
+    },
     {
       version: "Version 3.13",
       title: "Saved Funnel Views and Filters",
@@ -11215,7 +11340,7 @@ function MySalesWorkspaceSection({
           </p>
           {workspace?.user?.displayName && (
             <p className="mt-2 text-xs font-semibold text-slate-500">
-              {workspace.user.displayName} Â· {formatTitleFromKey(workspace.user.role || "")}
+              {workspace.user.displayName} · {formatTitleFromKey(workspace.user.role || "")}
             </p>
           )}
         </div>
@@ -13013,6 +13138,8 @@ function CompanyDetailSection({
     subject: "",
     notes: "",
     dueDate: "",
+    primaryContactId: "",
+    relatedContactIds: [],
   });
   const [companyDetailBuyerPersonaDefinitions, setCompanyDetailBuyerPersonaDefinitions] = useState<any[]>([]);
   const [companyDetailBuyerPersonaDefinitionError, setCompanyDetailBuyerPersonaDefinitionError] = useState("");
@@ -13027,6 +13154,220 @@ function CompanyDetailSection({
     "all" | "open" | "completed"
   >("all");
   const [unifiedTimelineSearch, setUnifiedTimelineSearch] = useState("");
+  const [showAddContactForm, setShowAddContactForm] = useState(false);
+  const [isSavingContact, setIsSavingContact] = useState(false);
+  const [contactMessage, setContactMessage] = useState("");
+  const [contactError, setContactError] = useState("");
+  const [editingContactId, setEditingContactId] = useState("");
+  const [archivingContactId, setArchivingContactId] = useState("");
+  const [manualContactForm, setManualContactForm] = useState<ManualContactForm>({
+    firstName: "",
+    lastName: "",
+    title: "",
+    managementLevel: "",
+    department: "",
+    functionArea: "",
+    email: "",
+    directPhone: "",
+    mobilePhone: "",
+    personCity: "",
+    personState: "",
+    personCountry: "",
+    linkedinUrl: "",
+    buyingRoleHypothesis: "",
+    isPrimary: false,
+  });
+
+  function resetManualContactForm() {
+    setManualContactForm({
+      firstName: "",
+      lastName: "",
+      title: "",
+      managementLevel: "",
+      department: "",
+      functionArea: "",
+      email: "",
+      directPhone: "",
+      mobilePhone: "",
+      personCity: "",
+      personState: "",
+      personCountry: "",
+      linkedinUrl: "",
+      buyingRoleHypothesis: "",
+      isPrimary: false,
+    });
+  }
+
+  async function getVerifiedContactHeaders() {
+    if (!hasBrowserSupabaseConfig()) {
+      throw new Error("Browser Supabase configuration is not available.");
+    }
+
+    const supabase = getBrowserSupabaseClient();
+    const { data, error } = await supabase.auth.getSession();
+
+    if (error) {
+      throw new Error(error.message || "Could not read the signed-in session.");
+    }
+
+    const accessToken = data.session?.access_token;
+
+    if (!accessToken) {
+      throw new Error("A signed-in Supabase session is required.");
+    }
+
+    return {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    };
+  }
+
+  function startEditingContact(contact: any) {
+    setEditingContactId(String(contact.id || ""));
+    setShowAddContactForm(true);
+    setContactMessage("");
+    setContactError("");
+    setManualContactForm({
+      firstName: String(contact.first_name || ""),
+      lastName: String(contact.last_name || ""),
+      title: String(contact.title || ""),
+      managementLevel: String(contact.management_level || ""),
+      department: String(contact.department || ""),
+      functionArea: String(contact.function_area || ""),
+      email: String(contact.email || ""),
+      directPhone: String(contact.direct_phone || ""),
+      mobilePhone: String(contact.mobile_phone || ""),
+      personCity: String(contact.person_city || ""),
+      personState: String(contact.person_state || ""),
+      personCountry: String(contact.person_country || ""),
+      linkedinUrl: String(contact.linkedin_url || ""),
+      buyingRoleHypothesis: String(contact.buying_role_hypothesis || ""),
+      isPrimary: Boolean(contact.is_primary),
+    });
+  }
+
+  function cancelContactForm() {
+    resetManualContactForm();
+    setEditingContactId("");
+    setShowAddContactForm(false);
+    setContactError("");
+  }
+
+  async function archiveContact(contactId: string) {
+    const companyId = String(detail?.company?.id || "").trim();
+    if (!companyId || !contactId || archivingContactId) return;
+
+    const confirmed =
+      typeof window === "undefined"
+        ? false
+        : window.confirm(
+            "Archive this contact? The contact will be removed from active company views but retained in the CRM database."
+          );
+
+    if (!confirmed) return;
+
+    setArchivingContactId(contactId);
+    setContactMessage("");
+    setContactError("");
+
+    try {
+      const headers = await getVerifiedContactHeaders();
+      const response = await fetch("/api/contacts", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          contactId,
+          archived: true,
+        }),
+      });
+
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error || "Could not archive the contact.");
+      }
+
+      if (editingContactId === contactId) {
+        cancelContactForm();
+      }
+
+      setContactMessage("Contact archived successfully.");
+      await onRefreshCompanyDetail(companyId);
+    } catch (error) {
+      setContactError(
+        error instanceof Error ? error.message : "Could not archive the contact."
+      );
+    } finally {
+      setArchivingContactId("");
+    }
+  }
+
+  async function saveManualContact() {
+    const companyId = String(detail?.company?.id || "").trim();
+    if (!companyId || isSavingContact) return;
+
+    const hasName =
+      manualContactForm.firstName.trim().length > 0 ||
+      manualContactForm.lastName.trim().length > 0;
+    const hasEmail = manualContactForm.email.trim().length > 0;
+
+    if (!hasName && !hasEmail) {
+      setContactError("Enter a first or last name, or an email address.");
+      return;
+    }
+
+    setIsSavingContact(true);
+    setContactMessage("");
+    setContactError("");
+
+    try {
+      const headers = await getVerifiedContactHeaders();
+      const response = await fetch("/api/contacts", {
+        method: editingContactId ? "PATCH" : "POST",
+        headers,
+        body: JSON.stringify({
+          ...(editingContactId ? { contactId: editingContactId } : { companyId }),
+          firstName: manualContactForm.firstName,
+          lastName: manualContactForm.lastName,
+          title: manualContactForm.title,
+          managementLevel: manualContactForm.managementLevel,
+          department: manualContactForm.department,
+          functionArea: manualContactForm.functionArea,
+          email: manualContactForm.email,
+          directPhone: manualContactForm.directPhone,
+          mobilePhone: manualContactForm.mobilePhone,
+          personCity: manualContactForm.personCity,
+          personState: manualContactForm.personState,
+          personCountry: manualContactForm.personCountry,
+          linkedinUrl: manualContactForm.linkedinUrl,
+          buyingRoleHypothesis: manualContactForm.buyingRoleHypothesis,
+          isPrimary: manualContactForm.isPrimary,
+          source: "Manual",
+        }),
+      });
+
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error || "Could not create the contact.");
+      }
+
+      const wasEditing = Boolean(editingContactId);
+      resetManualContactForm();
+      setEditingContactId("");
+      setShowAddContactForm(false);
+      setContactMessage(
+        wasEditing ? "Contact updated successfully." : "Contact added successfully."
+      );
+      await onRefreshCompanyDetail(companyId);
+    } catch (error) {
+      setContactError(
+        error instanceof Error ? error.message : "Could not create the contact."
+      );
+    } finally {
+      setIsSavingContact(false);
+    }
+  }
 
   async function loadUnifiedTimeline() {
     const companyId = String(detail?.company?.id || "").trim();
@@ -13080,7 +13421,7 @@ function CompanyDetailSection({
 
   useEffect(() => {
     void loadUnifiedTimeline();
-  }, [detail?.company?.id]);
+  }, [detail?.company?.id, detail?.activities]);
 
   function getEditableCompanyActivityType(activityType: unknown): ActivityForm["activityType"] {
     const allowedActivityTypes: ActivityForm["activityType"][] = [
@@ -13107,6 +13448,10 @@ function CompanyDetailSection({
       subject: String(activity.subject || ""),
       notes: String(activity.notes || ""),
       dueDate: activity.due_date ? String(activity.due_date).slice(0, 10) : "",
+      primaryContactId: String(activity.contact_id || ""),
+      relatedContactIds: Array.isArray(activity.related_contacts)
+        ? activity.related_contacts.map((contact: any) => String(contact.id))
+        : [],
     });
   }
 
@@ -13118,6 +13463,8 @@ function CompanyDetailSection({
       subject: "",
       notes: "",
       dueDate: "",
+      primaryContactId: "",
+      relatedContactIds: [],
     });
   }
 
@@ -13237,6 +13584,8 @@ function CompanyDetailSection({
       subject: "",
       notes: "",
       dueDate: "",
+      primaryContactId: "",
+      relatedContactIds: [],
     });
   }
 
@@ -13247,6 +13596,7 @@ function CompanyDetailSection({
     dueDate = activityForm.dueDate
   ) {
     setActivityForm({
+      ...activityForm,
       activityType,
       subject,
       notes,
@@ -13275,6 +13625,12 @@ function CompanyDetailSection({
       item.opportunity_name,
       item.contact?.full_name,
       item.contact?.email,
+      ...(Array.isArray(item.related_contacts)
+        ? item.related_contacts.flatMap((contact: any) => [
+            contact?.full_name,
+            contact?.email,
+          ])
+        : []),
     ]
       .map(normalizeForSearch)
       .join("  ".trim());
@@ -13357,6 +13713,14 @@ function CompanyDetailSection({
       activity.activity_type,
       activity.subject,
       activity.notes,
+      activity.contact?.full_name,
+      activity.contact?.email,
+      ...(Array.isArray(activity.related_contacts)
+        ? activity.related_contacts.flatMap((contact: any) => [
+            contact?.full_name,
+            contact?.email,
+          ])
+        : []),
     ]
       .map(normalizeForSearch)
       .join(" ");
@@ -14240,6 +14604,74 @@ function CompanyDetailSection({
         </div>
 
 <div className="mt-4 grid gap-4 lg:grid-cols-4">
+          <div className="lg:col-span-2">
+            <label className="text-sm font-semibold text-slate-700">Primary Contact</label>
+            <select
+              value={activityForm.primaryContactId}
+              onChange={(event) =>
+                setActivityForm({
+                  ...activityForm,
+                  primaryContactId: event.target.value,
+                  relatedContactIds: activityForm.relatedContactIds.filter(
+                    (contactId) => contactId !== event.target.value
+                  ),
+                })
+              }
+              className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
+            >
+              <option value="">No primary contact selected</option>
+              {detail.contacts.map((contact: any) => (
+                <option key={String(contact.id)} value={String(contact.id)}>
+                  {displayValue(contact.full_name || contact.email)}
+                  {contact.is_primary ? " — Company Primary" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="lg:col-span-2">
+            <p className="text-sm font-semibold text-slate-700">Related Contacts</p>
+            <div className="mt-2 grid max-h-36 gap-2 overflow-y-auto rounded-lg border border-slate-300 bg-white p-3">
+              {detail.contacts.length === 0 ? (
+                <p className="text-xs text-slate-500">No active company contacts available.</p>
+              ) : (
+                detail.contacts.map((contact: any) => {
+                  const contactId = String(contact.id);
+                  const isPrimarySelection =
+                    contactId === activityForm.primaryContactId;
+                  const isChecked = activityForm.relatedContactIds.includes(contactId);
+
+                  return (
+                    <label
+                      key={contactId}
+                      className="flex items-center gap-2 text-sm text-slate-700"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        disabled={isPrimarySelection}
+                        onChange={(event) =>
+                          setActivityForm({
+                            ...activityForm,
+                            relatedContactIds: event.target.checked
+                              ? [...activityForm.relatedContactIds, contactId]
+                              : activityForm.relatedContactIds.filter(
+                                  (selectedId) => selectedId !== contactId
+                                ),
+                          })
+                        }
+                      />
+                      <span>
+                        {displayValue(contact.full_name || contact.email)}
+                        {isPrimarySelection ? " — Primary Contact" : ""}
+                      </span>
+                    </label>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
           <div>
             <label className="text-sm font-semibold text-slate-700">Activity Type</label>
             <select
@@ -14512,10 +14944,27 @@ function CompanyDetailSection({
                           {item.notes}
                         </p>
                       )}
-                      {item.contact?.full_name && (
-                        <p className="mt-2 text-xs text-slate-500">
-                          Contact: {item.contact.full_name}
-                        </p>
+                      {(item.contact?.full_name ||
+                        (Array.isArray(item.related_contacts) &&
+                          item.related_contacts.length > 0)) && (
+                        <div className="mt-3 grid gap-1 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+                          <p>
+                            <span className="font-semibold text-slate-700">Primary Contact:</span>{" "}
+                            {item.contact?.full_name || "None selected"}
+                          </p>
+                          <p>
+                            <span className="font-semibold text-slate-700">Related Contacts:</span>{" "}
+                            {Array.isArray(item.related_contacts) &&
+                            item.related_contacts.length > 0
+                              ? item.related_contacts
+                                  .map((contact: any) =>
+                                    String(contact?.full_name || contact?.email || "")
+                                  )
+                                  .filter(Boolean)
+                                  .join(", ")
+                              : "None selected"}
+                          </p>
+                        </div>
                       )}
                     </div>
 
@@ -14892,6 +15341,28 @@ function CompanyDetailSection({
                         >
                           {activity.notes || "No notes"}
                         </p>
+                        {(activity.contact?.full_name ||
+                          (Array.isArray(activity.related_contacts) &&
+                            activity.related_contacts.length > 0)) && (
+                          <div className="mt-3 grid gap-1 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+                            <p>
+                              <span className="font-semibold text-slate-700">Primary Contact:</span>{" "}
+                              {activity.contact?.full_name || "None selected"}
+                            </p>
+                            <p>
+                              <span className="font-semibold text-slate-700">Related Contacts:</span>{" "}
+                              {Array.isArray(activity.related_contacts) &&
+                              activity.related_contacts.length > 0
+                                ? activity.related_contacts
+                                    .map((contact: any) =>
+                                      String(contact?.full_name || contact?.email || "")
+                                    )
+                                    .filter(Boolean)
+                                    .join(", ")
+                                : "None selected"}
+                            </p>
+                          </div>
+                        )}
                         {activity.notes && String(activity.notes).length > 180 && (
                           <button
                             type="button"
@@ -14975,21 +15446,346 @@ function CompanyDetailSection({
       </div>
 
       <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
-        <h3 className="text-xl font-bold">Contacts</h3>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="text-xl font-bold">Contacts</h3>
+            <p className="mt-1 text-sm text-slate-600">
+              Add and manage people associated with this company.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (showAddContactForm) {
+                cancelContactForm();
+              } else {
+                resetManualContactForm();
+                setEditingContactId("");
+                setShowAddContactForm(true);
+                setContactMessage("");
+                setContactError("");
+              }
+            }}
+            disabled={isSavingContact}
+            className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-blue-300"
+          >
+            {showAddContactForm
+              ? editingContactId
+                ? "Close Edit Contact"
+                : "Close Add Contact"
+              : "Add Contact"}
+          </button>
+        </div>
+
+        {contactMessage ? (
+          <p className="mt-4 rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+            {contactMessage}
+          </p>
+        ) : null}
+
+        {contactError ? (
+          <p className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+            {contactError}
+          </p>
+        ) : null}
+
+        {showAddContactForm ? (
+          <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 p-5">
+            <h4 className="font-bold text-blue-950">
+              {editingContactId ? "Edit Contact" : "Add Contact"}
+            </h4>
+            <p className="mt-1 text-xs leading-5 text-blue-800">
+              A first or last name, or an email address, is required.
+            </p>
+
+            <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                First Name
+                <input
+                  value={manualContactForm.firstName}
+                  onChange={(event) =>
+                    setManualContactForm({
+                      ...manualContactForm,
+                      firstName: event.target.value,
+                    })
+                  }
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                />
+              </label>
+
+              <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                Last Name
+                <input
+                  value={manualContactForm.lastName}
+                  onChange={(event) =>
+                    setManualContactForm({
+                      ...manualContactForm,
+                      lastName: event.target.value,
+                    })
+                  }
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                />
+              </label>
+
+              <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                Job Title
+                <input
+                  value={manualContactForm.title}
+                  onChange={(event) =>
+                    setManualContactForm({
+                      ...manualContactForm,
+                      title: event.target.value,
+                    })
+                  }
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                />
+              </label>
+
+              <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                Management Level
+                <input
+                  value={manualContactForm.managementLevel}
+                  onChange={(event) =>
+                    setManualContactForm({
+                      ...manualContactForm,
+                      managementLevel: event.target.value,
+                    })
+                  }
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                />
+              </label>
+
+              <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                Department
+                <input
+                  value={manualContactForm.department}
+                  onChange={(event) =>
+                    setManualContactForm({
+                      ...manualContactForm,
+                      department: event.target.value,
+                    })
+                  }
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                />
+              </label>
+
+              <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                Function
+                <input
+                  value={manualContactForm.functionArea}
+                  onChange={(event) =>
+                    setManualContactForm({
+                      ...manualContactForm,
+                      functionArea: event.target.value,
+                    })
+                  }
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                />
+              </label>
+
+              <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                Email
+                <input
+                  type="email"
+                  value={manualContactForm.email}
+                  onChange={(event) =>
+                    setManualContactForm({
+                      ...manualContactForm,
+                      email: event.target.value,
+                    })
+                  }
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                />
+              </label>
+
+              <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                Direct Phone
+                <input
+                  value={manualContactForm.directPhone}
+                  onChange={(event) =>
+                    setManualContactForm({
+                      ...manualContactForm,
+                      directPhone: event.target.value,
+                    })
+                  }
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                />
+              </label>
+
+              <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                Mobile Phone
+                <input
+                  value={manualContactForm.mobilePhone}
+                  onChange={(event) =>
+                    setManualContactForm({
+                      ...manualContactForm,
+                      mobilePhone: event.target.value,
+                    })
+                  }
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                />
+              </label>
+
+              <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                City
+                <input
+                  value={manualContactForm.personCity}
+                  onChange={(event) =>
+                    setManualContactForm({
+                      ...manualContactForm,
+                      personCity: event.target.value,
+                    })
+                  }
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                />
+              </label>
+
+              <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                State
+                <input
+                  value={manualContactForm.personState}
+                  onChange={(event) =>
+                    setManualContactForm({
+                      ...manualContactForm,
+                      personState: event.target.value,
+                    })
+                  }
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                />
+              </label>
+
+              <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                Country
+                <input
+                  value={manualContactForm.personCountry}
+                  onChange={(event) =>
+                    setManualContactForm({
+                      ...manualContactForm,
+                      personCountry: event.target.value,
+                    })
+                  }
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                />
+              </label>
+
+              <label className="grid gap-1 text-sm font-semibold text-slate-700 md:col-span-2">
+                LinkedIn URL
+                <input
+                  value={manualContactForm.linkedinUrl}
+                  onChange={(event) =>
+                    setManualContactForm({
+                      ...manualContactForm,
+                      linkedinUrl: event.target.value,
+                    })
+                  }
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                />
+              </label>
+
+              <label className="grid gap-1 text-sm font-semibold text-slate-700 md:col-span-2">
+                Buying Role / Notes
+                <input
+                  value={manualContactForm.buyingRoleHypothesis}
+                  onChange={(event) =>
+                    setManualContactForm({
+                      ...manualContactForm,
+                      buyingRoleHypothesis: event.target.value,
+                    })
+                  }
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                />
+              </label>
+
+              <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 md:col-span-2">
+                <input
+                  type="checkbox"
+                  checked={manualContactForm.isPrimary}
+                  onChange={(event) =>
+                    setManualContactForm({
+                      ...manualContactForm,
+                      isPrimary: event.target.checked,
+                    })
+                  }
+                />
+                Set as this company’s primary contact
+              </label>
+            </div>
+
+            <div className="mt-5 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={saveManualContact}
+                disabled={isSavingContact}
+                className="rounded-xl bg-green-700 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-green-800 disabled:cursor-not-allowed disabled:bg-green-300"
+              >
+                {isSavingContact
+                  ? "Saving Contact..."
+                  : editingContactId
+                    ? "Update Contact"
+                    : "Save Contact"}
+              </button>
+
+              <button
+                type="button"
+                onClick={cancelContactForm}
+                disabled={isSavingContact}
+                className="rounded-xl bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         {detail.contacts.length === 0 ? (
-          <p className="mt-3 text-sm text-slate-600">No contacts attached.</p>
+          <p className="mt-4 text-sm text-slate-600">No contacts attached.</p>
         ) : (
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             {detail.contacts.map((contact: any) => (
               <div key={String(contact.id)} className="rounded-xl border border-slate-200 p-4">
-                <p className="font-semibold">{displayValue(contact.full_name)}</p>
-                <p className="mt-1 text-sm text-slate-600">{displayValue(contact.title)}</p>
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="font-semibold">{displayValue(contact.full_name)}</p>
+                    <p className="mt-1 text-sm text-slate-600">{displayValue(contact.title)}</p>
+                  </div>
+                  {contact.is_primary ? (
+                    <span className="rounded-full bg-green-50 px-2.5 py-1 text-xs font-bold text-green-800 ring-1 ring-green-200">
+                      Primary
+                    </span>
+                  ) : null}
+                </div>
+
                 <div className="mt-3 grid gap-1 text-sm text-slate-700">
                   <p>Email: {displayValue(contact.email)}</p>
                   <p>Direct: {displayValue(contact.direct_phone)}</p>
                   <p>Mobile: {displayValue(contact.mobile_phone)}</p>
                   <p>Function: {displayValue(contact.function_area || contact.department)}</p>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => startEditingContact(contact)}
+                    disabled={isSavingContact || Boolean(archivingContactId)}
+                    className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
+                  >
+                    Edit Contact
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => archiveContact(String(contact.id))}
+                    disabled={
+                      isSavingContact ||
+                      archivingContactId === String(contact.id)
+                    }
+                    className="rounded-lg bg-red-50 px-3 py-2 text-xs font-bold text-red-700 shadow-sm ring-1 ring-red-200 hover:bg-red-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                  >
+                    {archivingContactId === String(contact.id)
+                      ? "Archiving..."
+                      : "Archive Contact"}
+                  </button>
                 </div>
 
                 <ContactProjectListManager
@@ -15863,10 +16659,12 @@ function OpportunityActivitiesPanel({
   opportunityId,
   companyId,
   contactId,
+  contacts,
 }: {
   opportunityId: string;
   companyId: string;
   contactId: string | null;
+  contacts: Record<string, string | boolean | null>[];
 }) {
   const [activities, setActivities] = useState<SalesOpportunityActivity[]>([]);
   const [isLoadingActivities, setIsLoadingActivities] = useState(false);
@@ -15874,11 +16672,14 @@ function OpportunityActivitiesPanel({
   const [activityMessage, setActivityMessage] = useState("");
   const [activityError, setActivityError] = useState("");
   const [showActivityForm, setShowActivityForm] = useState(false);
+  const [editingActivityId, setEditingActivityId] = useState("");
   const [form, setForm] = useState({
     activityType: "note",
     subject: "",
     notes: "",
     dueDate: "",
+    primaryContactId: contactId || "",
+    relatedContactIds: [] as string[],
   });
 
   async function loadOpportunityActivities() {
@@ -15887,7 +16688,10 @@ function OpportunityActivitiesPanel({
 
     try {
       const response = await fetch(
-        `/api/sales-opportunity-activities?opportunityId=${opportunityId}`
+        `/api/sales-opportunity-activities?opportunityId=${opportunityId}`,
+        {
+          headers: await getVerifiedBearerHeaders(),
+        }
       );
       const data = await response.json();
 
@@ -15909,6 +16713,43 @@ function OpportunityActivitiesPanel({
     loadOpportunityActivities();
   }, [opportunityId]);
 
+  function resetOpportunityActivityForm() {
+    setEditingActivityId("");
+    setForm({
+      activityType: "note",
+      subject: "",
+      notes: "",
+      dueDate: "",
+      primaryContactId: contactId || "",
+      relatedContactIds: [],
+    });
+    setShowActivityForm(false);
+  }
+
+  function startEditingOpportunityActivity(activity: any) {
+    setEditingActivityId(String(activity.id));
+    setForm({
+      activityType: String(activity.activity_type || "note"),
+      subject: String(activity.subject || ""),
+      notes: String(activity.notes || ""),
+      dueDate: activity.due_date ? String(activity.due_date).slice(0, 10) : "",
+      primaryContactId: String(
+        activity.contact?.id ||
+          activity.contacts?.id ||
+          activity.contact_id ||
+          ""
+      ),
+      relatedContactIds: Array.isArray(activity.related_contacts)
+        ? activity.related_contacts
+            .map((contact: any) => String(contact?.id || ""))
+            .filter(Boolean)
+        : [],
+    });
+    setShowActivityForm(true);
+    setActivityMessage("");
+    setActivityError("");
+  }
+
   async function saveOpportunityActivity() {
     setIsSavingActivity(true);
     setActivityMessage("");
@@ -15920,14 +16761,17 @@ function OpportunityActivitiesPanel({
       }
 
       const response = await fetch("/api/sales-opportunity-activities", {
-        method: "POST",
+        method: editingActivityId ? "PATCH" : "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(await getVerifiedBearerHeaders()),
         },
         body: JSON.stringify({
+          activityId: editingActivityId || undefined,
           opportunityId,
           companyId,
-          contactId,
+          primaryContactId: form.primaryContactId || null,
+          relatedContactIds: form.relatedContactIds,
           activityType: form.activityType,
           subject: form.subject,
           notes: form.notes,
@@ -15938,21 +16782,28 @@ function OpportunityActivitiesPanel({
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Could not save opportunity activity.");
+        throw new Error(
+          data.error ||
+            (editingActivityId
+              ? "Could not update opportunity activity."
+              : "Could not save opportunity activity.")
+        );
       }
 
-      setActivityMessage("Opportunity activity saved.");
-      setForm({
-        activityType: "note",
-        subject: "",
-        notes: "",
-        dueDate: "",
-      });
-      setShowActivityForm(false);
+      setActivityMessage(
+        editingActivityId
+          ? "Opportunity activity updated."
+          : "Opportunity activity saved."
+      );
+      resetOpportunityActivityForm();
       await loadOpportunityActivities();
     } catch (error) {
       setActivityError(
-        error instanceof Error ? error.message : "Could not save opportunity activity."
+        error instanceof Error
+          ? error.message
+          : editingActivityId
+            ? "Could not update opportunity activity."
+            : "Could not save opportunity activity."
       );
     } finally {
       setIsSavingActivity(false);
@@ -15969,6 +16820,7 @@ function OpportunityActivitiesPanel({
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
+          ...(await getVerifiedBearerHeaders()),
         },
         body: JSON.stringify({
           activityId,
@@ -16013,7 +16865,22 @@ function OpportunityActivitiesPanel({
           </button>
 
           <button
-            onClick={() => setShowActivityForm((current) => !current)}
+            onClick={() => {
+              if (showActivityForm) {
+                resetOpportunityActivityForm();
+              } else {
+                setEditingActivityId("");
+                setForm({
+                  activityType: "note",
+                  subject: "",
+                  notes: "",
+                  dueDate: "",
+                  primaryContactId: contactId || "",
+                  relatedContactIds: [],
+                });
+                setShowActivityForm(true);
+              }
+            }}
             className="rounded-lg bg-blue-700 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-800"
           >
             {showActivityForm ? "Cancel" : "Add Activity"}
@@ -16038,6 +16905,22 @@ function OpportunityActivitiesPanel({
 
       {showActivityForm && (
         <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm font-semibold text-slate-900">
+              {editingActivityId ? "Edit Opportunity Activity" : "Add Opportunity Activity"}
+            </p>
+            {editingActivityId && (
+              <button
+                type="button"
+                onClick={resetOpportunityActivityForm}
+                disabled={isSavingActivity}
+                className="w-fit rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
+              >
+                Cancel Edit
+              </button>
+            )}
+          </div>
+
           <div className="grid gap-3 md:grid-cols-4">
             <div>
               <label className="text-xs font-semibold text-slate-700">Type</label>
@@ -16076,6 +16959,75 @@ function OpportunityActivitiesPanel({
               />
             </div>
 
+            <div className="md:col-span-2">
+              <label className="text-xs font-semibold text-slate-700">Primary Contact</label>
+              <select
+                value={form.primaryContactId}
+                onChange={(event) =>
+                  setForm({
+                    ...form,
+                    primaryContactId: event.target.value,
+                    relatedContactIds: form.relatedContactIds.filter(
+                      (selectedId) => selectedId !== event.target.value
+                    ),
+                  })
+                }
+                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs shadow-sm"
+              >
+                <option value="">No primary contact selected</option>
+                {contacts.map((contact: any) => (
+                  <option key={String(contact.id)} value={String(contact.id)}>
+                    {displayValue(contact.full_name || contact.email)}
+                    {contact.is_primary ? " — Company Primary" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="md:col-span-2">
+              <p className="text-xs font-semibold text-slate-700">Related Contacts</p>
+              <div className="mt-1 grid max-h-32 gap-2 overflow-y-auto rounded-lg border border-slate-300 bg-white p-3">
+                {contacts.length === 0 ? (
+                  <p className="text-xs text-slate-500">No active company contacts available.</p>
+                ) : (
+                  contacts.map((contact: any) => {
+                    const selectedContactId = String(contact.id);
+                    const isPrimarySelection =
+                      selectedContactId === form.primaryContactId;
+                    const isChecked =
+                      form.relatedContactIds.includes(selectedContactId);
+
+                    return (
+                      <label
+                        key={selectedContactId}
+                        className="flex items-center gap-2 text-xs text-slate-700"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          disabled={isPrimarySelection}
+                          onChange={(event) =>
+                            setForm({
+                              ...form,
+                              relatedContactIds: event.target.checked
+                                ? [...form.relatedContactIds, selectedContactId]
+                                : form.relatedContactIds.filter(
+                                    (selectedId) => selectedId !== selectedContactId
+                                  ),
+                            })
+                          }
+                        />
+                        <span>
+                          {displayValue(contact.full_name || contact.email)}
+                          {isPrimarySelection ? " — Primary Contact" : ""}
+                        </span>
+                      </label>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
             <div className="md:col-span-4">
               <label className="text-xs font-semibold text-slate-700">Notes</label>
               <textarea
@@ -16094,7 +17046,11 @@ function OpportunityActivitiesPanel({
               disabled={isSavingActivity}
               className="rounded-lg bg-green-700 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-green-800 disabled:cursor-not-allowed disabled:bg-slate-300"
             >
-              {isSavingActivity ? "Saving..." : "Save Activity"}
+              {isSavingActivity
+                ? "Saving..."
+                : editingActivityId
+                  ? "Save Changes"
+                  : "Save Activity"}
             </button>
           </div>
         </div>
@@ -16144,20 +17100,55 @@ function OpportunityActivitiesPanel({
                       </p>
                     )}
 
+                    <div className="mt-2 grid gap-1 text-xs text-slate-500">
+                      <p>
+                        <span className="font-semibold">Primary Contact:</span>{" "}
+                        {displayValue(
+                          activity.contact?.full_name ||
+                            activity.contacts?.full_name ||
+                            activity.contact?.email ||
+                            activity.contacts?.email
+                        )}
+                      </p>
+                      <p>
+                        <span className="font-semibold">Related Contacts:</span>{" "}
+                        {Array.isArray(activity.related_contacts) &&
+                        activity.related_contacts.length > 0
+                          ? activity.related_contacts
+                              .map((contact: any) =>
+                                String(contact?.full_name || contact?.email || "")
+                              )
+                              .filter(Boolean)
+                              .join(", ")
+                          : "None selected"}
+                      </p>
+                    </div>
+
                     <p className="mt-2 text-xs text-slate-500">
                       Created {formatDate(activity.created_at)}
                     </p>
                   </div>
 
-                  {!activity.completed_at && (
+                  <div className="flex w-fit flex-wrap gap-2">
                     <button
-                      onClick={() => completeOpportunityActivity(activity.id)}
+                      type="button"
+                      onClick={() => startEditingOpportunityActivity(activity)}
                       disabled={isSavingActivity}
-                      className="w-fit rounded-lg bg-green-700 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-green-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                      className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
                     >
-                      Complete
+                      Edit Activity
                     </button>
-                  )}
+
+                    {!activity.completed_at && (
+                      <button
+                        onClick={() => completeOpportunityActivity(activity.id)}
+                        disabled={isSavingActivity}
+                        className="rounded-lg bg-green-700 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-green-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                      >
+                        Complete
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
@@ -16196,6 +17187,8 @@ function CompanyOpportunityPanel({
   const [editForm, setEditForm] = useState({
     opportunityName: "",
     opportunityType: "",
+    primaryContactId: "",
+    relatedContactIds: [] as string[],
     productLine: "",
     likelyProductPath: "",
     primaryUseCase: "",
@@ -16216,7 +17209,8 @@ function CompanyOpportunityPanel({
   const [form, setForm] = useState({
     opportunityName: "",
     opportunityType: "Parts washer",
-    contactId: "",
+    primaryContactId: "",
+    relatedContactIds: [] as string[],
     prospectId: "",
     stageId: "",
     productLine: "",
@@ -16237,9 +17231,12 @@ function CompanyOpportunityPanel({
     setOpportunityError("");
 
     try {
+      const verifiedHeaders = await getVerifiedBearerHeaders();
       const [stagesResponse, opportunitiesResponse] = await Promise.all([
         fetch("/api/funnel-stages"),
-        fetch(`/api/sales-opportunities?companyId=${companyId}`),
+        fetch(`/api/sales-opportunities?companyId=${companyId}`, {
+          headers: verifiedHeaders,
+        }),
       ]);
 
       const stagesData = await stagesResponse.json();
@@ -16313,11 +17310,12 @@ function CompanyOpportunityPanel({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...apiPermissionHeaders(),
+          ...(await getVerifiedBearerHeaders()),
         },
         body: JSON.stringify({
           companyId,
-          contactId: form.contactId || null,
+          primaryContactId: form.primaryContactId || null,
+          relatedContactIds: form.relatedContactIds,
           prospectId: form.prospectId || null,
           stageId: form.stageId || null,
           opportunityName: form.opportunityName,
@@ -16348,7 +17346,8 @@ function CompanyOpportunityPanel({
       setForm({
         opportunityName: "",
         opportunityType: "Parts washer",
-        contactId: "",
+        primaryContactId: "",
+        relatedContactIds: [],
         prospectId: "",
         stageId: "",
         productLine: "",
@@ -16380,6 +17379,10 @@ function CompanyOpportunityPanel({
     setEditForm({
       opportunityName: opportunity.opportunity_name ?? "",
       opportunityType: opportunity.opportunity_type ?? "",
+      primaryContactId: String(opportunity.contact_id || ""),
+      relatedContactIds: Array.isArray((opportunity as any).related_contacts)
+        ? (opportunity as any).related_contacts.map((contact: any) => String(contact.id))
+        : [],
       productLine: opportunity.product_line ?? "",
       likelyProductPath: opportunity.likely_product_path ?? "",
       primaryUseCase: opportunity.primary_use_case ?? "",
@@ -16405,6 +17408,8 @@ function CompanyOpportunityPanel({
     setEditForm({
       opportunityName: "",
       opportunityType: "",
+      primaryContactId: "",
+      relatedContactIds: [],
       productLine: "",
       likelyProductPath: "",
       primaryUseCase: "",
@@ -16443,10 +17448,12 @@ function CompanyOpportunityPanel({
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          ...apiPermissionHeaders(),
+          ...(await getVerifiedBearerHeaders()),
         },
         body: JSON.stringify({
           id: editingOpportunityId,
+          primaryContactId: editForm.primaryContactId || null,
+          relatedContactIds: editForm.relatedContactIds,
           opportunityName: editForm.opportunityName,
           opportunityType: editForm.opportunityType,
           productLine: editForm.productLine,
@@ -16491,7 +17498,7 @@ function CompanyOpportunityPanel({
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          ...apiPermissionHeaders(),
+          ...(await getVerifiedBearerHeaders()),
         },
         body: JSON.stringify({
           id: opportunityId,
@@ -16623,20 +17630,71 @@ function CompanyOpportunityPanel({
               </select>
             </div>
 
-            <div>
-              <label className="text-sm font-semibold text-slate-700">Contact</label>
+            <div className="lg:col-span-2">
+              <label className="text-sm font-semibold text-slate-700">Primary Contact</label>
               <select
-                value={form.contactId}
-                onChange={(event) => setForm({ ...form, contactId: event.target.value })}
+                value={form.primaryContactId}
+                onChange={(event) =>
+                  setForm({
+                    ...form,
+                    primaryContactId: event.target.value,
+                    relatedContactIds: form.relatedContactIds.filter(
+                      (contactId) => contactId !== event.target.value
+                    ),
+                  })
+                }
                 className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
               >
-                <option value="">No contact selected</option>
+                <option value="">No primary contact selected</option>
                 {contacts.map((contact: any) => (
                   <option key={String(contact.id)} value={String(contact.id)}>
                     {displayValue(contact.full_name || contact.email)}
+                    {contact.is_primary ? " — Company Primary" : ""}
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div className="lg:col-span-2">
+              <p className="text-sm font-semibold text-slate-700">Related Contacts</p>
+              <div className="mt-2 grid max-h-36 gap-2 overflow-y-auto rounded-xl border border-slate-300 bg-white p-3">
+                {contacts.length === 0 ? (
+                  <p className="text-xs text-slate-500">No active company contacts available.</p>
+                ) : (
+                  contacts.map((contact: any) => {
+                    const contactId = String(contact.id);
+                    const isPrimarySelection = contactId === form.primaryContactId;
+                    const isChecked = form.relatedContactIds.includes(contactId);
+
+                    return (
+                      <label
+                        key={contactId}
+                        className="flex items-center gap-2 text-sm text-slate-700"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          disabled={isPrimarySelection}
+                          onChange={(event) =>
+                            setForm({
+                              ...form,
+                              relatedContactIds: event.target.checked
+                                ? [...form.relatedContactIds, contactId]
+                                : form.relatedContactIds.filter(
+                                    (selectedId) => selectedId !== contactId
+                                  ),
+                            })
+                          }
+                        />
+                        <span>
+                          {displayValue(contact.full_name || contact.email)}
+                          {isPrimarySelection ? " — Primary Contact" : ""}
+                        </span>
+                      </label>
+                    );
+                  })
+                )}
+              </div>
             </div>
 
             <div>
@@ -16809,8 +17867,25 @@ function CompanyOpportunityPanel({
                         {formatDate(opportunity.expected_close_date)}
                       </p>
                       <p>
-                        <span className="font-semibold">Contact:</span>{" "}
-                        {displayValue(opportunity.contacts?.full_name)}
+                        <span className="font-semibold">Primary Contact:</span>{" "}
+                        {displayValue(
+                          opportunity.contact?.full_name ||
+                            opportunity.contacts?.full_name ||
+                            opportunity.contact?.email ||
+                            opportunity.contacts?.email
+                        )}
+                      </p>
+                      <p>
+                        <span className="font-semibold">Related Contacts:</span>{" "}
+                        {Array.isArray(opportunity.related_contacts) &&
+                        opportunity.related_contacts.length > 0
+                          ? opportunity.related_contacts
+                              .map((contact: any) =>
+                                String(contact?.full_name || contact?.email || "")
+                              )
+                              .filter(Boolean)
+                              .join(", ")
+                          : "None selected"}
                       </p>
                       <p>
                         <span className="font-semibold">Source:</span>{" "}
@@ -16890,6 +17965,75 @@ function CompanyOpportunityPanel({
                               }
                               className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
                             />
+                          </div>
+
+                          <div className="lg:col-span-2">
+                            <label className="text-sm font-semibold text-slate-700">Primary Contact</label>
+                            <select
+                              value={editForm.primaryContactId}
+                              onChange={(event) =>
+                                setEditForm({
+                                  ...editForm,
+                                  primaryContactId: event.target.value,
+                                  relatedContactIds: editForm.relatedContactIds.filter(
+                                    (contactId) => contactId !== event.target.value
+                                  ),
+                                })
+                              }
+                              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
+                            >
+                              <option value="">No primary contact selected</option>
+                              {contacts.map((contact: any) => (
+                                <option key={String(contact.id)} value={String(contact.id)}>
+                                  {displayValue(contact.full_name || contact.email)}
+                                  {contact.is_primary ? " — Company Primary" : ""}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div className="lg:col-span-2">
+                            <p className="text-sm font-semibold text-slate-700">Related Contacts</p>
+                            <div className="mt-2 grid max-h-36 gap-2 overflow-y-auto rounded-xl border border-slate-300 bg-white p-3">
+                              {contacts.length === 0 ? (
+                                <p className="text-xs text-slate-500">No active company contacts available.</p>
+                              ) : (
+                                contacts.map((contact: any) => {
+                                  const contactId = String(contact.id);
+                                  const isPrimarySelection =
+                                    contactId === editForm.primaryContactId;
+                                  const isChecked =
+                                    editForm.relatedContactIds.includes(contactId);
+
+                                  return (
+                                    <label
+                                      key={contactId}
+                                      className="flex items-center gap-2 text-sm text-slate-700"
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={isChecked}
+                                        disabled={isPrimarySelection}
+                                        onChange={(event) =>
+                                          setEditForm({
+                                            ...editForm,
+                                            relatedContactIds: event.target.checked
+                                              ? [...editForm.relatedContactIds, contactId]
+                                              : editForm.relatedContactIds.filter(
+                                                  (selectedId) => selectedId !== contactId
+                                                ),
+                                          })
+                                        }
+                                      />
+                                      <span>
+                                        {displayValue(contact.full_name || contact.email)}
+                                        {isPrimarySelection ? " — Primary Contact" : ""}
+                                      </span>
+                                    </label>
+                                  );
+                                })
+                              )}
+                            </div>
                           </div>
 
                           <div className="lg:col-span-2">
@@ -17033,14 +18177,6 @@ function CompanyOpportunityPanel({
                         </div>
                       </div>
                     )}
-                    <OpportunityDocumentsPanel
-                      opportunityId={opportunity.id}
-                      companyId={companyId}
-                      contactId={opportunity.contact_id}
-                      apiPermissionHeaders={apiPermissionHeaders}
-                    />
-
-
                     {!canMoveOpportunityStages && (
                       <p className="mb-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs font-semibold text-amber-800">
                         Your current role cannot move this opportunity between stages.
@@ -17099,6 +18235,22 @@ function CompanyOpportunityPanel({
                       Archive
                     </button>
                   </div>
+                </div>
+
+                <div className="mt-5 grid gap-5">
+                  <OpportunityDocumentsPanel
+                    opportunityId={opportunity.id}
+                    companyId={companyId}
+                    contactId={opportunity.contact_id}
+                    apiPermissionHeaders={apiPermissionHeaders}
+                  />
+
+                  <OpportunityActivitiesPanel
+                    opportunityId={opportunity.id}
+                    companyId={companyId}
+                    contactId={opportunity.contact_id}
+                    contacts={contacts}
+                  />
                 </div>
               </div>
             ))}

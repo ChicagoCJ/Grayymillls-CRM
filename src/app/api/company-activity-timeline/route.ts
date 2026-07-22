@@ -43,6 +43,9 @@ function normalizeCompanyActivity(activity: any) {
     updated_at: activity.updated_at ?? null,
     archived_at: activity.archived_at ?? null,
     contact: activity.contacts ?? null,
+    related_contacts: (activity.activity_contact_assignments ?? [])
+      .map((assignment: any) => assignment.contacts)
+      .filter(Boolean),
   };
 }
 
@@ -68,6 +71,9 @@ function normalizeOpportunityActivity(activity: any) {
     updated_at: activity.updated_at ?? null,
     archived_at: null,
     contact: activity.contacts ?? null,
+    related_contacts: (activity.opportunity_activity_contact_assignments ?? [])
+      .map((assignment: any) => assignment.contacts)
+      .filter(Boolean),
   };
 }
 
@@ -111,6 +117,15 @@ export async function GET(request: Request) {
             full_name,
             title,
             email
+          ),
+          activity_contact_assignments (
+            contact_id,
+            contacts (
+              id,
+              full_name,
+              title,
+              email
+            )
           )
         `)
         .eq("company_id", companyId)
@@ -134,6 +149,15 @@ export async function GET(request: Request) {
             full_name,
             title,
             email
+          ),
+          opportunity_activity_contact_assignments (
+            contact_id,
+            contacts (
+              id,
+              full_name,
+              title,
+              email
+            )
           )
         `)
         .eq("company_id", companyId)
