@@ -107,9 +107,9 @@ type ManualContactForm = {
   isPrimary: boolean;
 };
 
-const APP_VERSION = "Version 3.15 - Company Detail Layout Cleanup";
+const APP_VERSION = "Version 3.16 - Activity Security and Contact Update Audit";
 const REVISION_NOTE =
-  "Moves Sales Coverage below the main Company Detail content and Company Industry Enrichment, preserving the Coverage shortcut, assignment behavior, and Funnel placement.";
+  "Hardens company activity completion and editing with verified bearer authentication and preserves Primary and Related Contact changes during activity updates.";
 
 type SignedInSessionStatus = {
   state: "checking" | "not_configured" | "signed_out" | "signed_in" | "error";
@@ -1688,7 +1688,7 @@ async function loadCompanyOwnerFilterData() {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          ...apiPermissionHeaders(),
+          ...(await getVerifiedBearerHeaders()),
         },
         body: JSON.stringify({
           activityId,
@@ -2011,7 +2011,7 @@ async function handleAnalyzeProspect() {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          ...apiPermissionHeaders(),
+          ...(await getVerifiedBearerHeaders()),
         },
         body: JSON.stringify({
           activityId,
@@ -2019,6 +2019,8 @@ async function handleAnalyzeProspect() {
           subject: form.subject,
           notes: form.notes,
           dueDate: form.dueDate || null,
+          primaryContactId: form.primaryContactId || null,
+          relatedContactIds: form.relatedContactIds,
         }),
       });
 
@@ -10580,6 +10582,31 @@ function HelpSection() {
 function ReleaseNotesSection() {
   const releases = [
     {
+      version: "Version 3.16",
+      title: "Activity Security and Contact Update Audit",
+      date: "July 22, 2026",
+      summary:
+        "Completes the company activity security audit by moving client-side activity completion and editing to verified bearer authentication and preserving contact edits.",
+      changes: [
+        "Confirmed the general activities API already verifies signed-in CRM users server-side.",
+        "Confirmed company access and active same-company contact validation are enforced server-side.",
+        "Updated company activity completion to use verified bearer authentication.",
+        "Updated company activity editing to use verified bearer authentication.",
+        "Added Primary Contact and Related Contact fields to activity update requests.",
+        "Updated edit change detection so contact-only changes enable Save Edit.",
+        "Preserved company detail and dashboard refresh behavior after activity updates and completion.",
+      ],
+      testNotes: [
+        "Confirm changing only the Primary Contact enables Save Edit.",
+        "Confirm saved Primary Contact changes remain after refresh.",
+        "Confirm saved Related Contact changes remain after refresh.",
+        "Confirm completing an activity succeeds from Company Detail and dashboard views.",
+        "Confirm Company Detail and dashboard data refresh after completion.",
+        "Confirm unchanged activity edits keep Save Edit disabled.",
+        "Confirm the production build passes.",
+      ],
+    },
+    {
       version: "Version 3.15",
       title: "Company Detail Layout Cleanup",
       date: "July 22, 2026",
@@ -13701,7 +13728,18 @@ function CompanyDetailSection({
         companyActivityEditForm.dueDate !==
           (selectedEditingCompanyActivity.due_date
             ? String(selectedEditingCompanyActivity.due_date).slice(0, 10)
-            : ""))
+            : "") ||
+        companyActivityEditForm.primaryContactId !==
+          String(selectedEditingCompanyActivity.contact_id || "") ||
+        JSON.stringify([...companyActivityEditForm.relatedContactIds].sort()) !==
+          JSON.stringify(
+            (Array.isArray(selectedEditingCompanyActivity.related_contacts)
+              ? selectedEditingCompanyActivity.related_contacts
+                  .map((contact: any) => String(contact.id))
+                  .filter(Boolean)
+              : []
+            ).sort()
+          ))
   );
   const companyActivityHistoryTypeFilters = [
     { label: "All Types", value: "All Types" },
