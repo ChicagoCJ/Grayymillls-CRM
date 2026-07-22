@@ -107,9 +107,9 @@ type ManualContactForm = {
   isPrimary: boolean;
 };
 
-const APP_VERSION = "Version 3.17 - Company Activity Permission Alignment";
+const APP_VERSION = "Version 3.18 - Dashboard Activity Permission Alignment";
 const REVISION_NOTE =
-  "Aligns Company Detail activity controls with server-side role and company-assignment rules, including clear view-only messaging when activity management is unavailable.";
+  "Aligns Dashboard follow-up metrics and guidance with existing role-visible activity filtering while preserving secure completion behavior.";
 
 type SignedInSessionStatus = {
   state: "checking" | "not_configured" | "signed_out" | "signed_in" | "error";
@@ -2540,20 +2540,44 @@ async function handleAnalyzeProspect() {
               />
               <MetricCard
                 label="Open follow-ups"
-                value={crmSummary.activities.open.length.toString()}
-                note="Incomplete activities"
+                value={visibleOpenFollowUpCount.toString()}
+                note={
+                  roleVisibilityEnabled
+                    ? `${visibleOpenFollowUpCount} visible of ${totalOpenFollowUpCount} incomplete activities`
+                    : "Incomplete activities"
+                }
               />
               <MetricCard
                 label="Due today"
-                value={crmSummary.activities.dueToday.length.toString()}
-                note="Incomplete and due today"
+                value={visibleDueTodayFollowUpCount.toString()}
+                note={
+                  roleVisibilityEnabled
+                    ? `${visibleDueTodayFollowUpCount} visible of ${totalDueTodayFollowUpCount} due today`
+                    : "Incomplete and due today"
+                }
               />
               <MetricCard
                 label="Overdue"
-                value={crmSummary.activities.overdue.length.toString()}
-                note="Incomplete and past due"
+                value={visibleOverdueFollowUpCount.toString()}
+                note={
+                  roleVisibilityEnabled
+                    ? `${visibleOverdueFollowUpCount} visible of ${totalOverdueFollowUpCount} overdue`
+                    : "Incomplete and past due"
+                }
               />
             </div>
+
+            {roleVisibilityEnabled && (
+              <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+                <p className="font-bold">Dashboard follow-ups follow current role visibility.</p>
+                <p className="mt-1 text-xs leading-5">
+                  Admin and Sales Manager users see all company follow-ups. Sales Rep users see and complete follow-ups only for companies assigned to them as Salesperson / Rep.
+                </p>
+                <p className="mt-2 rounded-lg bg-white p-2 text-xs font-semibold text-blue-900 ring-1 ring-blue-100">
+                  Activity visibility reason: {getRoleVisibilityReason(currentUserRole, currentUserDisplayName)}
+                </p>
+              </div>
+            )}
 
             <FollowUpDashboard
               title="Overdue Follow-Ups"
@@ -10588,6 +10612,32 @@ function HelpSection() {
 
 function ReleaseNotesSection() {
   const releases = [
+    {
+      version: "Version 3.18",
+      title: "Dashboard Activity Permission Alignment",
+      date: "July 22, 2026",
+      summary:
+        "Aligns Dashboard follow-up metrics and explanatory messaging with the existing role-visible activity lists and secure completion workflow.",
+      changes: [
+        "Confirmed Dashboard follow-up lists already filter by current role and company assignment.",
+        "Confirmed Admin and Sales Manager users continue to see all company follow-ups.",
+        "Confirmed Sales Rep users see only follow-ups for companies assigned to them as Salesperson / Rep.",
+        "Updated Open, Due Today, and Overdue metric cards to use role-visible counts.",
+        "Added visible-versus-total notes to the Dashboard follow-up metrics.",
+        "Added a role-visibility explanation above the Dashboard follow-up lists.",
+        "Preserved verified bearer-token activity completion and server-side company access enforcement.",
+      ],
+      testNotes: [
+        "Confirm Admin Dashboard follow-up counts match visible lists and Complete still works.",
+        "Confirm Sales Manager Dashboard follow-up counts match visible lists and Complete still works.",
+        "Confirm Sales Rep Dashboard follow-up lists include only assigned-company activities.",
+        "Confirm Sales Rep Open, Due Today, and Overdue metrics match the visible lists.",
+        "Confirm the Dashboard role-visibility explanation appears.",
+        "Confirm completing an assigned-company follow-up still works.",
+        "Confirm unassigned-company follow-ups do not appear for Sales Rep users.",
+        "Confirm the production build passes.",
+      ],
+    },
     {
       version: "Version 3.17",
       title: "Company Activity Permission Alignment",
