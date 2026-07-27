@@ -107,9 +107,9 @@ type ManualContactForm = {
   isPrimary: boolean;
 };
 
-const APP_VERSION = "Version 3.19 - Opportunity Activity Security Cleanup";
+const APP_VERSION = "Version 3.20 - Bulk Projects / Lists Assignment";
 const REVISION_NOTE =
-  "Removes spoofable Opportunity Activities Dashboard permission headers and moves activity loading and completion to verified bearer authentication.";
+  "Adds secure Admin-only bulk assignment of selected companies to one or more active Projects / Lists while preserving existing company-level and sales coverage workflows.";
 
 type SignedInSessionStatus = {
   state: "checking" | "not_configured" | "signed_out" | "signed_in" | "error";
@@ -892,8 +892,11 @@ export default function Home() {
   const [selectedCompanyIds, setSelectedCompanyIds] = useState<string[]>([]);
   const [bulkAssignedSalespersonId, setBulkAssignedSalespersonId] = useState("");
   const [bulkAssignedSalesManagerId, setBulkAssignedSalesManagerId] = useState("");
+  const [bulkProjectListIds, setBulkProjectListIds] = useState<string[]>([]);
   const [isBulkAssigningCompanies, setIsBulkAssigningCompanies] = useState(false);
+  const [isBulkAssigningProjectsLists, setIsBulkAssigningProjectsLists] = useState(false);
   const [bulkCompanyAssignmentMessage, setBulkCompanyAssignmentMessage] = useState("");
+  const [bulkProjectListAssignmentMessage, setBulkProjectListAssignmentMessage] = useState("");
   const [roleTestUsers, setRoleTestUsers] = useState<CrmUser[]>([]);
   const [showSalesCoverageDiagnostics, setShowSalesCoverageDiagnostics] = useState(true);
   const [diagnosticsCompanySearch, setDiagnosticsCompanySearch] = useState("");
@@ -1551,7 +1554,9 @@ const companyBuyerPersonas = getCompanyEffectiveBuyerPersonas(
     setSelectedCompanyIds([]);
     setBulkAssignedSalespersonId("");
     setBulkAssignedSalesManagerId("");
+    setBulkProjectListIds([]);
     setBulkCompanyAssignmentMessage("");
+    setBulkProjectListAssignmentMessage("");
   }
 
 async function loadCompanyOwnerFilterData() {
@@ -2134,7 +2139,7 @@ async function handleAnalyzeProspect() {
   }
 
   useEffect(() => {
-    if (activeTab === "import") {
+    if (activeTab === "import" || activeTab === "companies") {
       loadImportProjectLists();
     }
   }, [activeTab]);
@@ -2219,6 +2224,73 @@ async function handleAnalyzeProspect() {
       setIsBulkAssigningCompanies(false);
     }
   }
+  async function handleBulkProjectListAssignment() {
+    if (!currentPermissions.canManageAdminSettings) {
+      setBulkProjectListAssignmentMessage(
+        "Only CRM Admin users can change Project / List assignments."
+      );
+      return;
+    }
+
+    if (selectedCompanyIds.length === 0) {
+      setBulkProjectListAssignmentMessage(
+        "Select at least one company before applying Project / List assignment."
+      );
+      return;
+    }
+
+    if (bulkProjectListIds.length === 0) {
+      setBulkProjectListAssignmentMessage(
+        "Select at least one Project / List before applying assignment."
+      );
+      return;
+    }
+
+    setIsBulkAssigningProjectsLists(true);
+    setBulkProjectListAssignmentMessage("");
+
+    try {
+      const response = await fetch("/api/company-project-assignments", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(await getVerifiedBearerHeaders()),
+        },
+        body: JSON.stringify({
+          companyIds: selectedCompanyIds,
+          projectIds: bulkProjectListIds,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Bulk Project / List assignment failed."
+        );
+      }
+
+      setBulkProjectListAssignmentMessage(
+        "Added " +
+          String(data.companyCount ?? selectedCompanyIds.length) +
+          " companies to " +
+          String(data.projectCount ?? bulkProjectListIds.length) +
+          " Project(s) / List(s)."
+      );
+
+      setBulkProjectListIds([]);
+      await loadCrmSummary();
+    } catch (error) {
+      setBulkProjectListAssignmentMessage(
+        error instanceof Error
+          ? error.message
+          : "Bulk Project / List assignment failed."
+      );
+    } finally {
+      setIsBulkAssigningProjectsLists(false);
+    }
+  }
+
   async function loadRoleTestUsers() {
     setIsLoadingRoleUsers(true);
     setRoleUserError("");
@@ -2668,15 +2740,22 @@ async function handleAnalyzeProspect() {
             companyPrimarySubIndustryOptions={companyPrimarySubIndustryOptions}
             clearCompanyFilters={clearCompanyFilters}
             canAssignSalesCoverage={currentPermissions.canAssignSalesCoverage}
+            canManageProjectsLists={currentPermissions.canManageAdminSettings}
             selectedCompanyIds={selectedCompanyIds}
             setSelectedCompanyIds={setSelectedCompanyIds}
             bulkAssignedSalespersonId={bulkAssignedSalespersonId}
             setBulkAssignedSalespersonId={setBulkAssignedSalespersonId}
             bulkAssignedSalesManagerId={bulkAssignedSalesManagerId}
             setBulkAssignedSalesManagerId={setBulkAssignedSalesManagerId}
+            bulkProjectListIds={bulkProjectListIds}
+            setBulkProjectListIds={setBulkProjectListIds}
+            bulkProjectListOptions={importProjectListOptions}
             isBulkAssigningCompanies={isBulkAssigningCompanies}
+            isBulkAssigningProjectsLists={isBulkAssigningProjectsLists}
             bulkCompanyAssignmentMessage={bulkCompanyAssignmentMessage}
+            bulkProjectListAssignmentMessage={bulkProjectListAssignmentMessage}
             onApplyBulkCompanyAssignment={handleBulkCompanyAssignment}
+            onApplyBulkProjectListAssignment={handleBulkProjectListAssignment}
             onOpenCompany={loadCompanyDetail}
             isLoadingCompanyDetail={isLoadingCompanyDetail}
           />
@@ -10615,6 +10694,30 @@ function HelpSection() {
 function ReleaseNotesSection() {
   const releases = [
     {
+      version: "Version 3.20",
+      title: "Bulk Projects / Lists Assignment",
+      date: "July 27, 2026",
+      summary:
+        "Adds Admin-only bulk Project / List assignment from the Companies screen, using verified bearer authentication and the existing company selection workflow.",
+      changes: [
+        "Added bulk Project / List assignment support to the company Project/List assignment API while preserving existing single-company add/remove behavior.",
+        "Protected bulk Project / List writes with verified signed-in CRM Admin authentication.",
+        "Reused the Companies screen multi-select workflow for Project / List bulk assignment.",
+        "Added selection of one or more active Projects / Lists directly from the Companies bulk assignment area.",
+        "Preserved existing Salesperson / Sales Manager bulk assignment behavior.",
+        "Preserved existing Company Detail and Contact Detail Project / List membership workflows.",
+        "Confirmed browser behavior and production build successfully.",
+      ],
+      testNotes: [
+        "Verified Admin can bulk-assign multiple selected companies to multiple active Projects / Lists.",
+        "Verified assigned memberships appear in Company Detail and Company Project / List filtering.",
+        "Verified repeated assignment does not create duplicate memberships.",
+        "Verified existing Salesperson / Sales Manager bulk assignment remains functional.",
+        "Verified non-Admin roles cannot make Project / List assignment changes.",
+        "Feature implementation build passed before version metadata update.",
+      ],
+    },
+    {
       version: "Version 3.19",
       title: "Opportunity Activity Security Cleanup",
       date: "July 22, 2026",
@@ -12135,15 +12238,22 @@ function CompaniesSection({
   companyPrimarySubIndustryOptions = ["All"],
   clearCompanyFilters,
   canAssignSalesCoverage = false,
+  canManageProjectsLists = false,
   selectedCompanyIds = [],
   setSelectedCompanyIds = () => {},
   bulkAssignedSalespersonId = "",
   setBulkAssignedSalespersonId = () => {},
   bulkAssignedSalesManagerId = "",
   setBulkAssignedSalesManagerId = () => {},
+  bulkProjectListIds = [],
+  setBulkProjectListIds = () => {},
+  bulkProjectListOptions = [],
   isBulkAssigningCompanies = false,
+  isBulkAssigningProjectsLists = false,
   bulkCompanyAssignmentMessage = "",
+  bulkProjectListAssignmentMessage = "",
   onApplyBulkCompanyAssignment = () => {},
+  onApplyBulkProjectListAssignment = () => {},
   onOpenCompany,
   isLoadingCompanyDetail,
 }: {
@@ -12203,15 +12313,22 @@ function CompaniesSection({
   companyPrimarySubIndustryOptions: string[];
   clearCompanyFilters: () => void;
   canAssignSalesCoverage?: boolean;
+  canManageProjectsLists?: boolean;
   selectedCompanyIds?: string[];
   setSelectedCompanyIds?: (companyIds: string[]) => void;
   bulkAssignedSalespersonId?: string;
   setBulkAssignedSalespersonId?: (value: string) => void;
   bulkAssignedSalesManagerId?: string;
   setBulkAssignedSalesManagerId?: (value: string) => void;
+  bulkProjectListIds?: string[];
+  setBulkProjectListIds?: (value: string[]) => void;
+  bulkProjectListOptions?: any[];
   isBulkAssigningCompanies?: boolean;
+  isBulkAssigningProjectsLists?: boolean;
   bulkCompanyAssignmentMessage?: string;
+  bulkProjectListAssignmentMessage?: string;
   onApplyBulkCompanyAssignment?: () => void;
+  onApplyBulkProjectListAssignment?: () => void;
   onOpenCompany: (companyId: string) => void;
   isLoadingCompanyDetail: boolean;
 }) {
@@ -12791,6 +12908,91 @@ function CompaniesSection({
             {bulkCompanyAssignmentMessage}
           </p>
         )}
+
+        <div className="mt-5 border-t border-blue-200 pt-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
+            <div className="flex-1">
+              <p className="text-sm font-bold text-blue-950">
+                Bulk Project / List Assignment
+              </p>
+              <p className="mt-1 text-xs leading-5 text-blue-800">
+                Admin only: add the selected companies to one or more active
+                Projects / Lists. Existing memberships are preserved.
+              </p>
+
+              <div className="mt-3 grid gap-2 md:grid-cols-2">
+                {bulkProjectListOptions.length === 0 ? (
+                  <p className="text-xs text-blue-800">
+                    No active Projects / Lists are available.
+                  </p>
+                ) : (
+                  bulkProjectListOptions.map((item: any) => {
+                    const itemId = String(item.id || "");
+                    const checked = bulkProjectListIds.includes(itemId);
+
+                    return (
+                      <label
+                        key={itemId}
+                        className="flex cursor-pointer items-start gap-2 rounded-lg border border-blue-200 bg-white p-3 text-xs text-blue-950"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={
+                            !canManageProjectsLists ||
+                            isBulkAssigningProjectsLists
+                          }
+                          onChange={() =>
+                            setBulkProjectListIds(
+                              checked
+                                ? bulkProjectListIds.filter((id) => id !== itemId)
+                                : [...bulkProjectListIds, itemId]
+                            )
+                          }
+                          className="mt-0.5 h-4 w-4 rounded border-blue-300 text-blue-700 focus:ring-blue-500"
+                        />
+                        <span>
+                          <span className="font-semibold">
+                            {item.project_kind === "list" ? "List" : "Project"}:
+                          </span>{" "}
+                          {item.project_name}
+                        </span>
+                      </label>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={onApplyBulkProjectListAssignment}
+              disabled={
+                !canManageProjectsLists ||
+                isBulkAssigningProjectsLists ||
+                selectedCompanyIds.length === 0 ||
+                bulkProjectListIds.length === 0
+              }
+              className="rounded-xl bg-violet-700 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-violet-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+            >
+              {isBulkAssigningProjectsLists
+                ? "Assigning..."
+                : "Add Selected to Projects / Lists"}
+            </button>
+          </div>
+
+          {!canManageProjectsLists && (
+            <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs font-semibold text-amber-800">
+              Project / List assignment changes are available to CRM Admin users only.
+            </p>
+          )}
+
+          {bulkProjectListAssignmentMessage && (
+            <p className="mt-3 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-violet-900 ring-1 ring-violet-100">
+              {bulkProjectListAssignmentMessage}
+            </p>
+          )}
+        </div>
       </div>
 
       {companies.length === 0 ? (
@@ -19850,279 +20052,3 @@ function ReadableListItem({
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

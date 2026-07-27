@@ -33,7 +33,21 @@ function getErrorMessage(error: unknown, fallback: string) {
 type CompanyProjectAssignmentPayload = {
   companyId?: string;
   projectId?: string;
+  companyIds?: string[];
+  projectIds?: string[];
 };
+
+function cleanTextArray(value: unknown) {
+  if (!Array.isArray(value)) return [];
+
+  return Array.from(
+    new Set(
+      value
+        .map((item) => cleanText(item))
+        .filter((item): item is string => Boolean(item))
+    )
+  );
+}
 
 export async function GET(request: Request) {
   try {
@@ -86,6 +100,51 @@ export async function POST(request: Request) {
     const payload =
       (await request.json()) as CompanyProjectAssignmentPayload;
 
+    const companyIds = cleanTextArray(payload.companyIds);
+    const projectIds = cleanTextArray(payload.projectIds);
+    const isBulkRequest = companyIds.length > 0 || projectIds.length > 0;
+
+    const supabase = getSupabaseAdmin();
+
+    if (isBulkRequest) {
+      if (companyIds.length === 0 || projectIds.length === 0) {
+        return NextResponse.json(
+          { error: "companyIds and projectIds are required for bulk assignment." },
+          { status: 400 }
+        );
+      }
+
+      const rows = companyIds.flatMap((companyId) =>
+        projectIds.map((projectId) => ({
+          company_id: companyId,
+          project_id: projectId,
+        }))
+      );
+
+      const { data, error } = await supabase
+        .from("company_project_assignments")
+        .upsert(rows, {
+          onConflict: "project_id,company_id",
+        })
+        .select(
+          "id, company_id, project_id, created_at, crm_projects(id, project_name, project_kind, description, owner_user_id, sort_order, status)"
+        );
+
+      if (error) throw error;
+
+      return NextResponse.json({
+        status: "bulk-added",
+        companyCount: companyIds.length,
+        projectCount: projectIds.length,
+        assignmentCount: rows.length,
+        companyProjectAssignments: data ?? [],
+        verifiedAdmin: {
+          crmUserId: verification.context.crmUserId,
+          displayName: verification.context.crmDisplayName,
+        },
+      });
+    }
+
     const companyId = cleanText(payload.companyId);
     const projectId = cleanText(payload.projectId);
 
@@ -95,8 +154,6 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-
-    const supabase = getSupabaseAdmin();
 
     const { data, error } = await supabase
       .from("company_project_assignments")
