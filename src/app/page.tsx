@@ -107,9 +107,9 @@ type ManualContactForm = {
   isPrimary: boolean;
 };
 
-const APP_VERSION = "Version 3.20 - Bulk Projects / Lists Assignment";
+const APP_VERSION = "Version 3.22 - Bulk Company Industry Classification";
 const REVISION_NOTE =
-  "Adds secure Admin-only bulk assignment of selected companies to one or more active Projects / Lists while preserving existing company-level and sales coverage workflows.";
+  "Adds secure Admin-only bulk Primary Industry and Primary Sub-Industry classification for selected companies while keeping Product Path prospect and opportunity intelligence unchanged.";
 
 type SignedInSessionStatus = {
   state: "checking" | "not_configured" | "signed_out" | "signed_in" | "error";
@@ -893,10 +893,14 @@ export default function Home() {
   const [bulkAssignedSalespersonId, setBulkAssignedSalespersonId] = useState("");
   const [bulkAssignedSalesManagerId, setBulkAssignedSalesManagerId] = useState("");
   const [bulkProjectListIds, setBulkProjectListIds] = useState<string[]>([]);
+  const [bulkPrimaryIndustry, setBulkPrimaryIndustry] = useState("");
+  const [bulkPrimarySubIndustry, setBulkPrimarySubIndustry] = useState("");
   const [isBulkAssigningCompanies, setIsBulkAssigningCompanies] = useState(false);
   const [isBulkAssigningProjectsLists, setIsBulkAssigningProjectsLists] = useState(false);
+  const [isBulkClassifyingCompanies, setIsBulkClassifyingCompanies] = useState(false);
   const [bulkCompanyAssignmentMessage, setBulkCompanyAssignmentMessage] = useState("");
   const [bulkProjectListAssignmentMessage, setBulkProjectListAssignmentMessage] = useState("");
+  const [bulkIndustryClassificationMessage, setBulkIndustryClassificationMessage] = useState("");
   const [roleTestUsers, setRoleTestUsers] = useState<CrmUser[]>([]);
   const [showSalesCoverageDiagnostics, setShowSalesCoverageDiagnostics] = useState(true);
   const [diagnosticsCompanySearch, setDiagnosticsCompanySearch] = useState("");
@@ -1555,8 +1559,11 @@ const companyBuyerPersonas = getCompanyEffectiveBuyerPersonas(
     setBulkAssignedSalespersonId("");
     setBulkAssignedSalesManagerId("");
     setBulkProjectListIds([]);
+    setBulkPrimaryIndustry("");
+    setBulkPrimarySubIndustry("");
     setBulkCompanyAssignmentMessage("");
     setBulkProjectListAssignmentMessage("");
+    setBulkIndustryClassificationMessage("");
   }
 
 async function loadCompanyOwnerFilterData() {
@@ -2291,6 +2298,88 @@ async function handleAnalyzeProspect() {
     }
   }
 
+  async function handleBulkIndustryClassification() {
+    if (!currentPermissions.canManageAdminSettings) {
+      setBulkIndustryClassificationMessage(
+        "Only CRM Admin users can change company industry classification."
+      );
+      return;
+    }
+
+    if (selectedCompanyIds.length === 0) {
+      setBulkIndustryClassificationMessage(
+        "Select at least one company before applying industry classification."
+      );
+      return;
+    }
+
+    const primaryIndustry = bulkPrimaryIndustry.trim();
+    const primarySubIndustry = bulkPrimarySubIndustry.trim();
+
+    if (!primaryIndustry && !primarySubIndustry) {
+      setBulkIndustryClassificationMessage(
+        "Enter a Primary Industry and/or Primary Sub-Industry before applying classification."
+      );
+      return;
+    }
+
+    setIsBulkClassifyingCompanies(true);
+    setBulkIndustryClassificationMessage("");
+
+    try {
+      const payload: Record<string, unknown> = {
+        companyIds: selectedCompanyIds,
+      };
+
+      if (primaryIndustry) {
+        payload.primaryIndustry = primaryIndustry;
+      }
+
+      if (primarySubIndustry) {
+        payload.primarySubIndustry = primarySubIndustry;
+      }
+
+      const response = await fetch("/api/company-industry-classification", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...(await getVerifiedBearerHeaders()),
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Bulk company industry classification failed."
+        );
+      }
+
+      const updatedCount = Number(
+        data.updatedCount ?? selectedCompanyIds.length
+      );
+
+      setBulkIndustryClassificationMessage(
+        updatedCount === 1
+          ? "Updated industry classification for 1 company."
+          : `Updated industry classification for ${updatedCount} companies.`
+      );
+
+      setBulkPrimaryIndustry("");
+      setBulkPrimarySubIndustry("");
+      await loadCrmSummary();
+    } catch (error) {
+      setBulkIndustryClassificationMessage(
+        error instanceof Error
+          ? error.message
+          : "Bulk company industry classification failed."
+      );
+    } finally {
+      setIsBulkClassifyingCompanies(false);
+    }
+  }
+
   async function loadRoleTestUsers() {
     setIsLoadingRoleUsers(true);
     setRoleUserError("");
@@ -2750,12 +2839,20 @@ async function handleAnalyzeProspect() {
             bulkProjectListIds={bulkProjectListIds}
             setBulkProjectListIds={setBulkProjectListIds}
             bulkProjectListOptions={importProjectListOptions}
+            canBulkClassifyCompanies={currentPermissions.canManageAdminSettings}
+            bulkPrimaryIndustry={bulkPrimaryIndustry}
+            setBulkPrimaryIndustry={setBulkPrimaryIndustry}
+            bulkPrimarySubIndustry={bulkPrimarySubIndustry}
+            setBulkPrimarySubIndustry={setBulkPrimarySubIndustry}
             isBulkAssigningCompanies={isBulkAssigningCompanies}
             isBulkAssigningProjectsLists={isBulkAssigningProjectsLists}
+            isBulkClassifyingCompanies={isBulkClassifyingCompanies}
             bulkCompanyAssignmentMessage={bulkCompanyAssignmentMessage}
             bulkProjectListAssignmentMessage={bulkProjectListAssignmentMessage}
+            bulkIndustryClassificationMessage={bulkIndustryClassificationMessage}
             onApplyBulkCompanyAssignment={handleBulkCompanyAssignment}
             onApplyBulkProjectListAssignment={handleBulkProjectListAssignment}
+            onApplyBulkIndustryClassification={handleBulkIndustryClassification}
             onOpenCompany={loadCompanyDetail}
             isLoadingCompanyDetail={isLoadingCompanyDetail}
           />
@@ -10694,6 +10791,32 @@ function HelpSection() {
 function ReleaseNotesSection() {
   const releases = [
     {
+      version: "Version 3.22",
+      title: "Bulk Company Industry Classification",
+      date: "July 27, 2026",
+      summary:
+        "Adds secure Admin-only bulk Primary Industry and Primary Sub-Industry classification from the Companies screen without changing prospect or opportunity Product Path data.",
+      changes: [
+        "Added a dedicated bulk company industry classification API using verified signed-in CRM Admin authentication.",
+        "Reused the Companies multi-select workflow for classification of selected company records.",
+        "Added bulk Primary Industry and Primary Sub-Industry controls with existing values offered as suggestions while still allowing new text values.",
+        "Allowed either field to be updated independently while leaving the other unchanged.",
+        "Reloaded CRM summary data after a successful update so company filters and displayed classification values refresh immediately.",
+        "Kept Product Path separate as prospect and opportunity intelligence rather than converting it into a company classification field.",
+        "Preserved existing bulk Salesperson / Sales Manager assignment and bulk Project / List assignment workflows.",
+        "Confirmed browser behavior and production build successfully.",
+      ],
+      testNotes: [
+        "Verified Admin can select multiple companies and bulk-update Primary Industry.",
+        "Verified Admin can bulk-update Primary Sub-Industry independently or together with Primary Industry.",
+        "Verified updated companies appear under the corresponding Primary Industry and Primary Sub-Industry filters.",
+        "Verified Product Path remains unchanged by company industry classification.",
+        "Verified non-Admin users cannot apply industry classification changes.",
+        "Verified existing bulk Sales Coverage and Project / List assignment controls remain functional.",
+        "Verified the production build passes.",
+      ],
+    },
+    {
       version: "Version 3.20",
       title: "Bulk Projects / Lists Assignment",
       date: "July 27, 2026",
@@ -12248,12 +12371,20 @@ function CompaniesSection({
   bulkProjectListIds = [],
   setBulkProjectListIds = () => {},
   bulkProjectListOptions = [],
+  canBulkClassifyCompanies = false,
+  bulkPrimaryIndustry = "",
+  setBulkPrimaryIndustry = () => {},
+  bulkPrimarySubIndustry = "",
+  setBulkPrimarySubIndustry = () => {},
   isBulkAssigningCompanies = false,
   isBulkAssigningProjectsLists = false,
+  isBulkClassifyingCompanies = false,
   bulkCompanyAssignmentMessage = "",
   bulkProjectListAssignmentMessage = "",
+  bulkIndustryClassificationMessage = "",
   onApplyBulkCompanyAssignment = () => {},
   onApplyBulkProjectListAssignment = () => {},
+  onApplyBulkIndustryClassification = () => {},
   onOpenCompany,
   isLoadingCompanyDetail,
 }: {
@@ -12323,12 +12454,20 @@ function CompaniesSection({
   bulkProjectListIds?: string[];
   setBulkProjectListIds?: (value: string[]) => void;
   bulkProjectListOptions?: any[];
+  canBulkClassifyCompanies?: boolean;
+  bulkPrimaryIndustry?: string;
+  setBulkPrimaryIndustry?: (value: string) => void;
+  bulkPrimarySubIndustry?: string;
+  setBulkPrimarySubIndustry?: (value: string) => void;
   isBulkAssigningCompanies?: boolean;
   isBulkAssigningProjectsLists?: boolean;
+  isBulkClassifyingCompanies?: boolean;
   bulkCompanyAssignmentMessage?: string;
   bulkProjectListAssignmentMessage?: string;
+  bulkIndustryClassificationMessage?: string;
   onApplyBulkCompanyAssignment?: () => void;
   onApplyBulkProjectListAssignment?: () => void;
+  onApplyBulkIndustryClassification?: () => void;
   onOpenCompany: (companyId: string) => void;
   isLoadingCompanyDetail: boolean;
 }) {
@@ -12990,6 +13129,94 @@ function CompaniesSection({
           {bulkProjectListAssignmentMessage && (
             <p className="mt-3 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-violet-900 ring-1 ring-violet-100">
               {bulkProjectListAssignmentMessage}
+            </p>
+          )}
+        </div>
+
+        <div className="mt-5 border-t border-blue-200 pt-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
+            <div className="flex-1">
+              <p className="text-sm font-bold text-blue-950">
+                Bulk Industry Classification
+              </p>
+              <p className="mt-1 text-xs leading-5 text-blue-800">
+                Admin only: update Primary Industry and/or Primary Sub-Industry
+                for the selected companies. Product Path is not changed.
+              </p>
+
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wide text-blue-900">
+                    Primary Industry
+                  </label>
+                  <input
+                    type="text"
+                    list="bulk-primary-industry-options"
+                    value={bulkPrimaryIndustry}
+                    disabled={!canBulkClassifyCompanies || isBulkClassifyingCompanies}
+                    onChange={(event) => setBulkPrimaryIndustry(event.target.value)}
+                    placeholder="Do not change"
+                    className="mt-2 w-full rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+                  />
+                  <datalist id="bulk-primary-industry-options">
+                    {companyPrimaryIndustryOptions
+                      .filter((option) => option !== "All")
+                      .map((option) => (
+                        <option key={`bulk-primary-industry-${option}`} value={option} />
+                      ))}
+                  </datalist>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wide text-blue-900">
+                    Primary Sub-Industry
+                  </label>
+                  <input
+                    type="text"
+                    list="bulk-primary-sub-industry-options"
+                    value={bulkPrimarySubIndustry}
+                    disabled={!canBulkClassifyCompanies || isBulkClassifyingCompanies}
+                    onChange={(event) => setBulkPrimarySubIndustry(event.target.value)}
+                    placeholder="Do not change"
+                    className="mt-2 w-full rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+                  />
+                  <datalist id="bulk-primary-sub-industry-options">
+                    {companyPrimarySubIndustryOptions
+                      .filter((option) => option !== "All")
+                      .map((option) => (
+                        <option key={`bulk-primary-sub-industry-${option}`} value={option} />
+                      ))}
+                  </datalist>
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={onApplyBulkIndustryClassification}
+              disabled={
+                !canBulkClassifyCompanies ||
+                isBulkClassifyingCompanies ||
+                selectedCompanyIds.length === 0 ||
+                (!bulkPrimaryIndustry.trim() && !bulkPrimarySubIndustry.trim())
+              }
+              className="rounded-xl bg-emerald-700 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+            >
+              {isBulkClassifyingCompanies
+                ? "Updating..."
+                : "Apply Industry Classification"}
+            </button>
+          </div>
+
+          {!canBulkClassifyCompanies && (
+            <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs font-semibold text-amber-800">
+              Industry classification changes are available to CRM Admin users only.
+            </p>
+          )}
+
+          {bulkIndustryClassificationMessage && (
+            <p className="mt-3 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-emerald-900 ring-1 ring-emerald-100">
+              {bulkIndustryClassificationMessage}
             </p>
           )}
         </div>
