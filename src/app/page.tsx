@@ -107,9 +107,9 @@ type ManualContactForm = {
   isPrimary: boolean;
 };
 
-const APP_VERSION = "Version 3.22 - Bulk Company Industry Classification";
+const APP_VERSION = "Version 3.22.1 - Graymills Category / Industry Classification";
 const REVISION_NOTE =
-  "Adds secure Admin-only bulk Primary Industry and Primary Sub-Industry classification for selected companies while keeping Product Path prospect and opportunity intelligence unchanged.";
+  "Adds managed Graymills Category, Industry, and optional Sub-Industry classifications, supports multiple category paths per company, and enables secure Company Detail editing for Admins, Sales Managers, and assigned Sales Reps.";
 
 type SignedInSessionStatus = {
   state: "checking" | "not_configured" | "signed_out" | "signed_in" | "error";
@@ -390,7 +390,7 @@ function suggestMappings(headers: string[]): MappingSuggestion[] {
     const containsMatch = normalizedHeaders.find((header) =>
       crmField.aliases.some((alias) => {
         const normalizedAlias = normalizeHeader(alias);
-        
+
 
 return (
           header.normalized.includes(normalizedAlias) ||
@@ -569,6 +569,47 @@ type AppPermissions = {
   canManageFunnelStages: boolean;
   canMoveOpportunityStages: boolean;
   canAssignSalesCoverage: boolean;
+};
+
+type CompanyGraymillsCategoryDefinition = {
+  id: string;
+  category_key: string;
+  category_name: string;
+  sort_order: number;
+  status: "active" | "archived";
+};
+
+type CompanyGraymillsClassificationDisplay = {
+  id: string;
+  companyId: string;
+  categoryId: string;
+  categoryKey: string;
+  categoryName: string;
+  categorySortOrder: number;
+  categoryStatus: "active" | "archived";
+  industryId: string | null;
+  industryName: string | null;
+  industryStatus: "active" | "archived" | null;
+  subIndustryId: string | null;
+  subIndustryName: string | null;
+  subIndustryStatus: "active" | "archived" | null;
+  updatedAt: string | null;
+};
+
+type CompanyIndustryDefinition = {
+  id: string;
+  graymills_category_id: string | null;
+  industry_name: string;
+  sort_order: number;
+  status: "active" | "archived";
+};
+
+type CompanySubIndustryDefinition = {
+  id: string;
+  industry_id: string | null;
+  sub_industry_name: string;
+  sort_order: number;
+  status: "active" | "archived";
 };
 
 function getRoleVisibilityReason(role: AppUserRole, userDisplayName: string) {
@@ -893,8 +934,14 @@ export default function Home() {
   const [bulkAssignedSalespersonId, setBulkAssignedSalespersonId] = useState("");
   const [bulkAssignedSalesManagerId, setBulkAssignedSalesManagerId] = useState("");
   const [bulkProjectListIds, setBulkProjectListIds] = useState<string[]>([]);
-  const [bulkPrimaryIndustry, setBulkPrimaryIndustry] = useState("");
-  const [bulkPrimarySubIndustry, setBulkPrimarySubIndustry] = useState("");
+  const [bulkGraymillsCategoryId, setBulkGraymillsCategoryId] = useState("");
+  const [bulkIndustryId, setBulkIndustryId] = useState("");
+  const [bulkSubIndustryId, setBulkSubIndustryId] = useState("");
+  const [companyGraymillsCategoryDefinitions, setCompanyGraymillsCategoryDefinitions] = useState<CompanyGraymillsCategoryDefinition[]>([]);
+  const [companyIndustryDefinitions, setCompanyIndustryDefinitions] = useState<CompanyIndustryDefinition[]>([]);
+  const [companySubIndustryDefinitions, setCompanySubIndustryDefinitions] = useState<CompanySubIndustryDefinition[]>([]);
+  const [isLoadingCompanyIndustryDefinitions, setIsLoadingCompanyIndustryDefinitions] = useState(false);
+  const [companyIndustryDefinitionError, setCompanyIndustryDefinitionError] = useState("");
   const [isBulkAssigningCompanies, setIsBulkAssigningCompanies] = useState(false);
   const [isBulkAssigningProjectsLists, setIsBulkAssigningProjectsLists] = useState(false);
   const [isBulkClassifyingCompanies, setIsBulkClassifyingCompanies] = useState(false);
@@ -910,6 +957,8 @@ export default function Home() {
     () => getRolePermissions(currentUserRole),
     [currentUserRole]
   );
+  const canManageIndustryDefinitions =
+    currentUserRole === "admin" || currentUserRole === "sales_manager";
 
   const productionRoleEnforcementEnabled =
     signedInProductionUser.state !== "checking" &&
@@ -1395,7 +1444,7 @@ const companyBuyerPersonas = getCompanyEffectiveBuyerPersonas(
     companySalespersonFilter,
     companySalesManagerFilter,
     companyAssignmentStatusFilter,
-    
+
     companyAccountTypeFilter,
 
     companyBuyerPersonaFilter,
@@ -1429,7 +1478,7 @@ const companyBuyerPersonas = getCompanyEffectiveBuyerPersonas(
     setContactCategoryTagFilter("All");
     setContactProjectListFilter("All");
   }
-  
+
   useEffect(() => {
     try {
       const savedPreferences = window.localStorage.getItem("graymills-crm-view-preferences");
@@ -1559,8 +1608,9 @@ const companyBuyerPersonas = getCompanyEffectiveBuyerPersonas(
     setBulkAssignedSalespersonId("");
     setBulkAssignedSalesManagerId("");
     setBulkProjectListIds([]);
-    setBulkPrimaryIndustry("");
-    setBulkPrimarySubIndustry("");
+    setBulkGraymillsCategoryId("");
+    setBulkIndustryId("");
+    setBulkSubIndustryId("");
     setBulkCompanyAssignmentMessage("");
     setBulkProjectListAssignmentMessage("");
     setBulkIndustryClassificationMessage("");
@@ -2298,27 +2348,76 @@ async function handleAnalyzeProspect() {
     }
   }
 
+  async function loadCompanyIndustryDefinitions() {
+    if (signedInProductionUser.state !== "ready") {
+      return;
+    }
+
+    setIsLoadingCompanyIndustryDefinitions(true);
+    setCompanyIndustryDefinitionError("");
+
+    try {
+      const response = await fetch("/api/company-industry-definitions", {
+        headers: {
+          ...(await getVerifiedBearerHeaders()),
+        },
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Could not load managed Industry definitions."
+        );
+      }
+
+      setCompanyGraymillsCategoryDefinitions(
+        Array.isArray(data.categories) ? data.categories : []
+      );
+      setCompanyIndustryDefinitions(
+        Array.isArray(data.industries) ? data.industries : []
+      );
+      setCompanySubIndustryDefinitions(
+        Array.isArray(data.subIndustries) ? data.subIndustries : []
+      );
+    } catch (error) {
+      setCompanyIndustryDefinitionError(
+        error instanceof Error
+          ? error.message
+          : "Could not load managed Industry definitions."
+      );
+    } finally {
+      setIsLoadingCompanyIndustryDefinitions(false);
+    }
+  }
+
+  useEffect(() => {
+    if (signedInProductionUser.state === "ready") {
+      loadCompanyIndustryDefinitions();
+    }
+  }, [signedInProductionUser.state]);
+
   async function handleBulkIndustryClassification() {
-    if (!currentPermissions.canManageAdminSettings) {
+    if (!canManageIndustryDefinitions) {
       setBulkIndustryClassificationMessage(
-        "Only CRM Admin users can change company industry classification."
+        "Only CRM Admin or Sales Manager users can change Graymills company classification."
       );
       return;
     }
 
     if (selectedCompanyIds.length === 0) {
       setBulkIndustryClassificationMessage(
-        "Select at least one company before applying industry classification."
+        "Select at least one company before applying Graymills classification."
       );
       return;
     }
 
-    const primaryIndustry = bulkPrimaryIndustry.trim();
-    const primarySubIndustry = bulkPrimarySubIndustry.trim();
+    const categoryId = bulkGraymillsCategoryId.trim();
+    const industryId = bulkIndustryId.trim();
+    const subIndustryId = bulkSubIndustryId.trim();
 
-    if (!primaryIndustry && !primarySubIndustry) {
+    if (!categoryId) {
       setBulkIndustryClassificationMessage(
-        "Enter a Primary Industry and/or Primary Sub-Industry before applying classification."
+        "Select a Graymills Category before applying classification."
       );
       return;
     }
@@ -2329,14 +2428,15 @@ async function handleAnalyzeProspect() {
     try {
       const payload: Record<string, unknown> = {
         companyIds: selectedCompanyIds,
+        categoryId,
       };
 
-      if (primaryIndustry) {
-        payload.primaryIndustry = primaryIndustry;
+      if (industryId) {
+        payload.industryId = industryId;
       }
 
-      if (primarySubIndustry) {
-        payload.primarySubIndustry = primarySubIndustry;
+      if (subIndustryId) {
+        payload.subIndustryId = subIndustryId;
       }
 
       const response = await fetch("/api/company-industry-classification", {
@@ -2352,28 +2452,33 @@ async function handleAnalyzeProspect() {
 
       if (!response.ok) {
         throw new Error(
-          data.error || "Bulk company industry classification failed."
+          data.error || "Bulk Graymills company classification failed."
         );
       }
 
       const updatedCount = Number(
         data.updatedCount ?? selectedCompanyIds.length
       );
+      const categoryName =
+        companyGraymillsCategoryDefinitions.find(
+          (category) => category.id === categoryId
+        )?.category_name || "Graymills Category";
 
       setBulkIndustryClassificationMessage(
         updatedCount === 1
-          ? "Updated industry classification for 1 company."
-          : `Updated industry classification for ${updatedCount} companies.`
+          ? `Updated ${categoryName} classification for 1 company.`
+          : `Updated ${categoryName} classification for ${updatedCount} companies.`
       );
 
-      setBulkPrimaryIndustry("");
-      setBulkPrimarySubIndustry("");
+      setBulkGraymillsCategoryId("");
+      setBulkIndustryId("");
+      setBulkSubIndustryId("");
       await loadCrmSummary();
     } catch (error) {
       setBulkIndustryClassificationMessage(
         error instanceof Error
           ? error.message
-          : "Bulk company industry classification failed."
+          : "Bulk Graymills company classification failed."
       );
     } finally {
       setIsBulkClassifyingCompanies(false);
@@ -2590,7 +2695,7 @@ async function handleAnalyzeProspect() {
           </div>
         </header>
 
-        
+
 
         <nav aria-label="Primary CRM navigation" className="sticky top-2 z-40 flex flex-nowrap gap-2 overflow-x-auto rounded-2xl border border-slate-300 bg-slate-100/95 p-2 shadow-md backdrop-blur supports-[backdrop-filter]:bg-slate-100/85">
           {tabs
@@ -2687,7 +2792,7 @@ async function handleAnalyzeProspect() {
           </div>
         )}
 
-        
+
 
         {activeTab === "dashboard" && (
           <section className="grid max-w-full gap-6 overflow-hidden">
@@ -2789,7 +2894,7 @@ async function handleAnalyzeProspect() {
             companyProductPathFilter={companyProductPathFilter}
             setCompanyProductPathFilter={setCompanyProductPathFilter}
             companyProductPathOptions={companyProductPathOptions}
-            
+
             companyOwnerFilter={companyOwnerFilter}
             setCompanyOwnerFilter={setCompanyOwnerFilter}
             companyOwnerOptions={companyOwnerOptions}
@@ -2839,11 +2944,19 @@ async function handleAnalyzeProspect() {
             bulkProjectListIds={bulkProjectListIds}
             setBulkProjectListIds={setBulkProjectListIds}
             bulkProjectListOptions={importProjectListOptions}
-            canBulkClassifyCompanies={currentPermissions.canManageAdminSettings}
-            bulkPrimaryIndustry={bulkPrimaryIndustry}
-            setBulkPrimaryIndustry={setBulkPrimaryIndustry}
-            bulkPrimarySubIndustry={bulkPrimarySubIndustry}
-            setBulkPrimarySubIndustry={setBulkPrimarySubIndustry}
+            canBulkClassifyCompanies={canManageIndustryDefinitions}
+            companyGraymillsCategoryDefinitions={companyGraymillsCategoryDefinitions}
+            companyIndustryDefinitions={companyIndustryDefinitions}
+            companySubIndustryDefinitions={companySubIndustryDefinitions}
+            isLoadingCompanyIndustryDefinitions={isLoadingCompanyIndustryDefinitions}
+            companyIndustryDefinitionError={companyIndustryDefinitionError}
+            onReloadCompanyIndustryDefinitions={loadCompanyIndustryDefinitions}
+            bulkGraymillsCategoryId={bulkGraymillsCategoryId}
+            setBulkGraymillsCategoryId={setBulkGraymillsCategoryId}
+            bulkIndustryId={bulkIndustryId}
+            setBulkIndustryId={setBulkIndustryId}
+            bulkSubIndustryId={bulkSubIndustryId}
+            setBulkSubIndustryId={setBulkSubIndustryId}
             isBulkAssigningCompanies={isBulkAssigningCompanies}
             isBulkAssigningProjectsLists={isBulkAssigningProjectsLists}
             isBulkClassifyingCompanies={isBulkClassifyingCompanies}
@@ -2941,6 +3054,16 @@ async function handleAnalyzeProspect() {
               String(signedInProductionUser.role).toLowerCase() === "admin" ||
               String(signedInProductionUser.role).toLowerCase() === "sales_manager"
             }
+            canEditGraymillsClassifications={
+              currentUserRole === "admin" ||
+              currentUserRole === "sales_manager" ||
+              (currentUserRole === "sales_rep" &&
+                String(selectedCompanyDetail?.company?.assigned_salesperson_id || "") ===
+                  String(currentUserId || ""))
+            }
+            graymillsCategoryDefinitions={companyGraymillsCategoryDefinitions}
+            graymillsIndustryDefinitions={companyIndustryDefinitions}
+            graymillsSubIndustryDefinitions={companySubIndustryDefinitions}
             apiPermissionHeaders={apiPermissionHeaders}
             canMoveOpportunityStages={currentPermissions.canMoveOpportunityStages}
             canManageProjectsLists={currentPermissions.canManageAdminSettings}
@@ -3380,7 +3503,7 @@ async function handleAnalyzeProspect() {
         )}
       </div>
     </main>
-  
+
     </LoginRequiredCrmShellGate>);
 }
 
@@ -12310,6 +12433,662 @@ function getCompanyBuyerPersonaLensClass(persona: string) {
   return "bg-slate-50 text-slate-700 ring-slate-200";
 }
 
+
+function ManagedIndustryDefinitionsPanel({
+  categories,
+  industries,
+  subIndustries,
+  onReload,
+}: {
+  categories: CompanyGraymillsCategoryDefinition[];
+  industries: CompanyIndustryDefinition[];
+  subIndustries: CompanySubIndustryDefinition[];
+  onReload: () => Promise<void>;
+}) {
+  const [isSaving, setIsSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [editingIndustryId, setEditingIndustryId] = useState("");
+  const [editingSubIndustryId, setEditingSubIndustryId] = useState("");
+  const [industryForm, setIndustryForm] = useState({
+    categoryId: "",
+    name: "",
+    sortOrder: "100",
+    status: "active" as "active" | "archived",
+  });
+  const [subIndustryForm, setSubIndustryForm] = useState({
+    industryId: "",
+    name: "",
+    sortOrder: "100",
+    status: "active" as "active" | "archived",
+  });
+
+  const sortedCategories = useMemo(() => {
+    return [...categories].sort((a, b) => {
+      const orderDifference = a.sort_order - b.sort_order;
+      return orderDifference !== 0
+        ? orderDifference
+        : a.category_name.localeCompare(b.category_name);
+    });
+  }, [categories]);
+
+  const sortedIndustries = useMemo(() => {
+    return [...industries].sort((a, b) => {
+      const categoryA =
+        categories.find(
+          (category) => category.id === a.graymills_category_id
+        )?.category_name || "Legacy / Unassigned";
+      const categoryB =
+        categories.find(
+          (category) => category.id === b.graymills_category_id
+        )?.category_name || "Legacy / Unassigned";
+
+      const categoryCompare = categoryA.localeCompare(categoryB);
+      if (categoryCompare !== 0) return categoryCompare;
+
+      const orderDifference = a.sort_order - b.sort_order;
+      return orderDifference !== 0
+        ? orderDifference
+        : a.industry_name.localeCompare(b.industry_name);
+    });
+  }, [categories, industries]);
+
+  const sortedSubIndustries = useMemo(() => {
+    return [...subIndustries].sort((a, b) => {
+      const industryA =
+        industries.find((industry) => industry.id === a.industry_id)
+          ?.industry_name || "";
+      const industryB =
+        industries.find((industry) => industry.id === b.industry_id)
+          ?.industry_name || "";
+
+      const parentCompare = industryA.localeCompare(industryB);
+      if (parentCompare !== 0) return parentCompare;
+
+      const orderDifference = a.sort_order - b.sort_order;
+      return orderDifference !== 0
+        ? orderDifference
+        : a.sub_industry_name.localeCompare(b.sub_industry_name);
+    });
+  }, [industries, subIndustries]);
+
+  function resetIndustryForm() {
+    setEditingIndustryId("");
+    setIndustryForm({
+      categoryId: "",
+      name: "",
+      sortOrder: "100",
+      status: "active",
+    });
+  }
+
+  function resetSubIndustryForm() {
+    setEditingSubIndustryId("");
+    setSubIndustryForm({
+      industryId: "",
+      name: "",
+      sortOrder: "100",
+      status: "active",
+    });
+  }
+
+  function editIndustry(definition: CompanyIndustryDefinition) {
+    setEditingIndustryId(definition.id);
+    setIndustryForm({
+      categoryId: definition.graymills_category_id || "",
+      name: definition.industry_name,
+      sortOrder: String(definition.sort_order ?? 100),
+      status:
+        definition.status === "archived" ? "archived" : "active",
+    });
+  }
+
+  function editSubIndustry(definition: CompanySubIndustryDefinition) {
+    setEditingSubIndustryId(definition.id);
+    setSubIndustryForm({
+      industryId: definition.industry_id || "",
+      name: definition.sub_industry_name,
+      sortOrder: String(definition.sort_order ?? 100),
+      status:
+        definition.status === "archived" ? "archived" : "active",
+    });
+  }
+
+  async function request(
+    method: "POST" | "PATCH",
+    body: Record<string, unknown>
+  ) {
+    const response = await fetch("/api/company-industry-definitions", {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        ...(await getVerifiedBearerHeaders()),
+      },
+      body: JSON.stringify(body),
+    });
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.error || "Could not save managed Graymills Industry definition."
+      );
+    }
+
+    return data;
+  }
+
+  async function saveIndustry() {
+    if (!industryForm.categoryId) {
+      setErrorMessage("Graymills Category is required.");
+      return;
+    }
+
+    if (!industryForm.name.trim()) {
+      setErrorMessage("Industry name is required.");
+      return;
+    }
+
+    setIsSaving(true);
+    setMessage("");
+    setErrorMessage("");
+
+    try {
+      await request(editingIndustryId ? "PATCH" : "POST", {
+        action: editingIndustryId
+          ? "updateIndustry"
+          : "createIndustry",
+        id: editingIndustryId || undefined,
+        categoryId: industryForm.categoryId,
+        name: industryForm.name,
+        sortOrder: Number(industryForm.sortOrder || 100),
+        status: industryForm.status,
+      });
+
+      setMessage(
+        editingIndustryId
+          ? "Industry definition updated."
+          : "Industry definition created."
+      );
+      resetIndustryForm();
+      await onReload();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not save Industry definition."
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function saveSubIndustry() {
+    if (!subIndustryForm.industryId) {
+      setErrorMessage("Parent Industry is required.");
+      return;
+    }
+
+    if (!subIndustryForm.name.trim()) {
+      setErrorMessage("Sub-Industry name is required.");
+      return;
+    }
+
+    setIsSaving(true);
+    setMessage("");
+    setErrorMessage("");
+
+    try {
+      await request(editingSubIndustryId ? "PATCH" : "POST", {
+        action: editingSubIndustryId
+          ? "updateSubIndustry"
+          : "createSubIndustry",
+        id: editingSubIndustryId || undefined,
+        industryId: subIndustryForm.industryId,
+        name: subIndustryForm.name,
+        sortOrder: Number(subIndustryForm.sortOrder || 100),
+        status: subIndustryForm.status,
+      });
+
+      setMessage(
+        editingSubIndustryId
+          ? "Sub-Industry definition updated."
+          : "Sub-Industry definition created."
+      );
+      resetSubIndustryForm();
+      await onReload();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not save Sub-Industry definition."
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function setIndustryStatus(
+    definition: CompanyIndustryDefinition,
+    status: "active" | "archived"
+  ) {
+    setIsSaving(true);
+    setMessage("");
+    setErrorMessage("");
+
+    try {
+      await request("PATCH", {
+        action: "updateIndustry",
+        id: definition.id,
+        status,
+      });
+      setMessage(
+        status === "archived"
+          ? "Industry archived. Existing company classifications are preserved."
+          : "Industry restored."
+      );
+      await onReload();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not update Industry status."
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function setSubIndustryStatus(
+    definition: CompanySubIndustryDefinition,
+    status: "active" | "archived"
+  ) {
+    setIsSaving(true);
+    setMessage("");
+    setErrorMessage("");
+
+    try {
+      await request("PATCH", {
+        action: "updateSubIndustry",
+        id: definition.id,
+        status,
+      });
+      setMessage(
+        status === "archived"
+          ? "Sub-Industry archived. Existing company classifications are preserved."
+          : "Sub-Industry restored."
+      );
+      await onReload();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not update Sub-Industry status."
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <details className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+      <summary className="cursor-pointer text-sm font-bold text-emerald-950">
+        Manage Graymills Category / Industry Choices
+      </summary>
+
+      <p className="mt-2 text-xs leading-5 text-emerald-900">
+        Parts Washers, Pumps, Graphics, and Job Shop Fab are the stable Graymills Categories
+        used to route sales classification and future category-specific AI
+        research. Admin and Sales Manager users manage Industries within those
+        Categories and optional Sub-Industries beneath an Industry.
+      </p>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        {sortedCategories.map((category) => (
+          <span
+            key={category.id}
+            className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-emerald-900 ring-1 ring-emerald-200"
+          >
+            {category.category_name}
+          </span>
+        ))}
+      </div>
+
+      {message && (
+        <p className="mt-3 rounded-lg border border-emerald-200 bg-white p-2 text-xs font-semibold text-emerald-800">
+          {message}
+        </p>
+      )}
+
+      {errorMessage && (
+        <p className="mt-3 rounded-lg border border-red-200 bg-red-50 p-2 text-xs font-semibold text-red-800">
+          {errorMessage}
+        </p>
+      )}
+
+      <div className="mt-4 grid gap-5 xl:grid-cols-2">
+        <div className="rounded-xl border border-emerald-200 bg-white p-4">
+          <h4 className="font-bold text-slate-900">
+            {editingIndustryId ? "Edit Industry" : "Add Industry"}
+          </h4>
+
+          <div className="mt-3 grid gap-3">
+            <select
+              value={industryForm.categoryId}
+              disabled={isSaving}
+              onChange={(event) =>
+                setIndustryForm((current) => ({
+                  ...current,
+                  categoryId: event.target.value,
+                }))
+              }
+              className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+            >
+              <option value="">Select Graymills Category</option>
+              {sortedCategories
+                .filter(
+                  (category) =>
+                    category.status === "active" ||
+                    category.id === industryForm.categoryId
+                )
+                .map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.category_name}
+                  </option>
+                ))}
+            </select>
+
+            <div className="grid gap-3 md:grid-cols-[1fr_110px_140px]">
+              <input
+                type="text"
+                value={industryForm.name}
+                disabled={isSaving}
+                onChange={(event) =>
+                  setIndustryForm((current) => ({
+                    ...current,
+                    name: event.target.value,
+                  }))
+                }
+                placeholder="Industry name"
+                className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+              />
+              <input
+                type="number"
+                value={industryForm.sortOrder}
+                disabled={isSaving}
+                onChange={(event) =>
+                  setIndustryForm((current) => ({
+                    ...current,
+                    sortOrder: event.target.value,
+                  }))
+                }
+                className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+              />
+              <select
+                value={industryForm.status}
+                disabled={isSaving}
+                onChange={(event) =>
+                  setIndustryForm((current) => ({
+                    ...current,
+                    status:
+                      event.target.value === "archived"
+                        ? "archived"
+                        : "active",
+                  }))
+                }
+                className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+              >
+                <option value="active">Active</option>
+                <option value="archived">Archived</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={saveIndustry}
+              disabled={isSaving}
+              className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-semibold text-white disabled:bg-slate-300"
+            >
+              {editingIndustryId ? "Save Industry" : "Add Industry"}
+            </button>
+            {editingIndustryId && (
+              <button
+                type="button"
+                onClick={resetIndustryForm}
+                disabled={isSaving}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+
+          <div className="mt-4 max-h-72 space-y-2 overflow-y-auto">
+            {sortedIndustries.map((definition) => {
+              const parentCategory = categories.find(
+                (category) =>
+                  category.id === definition.graymills_category_id
+              );
+
+              return (
+                <div
+                  key={definition.id}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 p-3"
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">
+                      {definition.industry_name}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {parentCategory?.category_name || "Legacy / Unassigned"} ·
+                      {" "}Sort {definition.sort_order} · {definition.status}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => editIndustry(definition)}
+                      disabled={isSaving}
+                      className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setIndustryStatus(
+                          definition,
+                          definition.status === "active"
+                            ? "archived"
+                            : "active"
+                        )
+                      }
+                      disabled={isSaving}
+                      className="rounded-lg border border-amber-200 px-2 py-1 text-xs font-semibold text-amber-800"
+                    >
+                      {definition.status === "active" ? "Archive" : "Restore"}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-emerald-200 bg-white p-4">
+          <h4 className="font-bold text-slate-900">
+            {editingSubIndustryId
+              ? "Edit Optional Sub-Industry"
+              : "Add Optional Sub-Industry"}
+          </h4>
+
+          <div className="mt-3 grid gap-3">
+            <select
+              value={subIndustryForm.industryId}
+              disabled={isSaving || Boolean(editingSubIndustryId)}
+              onChange={(event) =>
+                setSubIndustryForm((current) => ({
+                  ...current,
+                  industryId: event.target.value,
+                }))
+              }
+              className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+            >
+              <option value="">Select parent Industry</option>
+              {sortedIndustries
+                .filter(
+                  (definition) =>
+                    Boolean(definition.graymills_category_id) &&
+                    (definition.status === "active" ||
+                      definition.id === subIndustryForm.industryId)
+                )
+                .map((definition) => {
+                  const parentCategory = categories.find(
+                    (category) =>
+                      category.id === definition.graymills_category_id
+                  );
+
+                  return (
+                    <option key={definition.id} value={definition.id}>
+                      {parentCategory?.category_name || "Unassigned"} —{" "}
+                      {definition.industry_name}
+                    </option>
+                  );
+                })}
+            </select>
+
+            <div className="grid gap-3 md:grid-cols-[1fr_110px_140px]">
+              <input
+                type="text"
+                value={subIndustryForm.name}
+                disabled={isSaving}
+                onChange={(event) =>
+                  setSubIndustryForm((current) => ({
+                    ...current,
+                    name: event.target.value,
+                  }))
+                }
+                placeholder="Sub-Industry name"
+                className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+              />
+              <input
+                type="number"
+                value={subIndustryForm.sortOrder}
+                disabled={isSaving}
+                onChange={(event) =>
+                  setSubIndustryForm((current) => ({
+                    ...current,
+                    sortOrder: event.target.value,
+                  }))
+                }
+                className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+              />
+              <select
+                value={subIndustryForm.status}
+                disabled={isSaving}
+                onChange={(event) =>
+                  setSubIndustryForm((current) => ({
+                    ...current,
+                    status:
+                      event.target.value === "archived"
+                        ? "archived"
+                        : "active",
+                  }))
+                }
+                className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+              >
+                <option value="active">Active</option>
+                <option value="archived">Archived</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={saveSubIndustry}
+              disabled={isSaving}
+              className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-semibold text-white disabled:bg-slate-300"
+            >
+              {editingSubIndustryId
+                ? "Save Sub-Industry"
+                : "Add Sub-Industry"}
+            </button>
+            {editingSubIndustryId && (
+              <button
+                type="button"
+                onClick={resetSubIndustryForm}
+                disabled={isSaving}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+
+          <div className="mt-4 max-h-72 space-y-2 overflow-y-auto">
+            {sortedSubIndustries.map((definition) => {
+              const parentIndustry = industries.find(
+                (industry) => industry.id === definition.industry_id
+              );
+              const parentCategory = categories.find(
+                (category) =>
+                  category.id === parentIndustry?.graymills_category_id
+              );
+
+              return (
+                <div
+                  key={definition.id}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 p-3"
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">
+                      {definition.sub_industry_name}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {parentCategory?.category_name || "Unassigned"} —{" "}
+                      {parentIndustry?.industry_name || "Unassigned"} · Sort{" "}
+                      {definition.sort_order} · {definition.status}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => editSubIndustry(definition)}
+                      disabled={isSaving}
+                      className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSubIndustryStatus(
+                          definition,
+                          definition.status === "active"
+                            ? "archived"
+                            : "active"
+                        )
+                      }
+                      disabled={isSaving}
+                      className="rounded-lg border border-amber-200 px-2 py-1 text-xs font-semibold text-amber-800"
+                    >
+                      {definition.status === "active"
+                        ? "Archive"
+                        : "Restore"}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </details>
+  );
+}
+
 function CompaniesSection({
   companies,
   totalCompanyCount,
@@ -12330,7 +13109,7 @@ function CompaniesSection({
   companyProductPathFilter,
   setCompanyProductPathFilter,
   companyProductPathOptions,
-  
+
   companyOwnerFilter,
   setCompanyOwnerFilter,
   companyOwnerOptions,
@@ -12372,10 +13151,18 @@ function CompaniesSection({
   setBulkProjectListIds = () => {},
   bulkProjectListOptions = [],
   canBulkClassifyCompanies = false,
-  bulkPrimaryIndustry = "",
-  setBulkPrimaryIndustry = () => {},
-  bulkPrimarySubIndustry = "",
-  setBulkPrimarySubIndustry = () => {},
+  companyGraymillsCategoryDefinitions = [],
+  companyIndustryDefinitions = [],
+  companySubIndustryDefinitions = [],
+  isLoadingCompanyIndustryDefinitions = false,
+  companyIndustryDefinitionError = "",
+  onReloadCompanyIndustryDefinitions = async () => {},
+  bulkGraymillsCategoryId = "",
+  setBulkGraymillsCategoryId = () => {},
+  bulkIndustryId = "",
+  setBulkIndustryId = () => {},
+  bulkSubIndustryId = "",
+  setBulkSubIndustryId = () => {},
   isBulkAssigningCompanies = false,
   isBulkAssigningProjectsLists = false,
   isBulkClassifyingCompanies = false,
@@ -12407,7 +13194,7 @@ function CompaniesSection({
   companyProductPathFilter: string;
   setCompanyProductPathFilter: (value: string) => void;
   companyProductPathOptions: string[];
-  
+
   companyOwnerFilter: string;
   setCompanyOwnerFilter: (value: string) => void;
   companyOwnerOptions: CrmUser[];
@@ -12455,10 +13242,18 @@ function CompaniesSection({
   setBulkProjectListIds?: (value: string[]) => void;
   bulkProjectListOptions?: any[];
   canBulkClassifyCompanies?: boolean;
-  bulkPrimaryIndustry?: string;
-  setBulkPrimaryIndustry?: (value: string) => void;
-  bulkPrimarySubIndustry?: string;
-  setBulkPrimarySubIndustry?: (value: string) => void;
+  companyGraymillsCategoryDefinitions?: CompanyGraymillsCategoryDefinition[];
+  companyIndustryDefinitions?: CompanyIndustryDefinition[];
+  companySubIndustryDefinitions?: CompanySubIndustryDefinition[];
+  isLoadingCompanyIndustryDefinitions?: boolean;
+  companyIndustryDefinitionError?: string;
+  onReloadCompanyIndustryDefinitions?: () => Promise<void>;
+  bulkGraymillsCategoryId?: string;
+  setBulkGraymillsCategoryId?: (value: string) => void;
+  bulkIndustryId?: string;
+  setBulkIndustryId?: (value: string) => void;
+  bulkSubIndustryId?: string;
+  setBulkSubIndustryId?: (value: string) => void;
   isBulkAssigningCompanies?: boolean;
   isBulkAssigningProjectsLists?: boolean;
   isBulkClassifyingCompanies?: boolean;
@@ -13134,59 +13929,152 @@ function CompaniesSection({
         </div>
 
         <div className="mt-5 border-t border-blue-200 pt-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-end">
             <div className="flex-1">
               <p className="text-sm font-bold text-blue-950">
-                Bulk Industry Classification
+                Bulk Graymills Classification
               </p>
               <p className="mt-1 text-xs leading-5 text-blue-800">
-                Admin only: update Primary Industry and/or Primary Sub-Industry
-                for the selected companies. Product Path is not changed.
+                Classify selected companies first by Graymills Category, then
+                Industry, with Sub-Industry used only where the additional
+                distinction is useful. A company can have a separate
+                classification in more than one Graymills Category.
               </p>
 
-              <div className="mt-3 grid gap-3 md:grid-cols-2">
+              {isLoadingCompanyIndustryDefinitions && (
+                <p className="mt-2 text-xs font-semibold text-blue-700">
+                  Loading managed Graymills classification choices...
+                </p>
+              )}
+
+              {companyIndustryDefinitionError && (
+                <p className="mt-2 rounded-lg border border-red-200 bg-red-50 p-2 text-xs font-semibold text-red-800">
+                  {companyIndustryDefinitionError}
+                </p>
+              )}
+
+              <div className="mt-3 grid gap-3 lg:grid-cols-3">
                 <div>
                   <label className="text-xs font-bold uppercase tracking-wide text-blue-900">
-                    Primary Industry
+                    Graymills Category
                   </label>
-                  <input
-                    type="text"
-                    list="bulk-primary-industry-options"
-                    value={bulkPrimaryIndustry}
-                    disabled={!canBulkClassifyCompanies || isBulkClassifyingCompanies}
-                    onChange={(event) => setBulkPrimaryIndustry(event.target.value)}
-                    placeholder="Do not change"
+                  <select
+                    value={bulkGraymillsCategoryId}
+                    disabled={
+                      !canBulkClassifyCompanies ||
+                      isBulkClassifyingCompanies ||
+                      isLoadingCompanyIndustryDefinitions
+                    }
+                    onChange={(event) => {
+                      setBulkGraymillsCategoryId(event.target.value);
+                      setBulkIndustryId("");
+                      setBulkSubIndustryId("");
+                    }}
                     className="mt-2 w-full rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100"
-                  />
-                  <datalist id="bulk-primary-industry-options">
-                    {companyPrimaryIndustryOptions
-                      .filter((option) => option !== "All")
-                      .map((option) => (
-                        <option key={`bulk-primary-industry-${option}`} value={option} />
+                  >
+                    <option value="">Select Category</option>
+                    {companyGraymillsCategoryDefinitions
+                      .filter((definition) => definition.status === "active")
+                      .sort((a, b) => {
+                        const orderDifference = a.sort_order - b.sort_order;
+                        return orderDifference !== 0
+                          ? orderDifference
+                          : a.category_name.localeCompare(b.category_name);
+                      })
+                      .map((definition) => (
+                        <option key={definition.id} value={definition.id}>
+                          {definition.category_name}
+                        </option>
                       ))}
-                  </datalist>
+                  </select>
                 </div>
 
                 <div>
                   <label className="text-xs font-bold uppercase tracking-wide text-blue-900">
-                    Primary Sub-Industry
+                    Industry
                   </label>
-                  <input
-                    type="text"
-                    list="bulk-primary-sub-industry-options"
-                    value={bulkPrimarySubIndustry}
-                    disabled={!canBulkClassifyCompanies || isBulkClassifyingCompanies}
-                    onChange={(event) => setBulkPrimarySubIndustry(event.target.value)}
-                    placeholder="Do not change"
+                  <select
+                    value={bulkIndustryId}
+                    disabled={
+                      !canBulkClassifyCompanies ||
+                      isBulkClassifyingCompanies ||
+                      isLoadingCompanyIndustryDefinitions ||
+                      !bulkGraymillsCategoryId
+                    }
+                    onChange={(event) => {
+                      setBulkIndustryId(event.target.value);
+                      setBulkSubIndustryId("");
+                    }}
                     className="mt-2 w-full rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100"
-                  />
-                  <datalist id="bulk-primary-sub-industry-options">
-                    {companyPrimarySubIndustryOptions
-                      .filter((option) => option !== "All")
-                      .map((option) => (
-                        <option key={`bulk-primary-sub-industry-${option}`} value={option} />
+                  >
+                    <option value="">
+                      {bulkGraymillsCategoryId
+                        ? "No Industry / category only"
+                        : "Select Category first"}
+                    </option>
+                    {companyIndustryDefinitions
+                      .filter((definition) => definition.status === "active")
+                      .filter(
+                        (definition) =>
+                          definition.graymills_category_id ===
+                          bulkGraymillsCategoryId
+                      )
+                      .sort((a, b) => {
+                        const orderDifference = a.sort_order - b.sort_order;
+                        return orderDifference !== 0
+                          ? orderDifference
+                          : a.industry_name.localeCompare(b.industry_name);
+                      })
+                      .map((definition) => (
+                        <option key={definition.id} value={definition.id}>
+                          {definition.industry_name}
+                        </option>
                       ))}
-                  </datalist>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wide text-blue-900">
+                    Sub-Industry (optional)
+                  </label>
+                  <select
+                    value={bulkSubIndustryId}
+                    disabled={
+                      !canBulkClassifyCompanies ||
+                      isBulkClassifyingCompanies ||
+                      isLoadingCompanyIndustryDefinitions ||
+                      !bulkIndustryId
+                    }
+                    onChange={(event) =>
+                      setBulkSubIndustryId(event.target.value)
+                    }
+                    className="mt-2 w-full rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+                  >
+                    <option value="">
+                      {bulkIndustryId
+                        ? "No Sub-Industry"
+                        : "Select Industry first"}
+                    </option>
+                    {companySubIndustryDefinitions
+                      .filter((definition) => definition.status === "active")
+                      .filter(
+                        (definition) =>
+                          definition.industry_id === bulkIndustryId
+                      )
+                      .sort((a, b) => {
+                        const orderDifference = a.sort_order - b.sort_order;
+                        return orderDifference !== 0
+                          ? orderDifference
+                          : a.sub_industry_name.localeCompare(
+                              b.sub_industry_name
+                            );
+                      })
+                      .map((definition) => (
+                        <option key={definition.id} value={definition.id}>
+                          {definition.sub_industry_name}
+                        </option>
+                      ))}
+                  </select>
                 </div>
               </div>
             </div>
@@ -13198,19 +14086,20 @@ function CompaniesSection({
                 !canBulkClassifyCompanies ||
                 isBulkClassifyingCompanies ||
                 selectedCompanyIds.length === 0 ||
-                (!bulkPrimaryIndustry.trim() && !bulkPrimarySubIndustry.trim())
+                !bulkGraymillsCategoryId
               }
               className="rounded-xl bg-emerald-700 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-300"
             >
               {isBulkClassifyingCompanies
                 ? "Updating..."
-                : "Apply Industry Classification"}
+                : "Apply Graymills Classification"}
             </button>
           </div>
 
           {!canBulkClassifyCompanies && (
             <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs font-semibold text-amber-800">
-              Industry classification changes are available to CRM Admin users only.
+              Graymills classification changes are available to CRM Admin and
+              Sales Manager users only.
             </p>
           )}
 
@@ -13218,6 +14107,15 @@ function CompaniesSection({
             <p className="mt-3 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-emerald-900 ring-1 ring-emerald-100">
               {bulkIndustryClassificationMessage}
             </p>
+          )}
+
+          {canBulkClassifyCompanies && (
+            <ManagedIndustryDefinitionsPanel
+              categories={companyGraymillsCategoryDefinitions}
+              industries={companyIndustryDefinitions}
+              subIndustries={companySubIndustryDefinitions}
+              onReload={onReloadCompanyIndustryDefinitions}
+            />
           )}
         </div>
       </div>
@@ -13691,6 +14589,10 @@ function CompanyDetailSection({
   salesCoverageCanEdit = true,
   canMoveOpportunityStages = true,
   canManageProjectsLists = false,
+  canEditGraymillsClassifications = false,
+  graymillsCategoryDefinitions = [],
+  graymillsIndustryDefinitions = [],
+  graymillsSubIndustryDefinitions = [],
   apiPermissionHeaders = () => ({}),
 }: {
   detail: CompanyDetail | null;
@@ -13710,6 +14612,10 @@ function CompanyDetailSection({
   salesCoverageCanEdit?: boolean;
   canMoveOpportunityStages?: boolean;
   canManageProjectsLists?: boolean;
+  canEditGraymillsClassifications?: boolean;
+  graymillsCategoryDefinitions?: CompanyGraymillsCategoryDefinition[];
+  graymillsIndustryDefinitions?: CompanyIndustryDefinition[];
+  graymillsSubIndustryDefinitions?: CompanySubIndustryDefinition[];
   apiPermissionHeaders?: any;
 }) {
   const [companyActivityHistoryFilter, setCompanyActivityHistoryFilter] = useState<
@@ -13733,6 +14639,17 @@ function CompanyDetailSection({
   });
   const [companyDetailBuyerPersonaDefinitions, setCompanyDetailBuyerPersonaDefinitions] = useState<any[]>([]);
   const [companyDetailBuyerPersonaDefinitionError, setCompanyDetailBuyerPersonaDefinitionError] = useState("");
+  const [companyDetailGraymillsClassifications, setCompanyDetailGraymillsClassifications] = useState<CompanyGraymillsClassificationDisplay[]>([]);
+  const [isLoadingCompanyDetailGraymillsClassifications, setIsLoadingCompanyDetailGraymillsClassifications] = useState(false);
+  const [companyDetailGraymillsClassificationError, setCompanyDetailGraymillsClassificationError] = useState("");
+  const [showGraymillsClassificationEditor, setShowGraymillsClassificationEditor] = useState(false);
+  const [graymillsClassificationEditingId, setGraymillsClassificationEditingId] = useState("");
+  const [graymillsClassificationCategoryId, setGraymillsClassificationCategoryId] = useState("");
+  const [graymillsClassificationIndustryId, setGraymillsClassificationIndustryId] = useState("");
+  const [graymillsClassificationSubIndustryId, setGraymillsClassificationSubIndustryId] = useState("");
+  const [isSavingGraymillsClassification, setIsSavingGraymillsClassification] = useState(false);
+  const [graymillsClassificationEditMessage, setGraymillsClassificationEditMessage] = useState("");
+  const [graymillsClassificationEditError, setGraymillsClassificationEditError] = useState("");
   const [showAiAnalysisHistory, setShowAiAnalysisHistory] = useState(false);
   const [unifiedTimeline, setUnifiedTimeline] = useState<any[]>([]);
   const [isLoadingUnifiedTimeline, setIsLoadingUnifiedTimeline] = useState(false);
@@ -14086,6 +15003,237 @@ function CompanyDetailSection({
       ...current,
       [activityId]: !current[activityId],
     }));
+  }
+
+  async function loadCompanyDetailGraymillsClassifications() {
+    const companyId = String(detail?.company?.id || "").trim();
+
+    if (!companyId) {
+      setCompanyDetailGraymillsClassifications([]);
+      setCompanyDetailGraymillsClassificationError("");
+      setIsLoadingCompanyDetailGraymillsClassifications(false);
+      return;
+    }
+
+    setIsLoadingCompanyDetailGraymillsClassifications(true);
+    setCompanyDetailGraymillsClassificationError("");
+
+    try {
+      const response = await fetch(
+        `/api/company-industry-classification?companyId=${encodeURIComponent(
+          companyId
+        )}`,
+        {
+          headers: await getVerifiedBearerHeaders(),
+        }
+      );
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            "Could not load saved Graymills classifications."
+        );
+      }
+
+      setCompanyDetailGraymillsClassifications(
+        Array.isArray(data.graymillsClassifications)
+          ? data.graymillsClassifications
+          : []
+      );
+    } catch (error) {
+      setCompanyDetailGraymillsClassifications([]);
+      setCompanyDetailGraymillsClassificationError(
+        error instanceof Error
+          ? error.message
+          : "Could not load saved Graymills classifications."
+      );
+    } finally {
+      setIsLoadingCompanyDetailGraymillsClassifications(false);
+    }
+  }
+
+  useEffect(() => {
+    loadCompanyDetailGraymillsClassifications();
+    setShowGraymillsClassificationEditor(false);
+    setGraymillsClassificationEditingId("");
+    setGraymillsClassificationCategoryId("");
+    setGraymillsClassificationIndustryId("");
+    setGraymillsClassificationSubIndustryId("");
+    setGraymillsClassificationEditMessage("");
+    setGraymillsClassificationEditError("");
+  }, [detail?.company?.id]);
+
+  function beginAddGraymillsClassification() {
+    setShowGraymillsClassificationEditor(true);
+    setGraymillsClassificationEditingId("");
+    setGraymillsClassificationCategoryId("");
+    setGraymillsClassificationIndustryId("");
+    setGraymillsClassificationSubIndustryId("");
+    setGraymillsClassificationEditMessage("");
+    setGraymillsClassificationEditError("");
+  }
+
+  function beginEditGraymillsClassification(
+    classification: CompanyGraymillsClassificationDisplay
+  ) {
+    setShowGraymillsClassificationEditor(true);
+    setGraymillsClassificationEditingId(classification.id);
+    setGraymillsClassificationCategoryId(classification.categoryId);
+    setGraymillsClassificationIndustryId(
+      classification.industryId || ""
+    );
+    setGraymillsClassificationSubIndustryId(
+      classification.subIndustryId || ""
+    );
+    setGraymillsClassificationEditMessage("");
+    setGraymillsClassificationEditError("");
+  }
+
+  function cancelGraymillsClassificationEdit() {
+    setShowGraymillsClassificationEditor(false);
+    setGraymillsClassificationEditingId("");
+    setGraymillsClassificationCategoryId("");
+    setGraymillsClassificationIndustryId("");
+    setGraymillsClassificationSubIndustryId("");
+    setGraymillsClassificationEditMessage("");
+    setGraymillsClassificationEditError("");
+  }
+
+  async function saveCompanyDetailGraymillsClassification() {
+    const companyId = String(detail?.company?.id || "").trim();
+    const categoryId = graymillsClassificationCategoryId.trim();
+    const industryId = graymillsClassificationIndustryId.trim();
+    const subIndustryId =
+      graymillsClassificationSubIndustryId.trim();
+
+    if (!canEditGraymillsClassifications || !companyId) return;
+
+    if (!categoryId) {
+      setGraymillsClassificationEditError(
+        "Select a Graymills Category."
+      );
+      return;
+    }
+
+    setIsSavingGraymillsClassification(true);
+    setGraymillsClassificationEditMessage("");
+    setGraymillsClassificationEditError("");
+
+    try {
+      const payload: Record<string, unknown> = {
+        companyIds: [companyId],
+        categoryId,
+      };
+
+      if (graymillsClassificationEditingId) {
+        payload.classificationId = graymillsClassificationEditingId;
+      }
+
+      if (industryId) payload.industryId = industryId;
+      if (subIndustryId) payload.subIndustryId = subIndustryId;
+
+      const response = await fetch(
+        "/api/company-industry-classification",
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            ...(await getVerifiedBearerHeaders()),
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Could not save Graymills classification."
+        );
+      }
+
+      await loadCompanyDetailGraymillsClassifications();
+      setGraymillsClassificationEditMessage(
+        "Graymills classification saved."
+      );
+      setShowGraymillsClassificationEditor(false);
+      setGraymillsClassificationEditingId("");
+      setGraymillsClassificationCategoryId("");
+      setGraymillsClassificationIndustryId("");
+      setGraymillsClassificationSubIndustryId("");
+    } catch (error) {
+      setGraymillsClassificationEditError(
+        error instanceof Error
+          ? error.message
+          : "Could not save Graymills classification."
+      );
+    } finally {
+      setIsSavingGraymillsClassification(false);
+    }
+  }
+
+  async function removeCompanyDetailGraymillsClassification(
+    classification: CompanyGraymillsClassificationDisplay
+  ) {
+    const companyId = String(detail?.company?.id || "").trim();
+
+    if (!canEditGraymillsClassifications || !companyId) return;
+
+    const confirmed =
+      typeof window === "undefined" ||
+      window.confirm(
+        `Remove the ${classification.categoryName} classification from this company?`
+      );
+
+    if (!confirmed) return;
+
+    setIsSavingGraymillsClassification(true);
+    setGraymillsClassificationEditMessage("");
+    setGraymillsClassificationEditError("");
+
+    try {
+      const response = await fetch(
+        "/api/company-industry-classification",
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            ...(await getVerifiedBearerHeaders()),
+          },
+          body: JSON.stringify({
+            companyIds: [companyId],
+            categoryId: classification.categoryId,
+            removeCategory: true,
+          }),
+        }
+      );
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Could not remove Graymills classification."
+        );
+      }
+
+      await loadCompanyDetailGraymillsClassifications();
+      setGraymillsClassificationEditMessage(
+        `${classification.categoryName} classification removed.`
+      );
+
+      if (
+        graymillsClassificationEditingId === classification.id
+      ) {
+        cancelGraymillsClassificationEdit();
+      }
+    } catch (error) {
+      setGraymillsClassificationEditError(
+        error instanceof Error
+          ? error.message
+          : "Could not remove Graymills classification."
+      );
+    } finally {
+      setIsSavingGraymillsClassification(false);
+    }
   }
 
   useEffect(() => {
@@ -14995,8 +16143,317 @@ function CompanyDetailSection({
         <DetailCard title="Sales Action Snapshot">
           <DetailRow label="Account Type" value={detailAccountTypeLens} />
           <DetailRow label="Sales Coverage" value={detailSalesCoverageStatus} />
-          <DetailRow label="Primary Industry" value={company.primary_industry} />
-          <DetailRow label="Primary Sub-Industry" value={company.primary_sub_industry} />
+          <div className="border-b border-slate-100 py-2 text-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="font-semibold text-slate-700">
+                Saved Graymills Classifications
+              </p>
+
+              {canEditGraymillsClassifications && (
+                <button
+                  type="button"
+                  onClick={beginAddGraymillsClassification}
+                  disabled={
+                    isSavingGraymillsClassification ||
+                    graymillsCategoryDefinitions
+                      .filter((category) => category.status === "active")
+                      .every((category) =>
+                        companyDetailGraymillsClassifications.some(
+                          (classification) =>
+                            classification.categoryId === category.id
+                        )
+                      )
+                  }
+                  className="rounded-lg bg-emerald-700 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                >
+                  Add Graymills Classification
+                </button>
+              )}
+            </div>
+
+            {isLoadingCompanyDetailGraymillsClassifications && (
+              <p className="mt-2 text-xs font-semibold text-slate-500">
+                Loading Graymills classifications...
+              </p>
+            )}
+
+            {companyDetailGraymillsClassificationError && (
+              <p className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold leading-5 text-red-800">
+                {companyDetailGraymillsClassificationError}
+              </p>
+            )}
+
+            {graymillsClassificationEditMessage && (
+              <p className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold leading-5 text-emerald-800">
+                {graymillsClassificationEditMessage}
+              </p>
+            )}
+
+            {graymillsClassificationEditError && (
+              <p className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold leading-5 text-red-800">
+                {graymillsClassificationEditError}
+              </p>
+            )}
+
+            {!isLoadingCompanyDetailGraymillsClassifications &&
+              !companyDetailGraymillsClassificationError &&
+              companyDetailGraymillsClassifications.length === 0 && (
+                <p className="mt-2 text-slate-500">
+                  No Graymills Category classification saved.
+                </p>
+              )}
+
+            <div className="mt-3 grid gap-2">
+              {companyDetailGraymillsClassifications.map(
+                (classification) => {
+                  const path = [
+                    classification.categoryName,
+                    classification.industryName,
+                    classification.subIndustryName,
+                  ]
+                    .filter(Boolean)
+                    .join(" → ");
+
+                  const hasArchivedValue =
+                    classification.categoryStatus === "archived" ||
+                    classification.industryStatus === "archived" ||
+                    classification.subIndustryStatus === "archived";
+
+                  return (
+                    <div
+                      key={classification.id}
+                      className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-full bg-emerald-700 px-2.5 py-1 text-xs font-bold text-white">
+                              {classification.categoryName}
+                            </span>
+
+                            {hasArchivedValue && (
+                              <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-800 ring-1 ring-amber-200">
+                                Includes archived choice
+                              </span>
+                            )}
+                          </div>
+
+                          <p className="mt-2 font-semibold text-emerald-950">
+                            {path}
+                          </p>
+                        </div>
+
+                        {canEditGraymillsClassifications && (
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                beginEditGraymillsClassification(
+                                  classification
+                                )
+                              }
+                              disabled={isSavingGraymillsClassification}
+                              className="rounded-lg border border-emerald-300 bg-white px-2.5 py-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              Edit
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                removeCompanyDetailGraymillsClassification(
+                                  classification
+                                )
+                              }
+                              disabled={isSavingGraymillsClassification}
+                              className="rounded-lg border border-red-200 bg-white px-2.5 py-1.5 text-xs font-bold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+              )}
+            </div>
+
+            {showGraymillsClassificationEditor &&
+              canEditGraymillsClassifications && (
+                <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="font-bold text-slate-800">
+                    {graymillsClassificationEditingId
+                      ? "Edit Graymills Classification"
+                      : "Add Graymills Classification"}
+                  </p>
+
+                  <div className="mt-3 grid gap-3">
+                    <div>
+                      <label className="text-xs font-bold uppercase tracking-wide text-slate-600">
+                        Graymills Category
+                      </label>
+                      <select
+                        value={graymillsClassificationCategoryId}
+                        disabled={isSavingGraymillsClassification}
+                        onChange={(event) => {
+                          setGraymillsClassificationCategoryId(
+                            event.target.value
+                          );
+                          setGraymillsClassificationIndustryId("");
+                          setGraymillsClassificationSubIndustryId("");
+                        }}
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-100"
+                      >
+                        <option value="">Select Category</option>
+                        {graymillsCategoryDefinitions
+                          .filter(
+                            (category) =>
+                              category.status === "active" &&
+                              !companyDetailGraymillsClassifications.some(
+                                (classification) =>
+                                  classification.categoryId === category.id &&
+                                  classification.id !==
+                                    graymillsClassificationEditingId
+                              )
+                          )
+                          .sort((a, b) => {
+                            const orderDifference =
+                              a.sort_order - b.sort_order;
+                            return orderDifference !== 0
+                              ? orderDifference
+                              : a.category_name.localeCompare(
+                                  b.category_name
+                                );
+                          })
+                          .map((category) => (
+                            <option key={category.id} value={category.id}>
+                              {category.category_name}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold uppercase tracking-wide text-slate-600">
+                        Industry
+                      </label>
+                      <select
+                        value={graymillsClassificationIndustryId}
+                        disabled={
+                          isSavingGraymillsClassification ||
+                          !graymillsClassificationCategoryId
+                        }
+                        onChange={(event) => {
+                          setGraymillsClassificationIndustryId(
+                            event.target.value
+                          );
+                          setGraymillsClassificationSubIndustryId("");
+                        }}
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-100"
+                      >
+                        <option value="">
+                          No Industry / category only
+                        </option>
+                        {graymillsIndustryDefinitions
+                          .filter(
+                            (industry) =>
+                              industry.status === "active" &&
+                              industry.graymills_category_id ===
+                                graymillsClassificationCategoryId
+                          )
+                          .sort((a, b) => {
+                            const orderDifference =
+                              a.sort_order - b.sort_order;
+                            return orderDifference !== 0
+                              ? orderDifference
+                              : a.industry_name.localeCompare(
+                                  b.industry_name
+                                );
+                          })
+                          .map((industry) => (
+                            <option key={industry.id} value={industry.id}>
+                              {industry.industry_name}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold uppercase tracking-wide text-slate-600">
+                        Sub-Industry
+                      </label>
+                      <select
+                        value={graymillsClassificationSubIndustryId}
+                        disabled={
+                          isSavingGraymillsClassification ||
+                          !graymillsClassificationIndustryId
+                        }
+                        onChange={(event) =>
+                          setGraymillsClassificationSubIndustryId(
+                            event.target.value
+                          )
+                        }
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-100"
+                      >
+                        <option value="">No Sub-Industry</option>
+                        {graymillsSubIndustryDefinitions
+                          .filter(
+                            (subIndustry) =>
+                              subIndustry.status === "active" &&
+                              subIndustry.industry_id ===
+                                graymillsClassificationIndustryId
+                          )
+                          .sort((a, b) => {
+                            const orderDifference =
+                              a.sort_order - b.sort_order;
+                            return orderDifference !== 0
+                              ? orderDifference
+                              : a.sub_industry_name.localeCompare(
+                                  b.sub_industry_name
+                                );
+                          })
+                          .map((subIndustry) => (
+                            <option
+                              key={subIndustry.id}
+                              value={subIndustry.id}
+                            >
+                              {subIndustry.sub_industry_name}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={
+                        saveCompanyDetailGraymillsClassification
+                      }
+                      disabled={
+                        isSavingGraymillsClassification ||
+                        !graymillsClassificationCategoryId
+                      }
+                      className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                    >
+                      {isSavingGraymillsClassification
+                        ? "Saving..."
+                        : "Save Classification"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={cancelGraymillsClassificationEdit}
+                      disabled={isSavingGraymillsClassification}
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+          </div>
 
           <div className="border-b border-slate-100 py-2 text-sm">
             <p className="font-semibold text-slate-700">Buyer Personas</p>
@@ -15741,7 +17198,7 @@ function CompanyDetailSection({
           </div>
         </div>
 
-        
+
         <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600" aria-label="Activity history result summary">
           <span className="font-semibold text-slate-900">
             Showing {sortedCompanyActivities.length} of {companyActivities.length} activities
