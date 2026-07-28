@@ -1,7 +1,6 @@
 ﻿import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
-import { enforceApiPermission } from "../_shared/permissions";
-import { verifySignedInAdmin } from "../_shared/verified-auth";
+import { verifySignedInCrmUser } from "../_shared/verified-auth";
 
 type ImportPayload = {
   fileName: string;
@@ -15,6 +14,7 @@ type ImportPayload = {
 
 type CompanyInsert = {
   company_name: string;
+  graymills_customer_number: string | null;
   website: string | null;
   domain: string | null;
   industry: string | null;
@@ -635,7 +635,75 @@ async function updateCompanyIndustryEnrichment(
 
   return changed;
 }
+function normalizeGraymillsCustomerNumber(value: unknown) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function escapePostgrestLikePattern(value: string) {
+  return value.replace(/[\\%_]/g, "\\$&");
+}
+async function applyImportedGraymillsCustomerNumber(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  company: any,
+  incomingCustomerNumber: string | null
+) {
+  const incomingCleaned = String(incomingCustomerNumber || "").trim();
+
+  if (!incomingCleaned) {
+    return company;
+  }
+
+  const existingCustomerNumber = String(
+    company?.graymills_customer_number || ""
+  ).trim();
+
+  if (existingCustomerNumber) {
+    if (
+      normalizeGraymillsCustomerNumber(existingCustomerNumber) !==
+      normalizeGraymillsCustomerNumber(incomingCleaned)
+    ) {
+      throw new Error(
+        `Graymills Customer Number conflict for ${
+          company?.company_name || company?.id || "matched company"
+        }: CRM has "${existingCustomerNumber}" but the import supplied "${incomingCleaned}".`
+      );
+    }
+
+    return company;
+  }
+
+  const { data, error } = await supabase
+    .from("companies")
+    .update({
+      graymills_customer_number: incomingCleaned,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", company.id)
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
 async function findOrCreateCompany(supabase: ReturnType<typeof getSupabaseAdmin>, company: CompanyInsert) {
+  if (company.graymills_customer_number) {
+    const { data: existingByCustomerNumber, error } = await supabase
+      .from("companies")
+      .select("*")
+      .ilike(
+        "graymills_customer_number",
+        escapePostgrestLikePattern(
+          String(company.graymills_customer_number).trim()
+        )
+      )
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (existingByCustomerNumber) return existingByCustomerNumber;
+  }
+
   if (company.domain) {
     const { data: existingByDomain, error } = await supabase
       .from("companies")
@@ -645,7 +713,13 @@ async function findOrCreateCompany(supabase: ReturnType<typeof getSupabaseAdmin>
       .maybeSingle();
 
     if (error) throw error;
-    if (existingByDomain) return existingByDomain;
+    if (existingByDomain) {
+      return applyImportedGraymillsCustomerNumber(
+        supabase,
+        existingByDomain,
+        company.graymills_customer_number
+      );
+    }
   }
 
   if (company.state) {
@@ -658,7 +732,13 @@ async function findOrCreateCompany(supabase: ReturnType<typeof getSupabaseAdmin>
       .maybeSingle();
 
     if (error) throw error;
-    if (existingByNameState) return existingByNameState;
+    if (existingByNameState) {
+      return applyImportedGraymillsCustomerNumber(
+        supabase,
+        existingByNameState,
+        company.graymills_customer_number
+      );
+    }
   }
 
   const { data: insertedCompany, error: insertError } = await supabase
@@ -767,21 +847,35 @@ function collectSelectedImportTagIds(payload: any) {
 
 export async function POST(request: Request) {
   try {
-    const permission = enforceApiPermission(request, "import_csv");
-    if (permission.response) return permission.response;
+    const verification = await verifySignedInCrmUser(request);
 
-const payload = (await request.json()) as ImportPayload;
+    if (verification.response) {
+      return verification.response;
+    }
+
+    const verifiedRole = verification.context.crmRole;
+
+    if (verifiedRole !== "admin" && verifiedRole !== "sales_manager") {
+      return NextResponse.json(
+        { error: "Your current CRM role cannot import CSV files." },
+        { status: 403 }
+      );
+    }
+
+    const payload = (await request.json()) as ImportPayload;
     const selectedImportTagIds = collectSelectedImportTagIds(payload);
     const selectedProjectListIds = normalizeProjectListIds(
       payload.selectedProjectListIds
     );
 
-    if (selectedProjectListIds.length > 0) {
-      const verification = await verifySignedInAdmin(request);
-
-      if (verification.response) {
-        return verification.response;
-      }
+    if (selectedProjectListIds.length > 0 && verifiedRole !== "admin") {
+      return NextResponse.json(
+        {
+          error:
+            "Only CRM Admin users can assign Projects / Lists during import.",
+        },
+        { status: 403 }
+      );
     }
 
     if (!payload.fileName || !Array.isArray(payload.rows) || payload.rows.length === 0) {
@@ -830,6 +924,11 @@ const payload = (await request.json()) as ImportPayload;
         const fullName = combineName(firstName, lastName, mappedFullName);
 
         const companyName = getMappedValue(row, payload.mapping, "Company Name");
+        const graymillsCustomerNumber = getMappedValue(
+          row,
+          payload.mapping,
+          "Graymills Customer Number"
+        );
         const website = getMappedValue(row, payload.mapping, "Website");
         const domain = normalizeDomain(website);
         const industry = getMappedValue(row, payload.mapping, "Industry");
@@ -884,6 +983,7 @@ const payload = (await request.json()) as ImportPayload;
 
         const companyBeforeInsert = {
           company_name: companyName,
+          graymills_customer_number: graymillsCustomerNumber,
           website,
           domain,
           industry,

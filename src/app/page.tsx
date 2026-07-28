@@ -107,9 +107,9 @@ type ManualContactForm = {
   isPrimary: boolean;
 };
 
-const APP_VERSION = "Version 3.22.1 - Graymills Category / Industry Classification";
+const APP_VERSION = "Version 3.23 - Graymills Customer Number";
 const REVISION_NOTE =
-  "Adds managed Graymills Category, Industry, and optional Sub-Industry classifications, supports multiple category paths per company, and enables secure Company Detail editing for Admins, Sales Managers, and assigned Sales Reps.";
+  "Adds a leading-zero-safe Graymills Customer Number to Company Detail, company search and listings, CRM summaries, and CSV imports, with verified role-based editing and strongest-match import reuse.";
 
 type SignedInSessionStatus = {
   state: "checking" | "not_configured" | "signed_out" | "signed_in" | "error";
@@ -152,6 +152,20 @@ const CRM_FIELDS = [
     field: "Company Name",
     required: true,
     aliases: ["company name", "company", "account name", "account"],
+  },
+  {
+    field: "Graymills Customer Number",
+    required: false,
+    aliases: [
+      "graymills customer number",
+      "graymills customer no",
+      "graymills customer #",
+      "customer number",
+      "customer no",
+      "customer #",
+      "erp customer number",
+      "m2m customer number",
+    ],
   },
   {
     field: "Website",
@@ -1342,6 +1356,7 @@ export default function Home() {
 
       const searchableText = [
         company.company_name,
+        company.graymills_customer_number,
         company.domain,
         company.website,
         company.industry,
@@ -1860,31 +1875,27 @@ async function loadCompanyOwnerFilterData() {
     }
 
     try {
-      let importAuthorizationHeader: Record<string, string> = {};
+      const supabase = getBrowserSupabaseClient();
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
 
-      if (importSelectedProjectListIds.length > 0) {
-        const supabase = getBrowserSupabaseClient();
-        const { data: sessionData, error: sessionError } =
-          await supabase.auth.getSession();
-
-        if (sessionError) {
-          throw new Error(
-            sessionError.message || "Could not read the signed-in session."
-          );
-        }
-
-        const accessToken = sessionData.session?.access_token;
-
-        if (!accessToken) {
-          throw new Error(
-            "A signed-in Admin session is required for import Project / List assignment."
-          );
-        }
-
-        importAuthorizationHeader = {
-          Authorization: `Bearer ${accessToken}`,
-        };
+      if (sessionError) {
+        throw new Error(
+          sessionError.message || "Could not read the signed-in session."
+        );
       }
+
+      const accessToken = sessionData.session?.access_token;
+
+      if (!accessToken) {
+        throw new Error(
+          "A signed-in Admin or Sales Manager session is required for CRM import."
+        );
+      }
+
+      const importAuthorizationHeader: Record<string, string> = {
+        Authorization: `Bearer ${accessToken}`,
+      };
 
       const response = await fetch("/api/import-zoominfo", {
         method: "POST",
@@ -3055,6 +3066,13 @@ async function handleAnalyzeProspect() {
               String(signedInProductionUser.role).toLowerCase() === "sales_manager"
             }
             canEditGraymillsClassifications={
+              currentUserRole === "admin" ||
+              currentUserRole === "sales_manager" ||
+              (currentUserRole === "sales_rep" &&
+                String(selectedCompanyDetail?.company?.assigned_salesperson_id || "") ===
+                  String(currentUserId || ""))
+            }
+            canEditGraymillsCustomerNumber={
               currentUserRole === "admin" ||
               currentUserRole === "sales_manager" ||
               (currentUserRole === "sales_rep" &&
@@ -14184,6 +14202,11 @@ function CompaniesSection({
                       <p className="text-xs text-slate-500">
                         {company.domain || company.website || "No website"}
                       </p>
+                      {company.graymills_customer_number && (
+                        <p className="mt-1 text-xs font-semibold text-emerald-700">
+                          Graymills Customer #{company.graymills_customer_number}
+                        </p>
+                      )}
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         {companyMissingSalespersonCoverage && (
                           <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800">
@@ -14590,6 +14613,7 @@ function CompanyDetailSection({
   canMoveOpportunityStages = true,
   canManageProjectsLists = false,
   canEditGraymillsClassifications = false,
+  canEditGraymillsCustomerNumber = false,
   graymillsCategoryDefinitions = [],
   graymillsIndustryDefinitions = [],
   graymillsSubIndustryDefinitions = [],
@@ -14613,6 +14637,7 @@ function CompanyDetailSection({
   canMoveOpportunityStages?: boolean;
   canManageProjectsLists?: boolean;
   canEditGraymillsClassifications?: boolean;
+  canEditGraymillsCustomerNumber?: boolean;
   graymillsCategoryDefinitions?: CompanyGraymillsCategoryDefinition[];
   graymillsIndustryDefinitions?: CompanyIndustryDefinition[];
   graymillsSubIndustryDefinitions?: CompanySubIndustryDefinition[];
@@ -14650,6 +14675,10 @@ function CompanyDetailSection({
   const [isSavingGraymillsClassification, setIsSavingGraymillsClassification] = useState(false);
   const [graymillsClassificationEditMessage, setGraymillsClassificationEditMessage] = useState("");
   const [graymillsClassificationEditError, setGraymillsClassificationEditError] = useState("");
+  const [graymillsCustomerNumberDraft, setGraymillsCustomerNumberDraft] = useState("");
+  const [isSavingGraymillsCustomerNumber, setIsSavingGraymillsCustomerNumber] = useState(false);
+  const [graymillsCustomerNumberMessage, setGraymillsCustomerNumberMessage] = useState("");
+  const [graymillsCustomerNumberError, setGraymillsCustomerNumberError] = useState("");
   const [showAiAnalysisHistory, setShowAiAnalysisHistory] = useState(false);
   const [unifiedTimeline, setUnifiedTimeline] = useState<any[]>([]);
   const [isLoadingUnifiedTimeline, setIsLoadingUnifiedTimeline] = useState(false);
@@ -15233,6 +15262,69 @@ function CompanyDetailSection({
       );
     } finally {
       setIsSavingGraymillsClassification(false);
+    }
+  }
+
+  useEffect(() => {
+    setGraymillsCustomerNumberDraft(
+      String(detail?.company?.graymills_customer_number || "")
+    );
+    setGraymillsCustomerNumberMessage("");
+    setGraymillsCustomerNumberError("");
+  }, [
+    detail?.company?.id,
+    detail?.company?.graymills_customer_number,
+  ]);
+
+  async function saveGraymillsCustomerNumber() {
+    const companyId = String(detail?.company?.id || "").trim();
+
+    if (!canEditGraymillsCustomerNumber || !companyId) return;
+
+    setIsSavingGraymillsCustomerNumber(true);
+    setGraymillsCustomerNumberMessage("");
+    setGraymillsCustomerNumberError("");
+
+    try {
+      const response = await fetch(
+        "/api/company-graymills-customer-number",
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            ...(await getVerifiedBearerHeaders()),
+          },
+          body: JSON.stringify({
+            companyId,
+            graymillsCustomerNumber: graymillsCustomerNumberDraft,
+          }),
+        }
+      );
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Could not save Graymills Customer Number."
+        );
+      }
+
+      setGraymillsCustomerNumberDraft(
+        String(data.graymillsCustomerNumber || "")
+      );
+      setGraymillsCustomerNumberMessage(
+        data.graymillsCustomerNumber
+          ? "Graymills Customer Number saved."
+          : "Graymills Customer Number cleared."
+      );
+      await Promise.resolve(onRefreshCompanyDetail(companyId));
+    } catch (error) {
+      setGraymillsCustomerNumberError(
+        error instanceof Error
+          ? error.message
+          : "Could not save Graymills Customer Number."
+      );
+    } finally {
+      setIsSavingGraymillsCustomerNumber(false);
     }
   }
 
@@ -16131,6 +16223,51 @@ function CompanyDetailSection({
         <DetailCard title="Company Snapshot">
           <DetailRow label="Website" value={company.website} />
           <DetailRow label="Domain" value={company.domain} />
+          <DetailRow
+            label="Graymills Customer Number"
+            value={company.graymills_customer_number}
+          />
+          {canEditGraymillsCustomerNumber && (
+            <div className="border-b border-slate-100 py-3 text-sm">
+              <label className="font-semibold text-slate-700">
+                Edit Graymills Customer Number
+              </label>
+              <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                <input
+                  type="text"
+                  value={graymillsCustomerNumberDraft}
+                  disabled={isSavingGraymillsCustomerNumber}
+                  onChange={(event) =>
+                    setGraymillsCustomerNumberDraft(event.target.value)
+                  }
+                  placeholder="Enter customer number"
+                  className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-100"
+                />
+                <button
+                  type="button"
+                  onClick={saveGraymillsCustomerNumber}
+                  disabled={isSavingGraymillsCustomerNumber}
+                  className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                >
+                  {isSavingGraymillsCustomerNumber ? "Saving..." : "Save"}
+                </button>
+              </div>
+              <p className="mt-2 text-xs leading-5 text-slate-500">
+                Stored as text so leading zeros are preserved. Leave blank to
+                clear the number.
+              </p>
+              {graymillsCustomerNumberMessage && (
+                <p className="mt-2 text-xs font-semibold text-emerald-700">
+                  {graymillsCustomerNumberMessage}
+                </p>
+              )}
+              {graymillsCustomerNumberError && (
+                <p className="mt-2 text-xs font-semibold text-red-700">
+                  {graymillsCustomerNumberError}
+                </p>
+              )}
+            </div>
+          )}
           <DetailRow label="Employees" value={company.employee_count} />
           <DetailRow label="Phone" value={company.company_phone} />
           <DetailRow

@@ -27,6 +27,7 @@ export async function GET() {
         `
         id,
         company_name,
+        graymills_customer_number,
         account_type,
         buyer_personas,
         assigned_salesperson_id,
