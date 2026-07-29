@@ -107,9 +107,9 @@ type ManualContactForm = {
   isPrimary: boolean;
 };
 
-const APP_VERSION = "Version 3.23.1 - Mojibake Repair";
+const APP_VERSION = "Version 3.23.2 - Contact Simplification";
 const REVISION_NOTE =
-  "Repairs confirmed mojibake in tag remove controls and active import-generated text without changing CRM data or permissions.";
+  "Simplifies Company Detail contacts with compact summaries, visible tag chips, and one expandable management panel per contact.";
 
 type SignedInSessionStatus = {
   state: "checking" | "not_configured" | "signed_out" | "signed_in" | "error";
@@ -14696,6 +14696,7 @@ function CompanyDetailSection({
   const [contactError, setContactError] = useState("");
   const [editingContactId, setEditingContactId] = useState("");
   const [archivingContactId, setArchivingContactId] = useState("");
+  const [managingContactId, setManagingContactId] = useState("");
   const [manualContactForm, setManualContactForm] = useState<ManualContactForm>({
     firstName: "",
     lastName: "",
@@ -14759,6 +14760,7 @@ function CompanyDetailSection({
   }
 
   function startEditingContact(contact: any) {
+    setManagingContactId("");
     setEditingContactId(String(contact.id || ""));
     setShowAddContactForm(true);
     setContactMessage("");
@@ -14825,6 +14827,10 @@ function CompanyDetailSection({
 
       if (editingContactId === contactId) {
         cancelContactForm();
+      }
+
+      if (managingContactId === contactId) {
+        setManagingContactId("");
       }
 
       setContactMessage("Contact archived successfully.");
@@ -17684,7 +17690,8 @@ function CompanyDetailSection({
           <div>
             <h3 className="text-xl font-bold">Contacts</h3>
             <p className="mt-1 text-sm text-slate-600">
-              Add and manage people associated with this company.
+              Add and manage people associated with this company. Use Manage Contact
+              to edit Projects / Lists and Market, Sector, or Category tags.
             </p>
           </div>
 
@@ -17696,6 +17703,7 @@ function CompanyDetailSection({
               } else {
                 resetManualContactForm();
                 setEditingContactId("");
+                setManagingContactId("");
                 setShowAddContactForm(true);
                 setContactMessage("");
                 setContactError("");
@@ -17975,7 +17983,7 @@ function CompanyDetailSection({
         {detail.contacts.length === 0 ? (
           <p className="mt-4 text-sm text-slate-600">No contacts attached.</p>
         ) : (
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <div className="mt-4 grid gap-3">
             {detail.contacts.map((contact: any) => (
               <div key={String(contact.id)} className="rounded-xl border border-slate-200 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
@@ -18009,6 +18017,28 @@ function CompanyDetailSection({
 
                   <button
                     type="button"
+                    onClick={() =>
+                      setManagingContactId(
+                        managingContactId === String(contact.id)
+                          ? ""
+                          : String(contact.id)
+                      )
+                    }
+                    disabled={
+                      isSavingContact || Boolean(archivingContactId)
+                    }
+                    aria-expanded={
+                      managingContactId === String(contact.id)
+                    }
+                    className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-blue-800 shadow-sm ring-1 ring-blue-200 hover:bg-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                  >
+                    {managingContactId === String(contact.id)
+                      ? "Close Management"
+                      : "Manage Contact"}
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => archiveContact(String(contact.id))}
                     disabled={
                       isSavingContact ||
@@ -18022,14 +18052,21 @@ function CompanyDetailSection({
                   </button>
                 </div>
 
-                <ContactProjectListManager
-                  contactId={String(contact.id)}
-                  canManageProjectsLists={canManageProjectsLists}
-                />
+                {managingContactId === String(contact.id) ? (
+                  <div className="mt-4 border-t border-slate-200 pt-4">
+                    <ContactProjectListManager
+                      contactId={String(contact.id)}
+                      canManageProjectsLists={canManageProjectsLists}
+                    />
+                  </div>
+                ) : null}
 
                 <ContactTagManager
                   contactId={String(contact.id)}
                   apiPermissionHeaders={apiPermissionHeaders}
+                  isExpanded={
+                    managingContactId === String(contact.id)
+                  }
                 />
               </div>
             ))}
@@ -21443,9 +21480,11 @@ function ContactProjectListManager({
 function ContactTagManager({
   contactId,
   apiPermissionHeaders = () => ({}),
+  isExpanded = false,
 }: {
   contactId: string;
   apiPermissionHeaders?: () => Record<string, string>;
+  isExpanded?: boolean;
 }) {
   const [allTags, setAllTags] = useState<CrmTag[]>([]);
   const [assignedTags, setAssignedTags] = useState<AssignedContactTag[]>([]);
@@ -21584,14 +21623,48 @@ function ContactTagManager({
     }
   }
 
+  if (!isExpanded) {
+    return (
+      <div className="mt-3">
+        {isLoadingTags && assignedTags.length === 0 ? (
+          <p className="text-xs text-slate-500">Loading tags...</p>
+        ) : null}
+
+        {!isLoadingTags &&
+        assignedTags.length === 0 &&
+        !tagError ? (
+          <p className="text-xs text-slate-500">No tags assigned.</p>
+        ) : null}
+
+        {assignedTags.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {assignedTags.map((tag) => (
+              <span
+                key={tag.id}
+                className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-800 ring-1 ring-blue-100"
+                title={tag.crm_tags?.description || ""}
+              >
+                {tag.crm_tags?.tag_name || "Unnamed tag"}
+              </span>
+            ))}
+          </div>
+        ) : null}
+
+        {tagError ? (
+          <p className="text-xs font-semibold text-red-700">
+            {tagError}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
           <h4 className="font-semibold text-slate-900">Contact Tags</h4>
-          <p className="mt-1 text-xs leading-5 text-slate-500">
-            Tag this person by market relevance, industry sector, or buying-role category.
-          </p>
+
         </div>
 
         <button
@@ -21698,7 +21771,7 @@ function ContactTagAssignmentRow({
 }) {
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3">
+    <div className="border-b border-slate-200 py-4 first:pt-0 last:border-b-0 last:pb-0">
       <p className="text-sm font-semibold text-slate-800">{title}</p>
 
       {assignedTags.length === 0 ? (
