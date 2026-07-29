@@ -578,7 +578,7 @@ function buildCopyableSalesBlock(input: {
     input.mobilePhone ? `mobile: ${input.mobilePhone}` : null,
   ].filter(Boolean);
 
-  return `${input.companyName} â€” ${contactPieces.join(", ")}. ${
+  return `${input.companyName} \u2014 ${contactPieces.join(", ")}. ${
     input.industry ? `Company is listed in/around ${input.industry}. ` : ""
   }Graymills fit hypothesis: likely parts-cleaning opportunity worth validating through discovery; potential product path is ${input.productPath}. Priority ${input.priorityScore}/100 (${input.priorityTier}). Next best action: ${input.nextBestAction}`;
 }
@@ -1202,10 +1202,10 @@ const industryFitScore = scoreIndustryFit(industry, naics);
             "New production, inspection, or repair workflow",
           ],
           first_call_opener:
-            "Iâ€™m calling because Graymills helps industrial maintenance and production teams improve parts cleaning workflows. I wanted to understand how youâ€™re cleaning parts today and whether cleaning is creating any bottlenecks before inspection, assembly, repair, or return-to-service.",
+            "I'm calling because Graymills helps industrial maintenance and production teams improve parts cleaning workflows. I wanted to understand how you're cleaning parts today and whether cleaning is creating any bottlenecks before inspection, assembly, repair, or return-to-service.",
           email_subject: "Parts cleaning workflow question",
           email_message:
-            "Iâ€™m reaching out from Graymills. We work with industrial teams on parts washing applications where cleaning consistency, labor, workflow, and maintenance practicality matter. Iâ€™d like to understand how your team currently cleans parts and whether there may be a fit for a manual, immersion, ultrasonic, high-pressure spray, or custom cleaning approach.",
+            "I'm reaching out from Graymills. We work with industrial teams on parts washing applications where cleaning consistency, labor, workflow, and maintenance practicality matter. I'd like to understand how your team currently cleans parts and whether there may be a fit for a manual, immersion, ultrasonic, high-pressure spray, or custom cleaning approach.",
           likely_objections: [
             {
               objection: "We already have a parts washer.",

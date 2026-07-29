@@ -107,9 +107,9 @@ type ManualContactForm = {
   isPrimary: boolean;
 };
 
-const APP_VERSION = "Version 3.23 - Graymills Customer Number";
+const APP_VERSION = "Version 3.23.1 - Mojibake Repair";
 const REVISION_NOTE =
-  "Adds a leading-zero-safe Graymills Customer Number to Company Detail, company search and listings, CRM summaries, and CSV imports, with verified role-based editing and strongest-match import reuse.";
+  "Repairs confirmed mojibake in tag remove controls and active import-generated text without changing CRM data or permissions.";
 
 type SignedInSessionStatus = {
   state: "checking" | "not_configured" | "signed_out" | "signed_in" | "error";
@@ -21133,7 +21133,7 @@ function TagAssignmentColumn({
                 aria-label={`Remove ${tag.crm_tags?.tag_name || "tag"}`}
                 title={`Remove ${tag.crm_tags?.tag_name || "tag"}`}
               >
-                Ãƒâ€”
+                &times;
               </button>
             </span>
           ))}
@@ -21720,7 +21720,7 @@ function ContactTagAssignmentRow({
                 aria-label={`Remove ${tag.crm_tags?.tag_name || "tag"}`}
                 title={`Remove ${tag.crm_tags?.tag_name || "tag"}`}
               >
-                Ãƒâ€”
+                &times;
               </button>
             </span>
           ))}
