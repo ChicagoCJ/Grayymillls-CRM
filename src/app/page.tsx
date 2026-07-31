@@ -126,10 +126,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.23.3 - Company Edit and Archive Controls";
+  "Version 3.23.5 - Company Editor Scroll Fix";
 
 const REVISION_NOTE =
-  "Adds visible Company Detail edit and archive controls, a prefilled company editor, and an Admin/Sales Manager archived-company restore panel.";
+  "Moves the Company editor outside the sticky Company Detail header so the full form scrolls normally while editing.";
 
 type SignedInSessionStatus = {
   state: "checking" | "not_configured" | "signed_out" | "signed_in" | "error";
@@ -16933,236 +16933,6 @@ function CompanyDetailSection({
           )}
         </div>
 
-        {/* Version 3.23.3 visible company editor */}
-        {canManageCompanyRecord &&
-          !showCompanyEditor &&
-          companyRecordMessage && (
-            <div className="mt-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-800">
-              {companyRecordMessage}
-            </div>
-          )}
-
-        {canManageCompanyRecord &&
-          !showCompanyEditor &&
-          companyRecordError && (
-            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800">
-              {companyRecordError}
-            </div>
-          )}
-
-        {canManageCompanyRecord && showCompanyEditor && (
-          <section className="mt-4 rounded-2xl border border-blue-200 bg-blue-50/50 p-5">
-            <div>
-              <h3 className="text-lg font-bold text-slate-900">
-                Edit Company
-              </h3>
-              <p className="mt-1 text-sm text-slate-600">
-                Review the prefilled company information and select Save Company.
-              </p>
-            </div>
-
-            {companyRecordError && (
-              <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-                {companyRecordError}
-              </div>
-            )}
-
-            {companyRecordMessage && (
-              <div className="mt-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-                {companyRecordMessage}
-              </div>
-            )}
-
-            <form
-              className="mt-5 space-y-5"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void saveCompanyRecord(false);
-              }}
-            >
-              <div className="grid gap-4 md:grid-cols-2">
-                {(
-                  [
-                    {
-                      key: "companyName",
-                      label: "Company Name",
-                      type: "text",
-                      required: true,
-                    },
-                    {
-                      key: "companyType",
-                      label: "Company Type",
-                      type: "text",
-                    },
-                    {
-                      key: "website",
-                      label: "Website",
-                      type: "text",
-                    },
-                    {
-                      key: "domain",
-                      label: "Domain",
-                      type: "text",
-                    },
-                    {
-                      key: "industry",
-                      label: "Industry",
-                      type: "text",
-                    },
-                    {
-                      key: "employeeCount",
-                      label: "Employee Count",
-                      type: "number",
-                    },
-                    {
-                      key: "companyPhone",
-                      label: "Company Phone",
-                      type: "tel",
-                    },
-                    {
-                      key: "status",
-                      label: "Status",
-                      type: "text",
-                    },
-                    {
-                      key: "addressLine1",
-                      label: "Address Line 1",
-                      type: "text",
-                      wide: true,
-                    },
-                    {
-                      key: "addressLine2",
-                      label: "Address Line 2",
-                      type: "text",
-                      wide: true,
-                    },
-                    {
-                      key: "city",
-                      label: "City",
-                      type: "text",
-                    },
-                    {
-                      key: "state",
-                      label: "State",
-                      type: "text",
-                    },
-                    {
-                      key: "postalCode",
-                      label: "Postal Code",
-                      type: "text",
-                    },
-                    {
-                      key: "country",
-                      label: "Country",
-                      type: "text",
-                    },
-                  ] as Array<{
-                    key: keyof ManualCompanyForm;
-                    label: string;
-                    type: "text" | "number" | "tel";
-                    required?: boolean;
-                    wide?: boolean;
-                  }>
-                ).map((field) => (
-                  <label
-                    key={field.key}
-                    className={field.wide ? "md:col-span-2" : ""}
-                  >
-                    <span className="text-sm font-semibold text-slate-700">
-                      {field.label}
-                      {field.required ? " *" : ""}
-                    </span>
-
-                    <input
-                      type={field.type}
-                      value={companyEditForm[field.key]}
-                      required={field.required}
-                      min={
-                        field.key === "employeeCount"
-                          ? "0"
-                          : undefined
-                      }
-                      disabled={isSavingCompanyRecord}
-                      onChange={(event) =>
-                        updateCompanyEditField(
-                          field.key,
-                          event.target.value
-                        )
-                      }
-                      className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:bg-slate-100"
-                    />
-                  </label>
-                ))}
-
-                <label className="md:col-span-2">
-                  <span className="text-sm font-semibold text-slate-700">
-                    Notes
-                  </span>
-
-                  <textarea
-                    rows={5}
-                    value={companyEditForm.notes}
-                    disabled={isSavingCompanyRecord}
-                    onChange={(event) =>
-                      updateCompanyEditField(
-                        "notes",
-                        event.target.value
-                      )
-                    }
-                    className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:bg-slate-100"
-                  />
-                </label>
-              </div>
-
-              {companyRecordRequiresDuplicateConfirmation && (
-                <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
-                  <p className="text-sm font-bold text-amber-900">
-                    A possible duplicate company was found.
-                  </p>
-                  <p className="mt-1 text-sm text-amber-800">
-                    Review the company name, website, and domain. Use Save Anyway only when this should remain a separate company record.
-                  </p>
-                </div>
-              )}
-
-              <div className="flex flex-wrap justify-end gap-3 border-t border-blue-200 pt-4">
-                <button
-                  type="button"
-                  onClick={cancelCompanyEditor}
-                  disabled={isSavingCompanyRecord}
-                  className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Cancel
-                </button>
-
-                {companyRecordRequiresDuplicateConfirmation ? (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      void saveCompanyRecord(true)
-                    }
-                    disabled={isSavingCompanyRecord}
-                    className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {isSavingCompanyRecord
-                      ? "Saving..."
-                      : "Save Anyway"}
-                  </button>
-                ) : (
-                  <button
-                    type="submit"
-                    disabled={isSavingCompanyRecord}
-                    className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {isSavingCompanyRecord
-                      ? "Saving..."
-                      : "Save Company"}
-                  </button>
-                )}
-              </div>
-            </form>
-          </section>
-        )}
         <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
@@ -17208,6 +16978,237 @@ function CompanyDetailSection({
           </a>
         </div>
       </div>
+
+      {/* Version 3.23.5 company editor outside sticky header */}
+      {canManageCompanyRecord &&
+        !showCompanyEditor &&
+        companyRecordMessage && (
+          <div className="mt-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-800">
+            {companyRecordMessage}
+          </div>
+        )}
+
+      {canManageCompanyRecord &&
+        !showCompanyEditor &&
+        companyRecordError && (
+          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800">
+            {companyRecordError}
+          </div>
+        )}
+
+      {canManageCompanyRecord && showCompanyEditor && (
+        <section className="mt-4 rounded-2xl border border-blue-200 bg-blue-50/50 p-5">
+          <div>
+            <h3 className="text-lg font-bold text-slate-900">
+              Edit Company
+            </h3>
+            <p className="mt-1 text-sm text-slate-600">
+              Review the prefilled company information and select Save Company.
+            </p>
+          </div>
+
+          {companyRecordError && (
+            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+              {companyRecordError}
+            </div>
+          )}
+
+          {companyRecordMessage && (
+            <div className="mt-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+              {companyRecordMessage}
+            </div>
+          )}
+
+          <form
+            className="mt-5 space-y-5"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void saveCompanyRecord(false);
+            }}
+          >
+            <div className="grid gap-4 md:grid-cols-2">
+              {(
+                [
+                  {
+                    key: "companyName",
+                    label: "Company Name",
+                    type: "text",
+                    required: true,
+                  },
+                  {
+                    key: "companyType",
+                    label: "Company Type",
+                    type: "text",
+                  },
+                  {
+                    key: "website",
+                    label: "Website",
+                    type: "text",
+                  },
+                  {
+                    key: "domain",
+                    label: "Domain",
+                    type: "text",
+                  },
+                  {
+                    key: "industry",
+                    label: "Industry",
+                    type: "text",
+                  },
+                  {
+                    key: "employeeCount",
+                    label: "Employee Count",
+                    type: "number",
+                  },
+                  {
+                    key: "companyPhone",
+                    label: "Company Phone",
+                    type: "tel",
+                  },
+                  {
+                    key: "status",
+                    label: "Status",
+                    type: "text",
+                  },
+                  {
+                    key: "addressLine1",
+                    label: "Address Line 1",
+                    type: "text",
+                    wide: true,
+                  },
+                  {
+                    key: "addressLine2",
+                    label: "Address Line 2",
+                    type: "text",
+                    wide: true,
+                  },
+                  {
+                    key: "city",
+                    label: "City",
+                    type: "text",
+                  },
+                  {
+                    key: "state",
+                    label: "State",
+                    type: "text",
+                  },
+                  {
+                    key: "postalCode",
+                    label: "Postal Code",
+                    type: "text",
+                  },
+                  {
+                    key: "country",
+                    label: "Country",
+                    type: "text",
+                  },
+                ] as Array<{
+                  key: keyof ManualCompanyForm;
+                  label: string;
+                  type: "text" | "number" | "tel";
+                  required?: boolean;
+                  wide?: boolean;
+                }>
+              ).map((field) => (
+                <label
+                  key={field.key}
+                  className={field.wide ? "md:col-span-2" : ""}
+                >
+                  <span className="text-sm font-semibold text-slate-700">
+                    {field.label}
+                    {field.required ? " *" : ""}
+                  </span>
+
+                  <input
+                    type={field.type}
+                    value={companyEditForm[field.key]}
+                    required={field.required}
+                    min={
+                      field.key === "employeeCount"
+                        ? "0"
+                        : undefined
+                    }
+                    disabled={isSavingCompanyRecord}
+                    onChange={(event) =>
+                      updateCompanyEditField(
+                        field.key,
+                        event.target.value
+                      )
+                    }
+                    className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:bg-slate-100"
+                  />
+                </label>
+              ))}
+
+              <label className="md:col-span-2">
+                <span className="text-sm font-semibold text-slate-700">
+                  Notes
+                </span>
+
+                <textarea
+                  rows={5}
+                  value={companyEditForm.notes}
+                  disabled={isSavingCompanyRecord}
+                  onChange={(event) =>
+                    updateCompanyEditField(
+                      "notes",
+                      event.target.value
+                    )
+                  }
+                  className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:bg-slate-100"
+                />
+              </label>
+            </div>
+
+            {companyRecordRequiresDuplicateConfirmation && (
+              <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
+                <p className="text-sm font-bold text-amber-900">
+                  A possible duplicate company was found.
+                </p>
+                <p className="mt-1 text-sm text-amber-800">
+                  Review the company name, website, and domain. Use Save Anyway only when this should remain a separate company record.
+                </p>
+              </div>
+            )}
+
+            <div className="flex flex-wrap justify-end gap-3 border-t border-blue-200 pt-4">
+              <button
+                type="button"
+                onClick={cancelCompanyEditor}
+                disabled={isSavingCompanyRecord}
+                className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Cancel
+              </button>
+
+              {companyRecordRequiresDuplicateConfirmation ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    void saveCompanyRecord(true)
+                  }
+                  disabled={isSavingCompanyRecord}
+                  className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isSavingCompanyRecord
+                    ? "Saving..."
+                    : "Save Anyway"}
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={isSavingCompanyRecord}
+                  className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isSavingCompanyRecord
+                    ? "Saving..."
+                    : "Save Company"}
+                </button>
+              )}
+            </div>
+          </form>
+        </section>
+      )}
 
       {hasAiAnalysis && (
         <div
