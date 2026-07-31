@@ -44,3 +44,12 @@ OpenAI API Key.txt
 *.secret
 .env.local
 .env*.local
+
+# local development and vibe-coding artifacts
+/.backups/
+/.inspection/
+/inspect-version-*.ps1
+/patch-version-*.ps1
+/page.current.txt
+/version_*_company_detail_targets.txt
+/version_*_loaded_company_header.txt
