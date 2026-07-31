@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 
 import { getBrowserSupabaseClient, hasBrowserSupabaseConfig } from "../lib/supabase-browser";
@@ -107,9 +107,29 @@ type ManualContactForm = {
   isPrimary: boolean;
 };
 
-const APP_VERSION = "Version 3.23.2 - Contact Simplification";
+type ManualCompanyForm = {
+  companyName: string;
+  website: string;
+  domain: string;
+  industry: string;
+  employeeCount: string;
+  companyPhone: string;
+  addressLine1: string;
+  addressLine2: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+  companyType: string;
+  status: string;
+  notes: string;
+};
+
+const APP_VERSION =
+  "Version 3.23.3 - Company Edit and Archive Controls";
+
 const REVISION_NOTE =
-  "Simplifies Company Detail contacts with compact summaries, visible tag chips, and one expandable management panel per contact.";
+  "Adds visible Company Detail edit and archive controls, a prefilled company editor, and an Admin/Sales Manager archived-company restore panel.";
 
 type SignedInSessionStatus = {
   state: "checking" | "not_configured" | "signed_out" | "signed_in" | "error";
@@ -2891,7 +2911,14 @@ async function handleAnalyzeProspect() {
         )}
 
         {activeTab === "companies" && (
-          <CompaniesSection
+          <>
+            {/* Version 3.23.3 archived companies render */}
+            <ArchivedCompaniesRestorePanel
+              currentUserRole={currentUserRole}
+              onCompanyRestored={loadCrmSummary}
+            />
+
+            <CompaniesSection
             companies={displayedCompanies}
             totalCompanyCount={crmSummary.companies.length}
             companySearchTerm={companySearchTerm}
@@ -2978,8 +3005,13 @@ async function handleAnalyzeProspect() {
             onApplyBulkProjectListAssignment={handleBulkProjectListAssignment}
             onApplyBulkIndustryClassification={handleBulkIndustryClassification}
             onOpenCompany={loadCompanyDetail}
+            onCompanyCreated={async (companyId) => {
+              await loadCrmSummary();
+              await loadCompanyDetail(companyId);
+            }}
             isLoadingCompanyDetail={isLoadingCompanyDetail}
           />
+          </>
         )}
 
         {activeTab === "contacts" && (
@@ -3058,6 +3090,22 @@ async function handleAnalyzeProspect() {
             onRefreshCompanyDetail={loadCompanyDetail}
             isRefreshingCompanyDetail={isLoadingCompanyDetail}
             onBack={returnFromCompanyDetail}
+            canManageCompanyRecord={
+              currentUserRole === "admin" ||
+              currentUserRole === "sales_manager" ||
+              (currentUserRole === "sales_rep" &&
+                String(
+                  selectedCompanyDetail?.company?.assigned_salesperson_id || ""
+                ) === String(currentUserId || ""))
+            }
+            onCompanyUpdated={async (companyId) => {
+              await loadCrmSummary();
+              await loadCompanyDetail(companyId);
+            }}
+            onCompanyArchived={async () => {
+              await loadCrmSummary();
+              returnFromCompanyDetail();
+            }}
             salesCoverageCanEdit={
               currentPermissions.canAssignSalesCoverage ||
               String(currentUserRole).toLowerCase() === "admin" ||
@@ -13107,6 +13155,323 @@ function ManagedIndustryDefinitionsPanel({
   );
 }
 
+function ArchivedCompaniesRestorePanel({
+  currentUserRole,
+  onCompanyRestored,
+}: {
+  currentUserRole: AppUserRole;
+  onCompanyRestored: () => Promise<void>;
+}) {
+  const canRestoreArchivedCompanies =
+    currentUserRole === "admin" ||
+    currentUserRole === "sales_manager";
+
+  const [showArchivedCompanies, setShowArchivedCompanies] =
+    useState(false);
+  const [archivedCompanies, setArchivedCompanies] =
+    useState<any[]>([]);
+  const [isLoadingArchivedCompanies, setIsLoadingArchivedCompanies] =
+    useState(false);
+  const [restoringArchivedCompanyId, setRestoringArchivedCompanyId] =
+    useState("");
+  const [archivedCompanyMessage, setArchivedCompanyMessage] =
+    useState("");
+  const [archivedCompanyError, setArchivedCompanyError] =
+    useState("");
+
+  async function getArchivedCompanyHeaders() {
+    if (!hasBrowserSupabaseConfig()) {
+      throw new Error(
+        "Browser Supabase configuration is not available."
+      );
+    }
+
+    const supabase = getBrowserSupabaseClient();
+    const { data, error } = await supabase.auth.getSession();
+
+    if (error) {
+      throw new Error(
+        error.message ||
+          "Could not read the signed-in Supabase session."
+      );
+    }
+
+    const accessToken = data.session?.access_token;
+
+    if (!accessToken) {
+      throw new Error(
+        "A signed-in Supabase session is required."
+      );
+    }
+
+    return {
+      Authorization: "Bearer " + accessToken,
+      "Content-Type": "application/json",
+    };
+  }
+
+  async function loadArchivedCompanies() {
+    if (
+      !canRestoreArchivedCompanies ||
+      isLoadingArchivedCompanies
+    ) {
+      return;
+    }
+
+    setIsLoadingArchivedCompanies(true);
+    setArchivedCompanyMessage("");
+    setArchivedCompanyError("");
+
+    try {
+      const headers = await getArchivedCompanyHeaders();
+
+      const response = await fetch(
+        "/api/companies?archived=true&includeArchived=true",
+        {
+          method: "GET",
+          headers,
+          cache: "no-store",
+        }
+      );
+
+      const payload = await response
+        .json()
+        .catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(
+          payload.error ||
+            "Could not load archived companies."
+        );
+      }
+
+      const returnedCompanies = Array.isArray(
+        payload.archivedCompanies
+      )
+        ? payload.archivedCompanies
+        : Array.isArray(payload.companies)
+          ? payload.companies
+          : Array.isArray(payload)
+            ? payload
+            : [];
+
+      setArchivedCompanies(
+        returnedCompanies.filter(
+          (company: any) =>
+            company?.archived === true ||
+            company?.is_archived === true ||
+            Boolean(company?.archived_at) ||
+            company?.status === "archived"
+        )
+      );
+    } catch (error) {
+      setArchivedCompanyError(
+        error instanceof Error
+          ? error.message
+          : "Could not load archived companies."
+      );
+    } finally {
+      setIsLoadingArchivedCompanies(false);
+    }
+  }
+
+  async function toggleArchivedCompanies() {
+    const nextValue = !showArchivedCompanies;
+
+    setShowArchivedCompanies(nextValue);
+    setArchivedCompanyMessage("");
+    setArchivedCompanyError("");
+
+    if (nextValue) {
+      await loadArchivedCompanies();
+    }
+  }
+
+  async function restoreArchivedCompany(company: any) {
+    const companyId = String(company?.id || "").trim();
+
+    if (!companyId || restoringArchivedCompanyId) {
+      return;
+    }
+
+    const companyName = String(
+      company?.company_name || "this company"
+    ).trim();
+
+    const confirmed =
+      typeof window !== "undefined" &&
+      window.confirm(
+        "Restore " +
+          companyName +
+          " to active CRM views?"
+      );
+
+    if (!confirmed) return;
+
+    setRestoringArchivedCompanyId(companyId);
+    setArchivedCompanyMessage("");
+    setArchivedCompanyError("");
+
+    try {
+      const headers = await getArchivedCompanyHeaders();
+
+      const response = await fetch("/api/companies", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          companyId,
+          archived: false,
+        }),
+      });
+
+      const payload = await response
+        .json()
+        .catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(
+          payload.error ||
+            "Could not restore the company."
+        );
+      }
+
+      setArchivedCompanies((current) =>
+        current.filter(
+          (candidate) =>
+            String(candidate?.id || "") !== companyId
+        )
+      );
+
+      setArchivedCompanyMessage(
+        companyName + " was restored successfully."
+      );
+
+      await onCompanyRestored();
+    } catch (error) {
+      setArchivedCompanyError(
+        error instanceof Error
+          ? error.message
+          : "Could not restore the company."
+      );
+    } finally {
+      setRestoringArchivedCompanyId("");
+    }
+  }
+
+  if (!canRestoreArchivedCompanies) {
+    return null;
+  }
+
+  return (
+    <section className="mb-6 rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <button
+        type="button"
+        onClick={() => void toggleArchivedCompanies()}
+        className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left"
+      >
+        <div>
+          <h2 className="text-base font-bold text-slate-900">
+            Archived Companies
+          </h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Restore archived company records to active CRM views.
+          </p>
+        </div>
+
+        <span className="text-sm font-bold text-blue-700">
+          {showArchivedCompanies ? "Close" : "Manage"}
+        </span>
+      </button>
+
+      {showArchivedCompanies && (
+        <div className="border-t border-slate-200 p-5">
+          {archivedCompanyMessage && (
+            <div className="mb-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+              {archivedCompanyMessage}
+            </div>
+          )}
+
+          {archivedCompanyError && (
+            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+              {archivedCompanyError}
+            </div>
+          )}
+
+          <div className="mb-4 flex justify-end">
+            <button
+              type="button"
+              onClick={() => void loadArchivedCompanies()}
+              disabled={isLoadingArchivedCompanies}
+              className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isLoadingArchivedCompanies
+                ? "Refreshing..."
+                : "Refresh"}
+            </button>
+          </div>
+
+          {isLoadingArchivedCompanies ? (
+            <p className="py-6 text-center text-sm text-slate-600">
+              Loading archived companies...
+            </p>
+          ) : archivedCompanies.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm font-semibold text-slate-700">
+              No archived companies were found.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {archivedCompanies.map((company: any) => {
+                const companyId = String(company?.id || "");
+                const location = [
+                  company?.city,
+                  company?.state,
+                  company?.country,
+                ]
+                  .filter(Boolean)
+                  .join(", ");
+
+                return (
+                  <div
+                    key={companyId}
+                    className="flex flex-col justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center"
+                  >
+                    <div>
+                      <p className="font-bold text-slate-900">
+                        {company?.company_name ||
+                          "Unnamed Company"}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-600">
+                        {location ||
+                          company?.domain ||
+                          company?.website ||
+                          "No location or domain provided"}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void restoreArchivedCompany(company)
+                      }
+                      disabled={Boolean(
+                        restoringArchivedCompanyId
+                      )}
+                      className="rounded-xl bg-green-700 px-4 py-2 text-sm font-semibold text-white hover:bg-green-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {restoringArchivedCompanyId === companyId
+                        ? "Restoring..."
+                        : "Restore Company"}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
 function CompaniesSection({
   companies,
   totalCompanyCount,
@@ -13191,6 +13556,7 @@ function CompaniesSection({
   onApplyBulkProjectListAssignment = () => {},
   onApplyBulkIndustryClassification = () => {},
   onOpenCompany,
+  onCompanyCreated,
   isLoadingCompanyDetail,
 }: {
   companies: CompanySummary[];
@@ -13282,6 +13648,7 @@ function CompaniesSection({
   onApplyBulkProjectListAssignment?: () => void;
   onApplyBulkIndustryClassification?: () => void;
   onOpenCompany: (companyId: string) => void;
+  onCompanyCreated: (companyId: string) => Promise<void>;
   isLoadingCompanyDetail: boolean;
 }) {
 
@@ -13306,6 +13673,182 @@ function CompaniesSection({
 
   const [buyerPersonaDefinitionOptions, setBuyerPersonaDefinitionOptions] = useState<string[]>([]);
   const [buyerPersonaDefinitionError, setBuyerPersonaDefinitionError] = useState("");
+  const [showAddCompanyForm, setShowAddCompanyForm] = useState(false);
+  const [isSavingCompany, setIsSavingCompany] = useState(false);
+  const [companyMessage, setCompanyMessage] = useState("");
+  const [companyError, setCompanyError] = useState("");
+  const [requiresDuplicateConfirmation, setRequiresDuplicateConfirmation] =
+    useState(false);
+  const [manualCompanyForm, setManualCompanyForm] =
+    useState<ManualCompanyForm>({
+      companyName: "",
+      website: "",
+      domain: "",
+      industry: "",
+      employeeCount: "",
+      companyPhone: "",
+      addressLine1: "",
+      addressLine2: "",
+      city: "",
+      state: "",
+      postalCode: "",
+      country: "United States",
+      companyType: "",
+      status: "new",
+      notes: "",
+    });
+
+  const manualCompanyInputClass =
+    "mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100";
+
+  function resetManualCompanyForm() {
+    setManualCompanyForm({
+      companyName: "",
+      website: "",
+      domain: "",
+      industry: "",
+      employeeCount: "",
+      companyPhone: "",
+      addressLine1: "",
+      addressLine2: "",
+      city: "",
+      state: "",
+      postalCode: "",
+      country: "United States",
+      companyType: "",
+      status: "new",
+      notes: "",
+    });
+
+    setRequiresDuplicateConfirmation(false);
+  }
+
+  function updateManualCompanyField(
+    field: keyof ManualCompanyForm,
+    value: string
+  ) {
+    setManualCompanyForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+
+    setCompanyError("");
+    setCompanyMessage("");
+    setRequiresDuplicateConfirmation(false);
+  }
+
+  function cancelManualCompanyForm() {
+    resetManualCompanyForm();
+    setShowAddCompanyForm(false);
+    setCompanyError("");
+    setCompanyMessage("");
+  }
+
+  async function getVerifiedCompanyHeaders() {
+    if (!hasBrowserSupabaseConfig()) {
+      throw new Error(
+        "Browser Supabase configuration is not available."
+      );
+    }
+
+    const supabase = getBrowserSupabaseClient();
+    const { data, error } = await supabase.auth.getSession();
+
+    if (error) {
+      throw new Error(
+        error.message ||
+          "Could not read the signed-in Supabase session."
+      );
+    }
+
+    const accessToken = data.session?.access_token;
+
+    if (!accessToken) {
+      throw new Error(
+        "A signed-in Supabase session is required."
+      );
+    }
+
+    return {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    };
+  }
+
+  async function saveManualCompany(
+    confirmPotentialDuplicate = false
+  ) {
+    if (isSavingCompany) return;
+
+    if (!manualCompanyForm.companyName.trim()) {
+      setCompanyError("Company Name is required.");
+      return;
+    }
+
+    setIsSavingCompany(true);
+    setCompanyError("");
+    setCompanyMessage("");
+
+    try {
+      const headers =
+        await getVerifiedCompanyHeaders();
+
+      const response = await fetch("/api/companies", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          ...manualCompanyForm,
+          confirmPotentialDuplicate,
+        }),
+      });
+
+      const payload = await response
+        .json()
+        .catch(() => ({}));
+
+      if (
+        response.status === 409 &&
+        payload.requiresConfirmation
+      ) {
+        setRequiresDuplicateConfirmation(true);
+        setCompanyError(
+          payload.error ||
+            "A possible duplicate company was found."
+        );
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          payload.error ||
+            "Could not create the company."
+        );
+      }
+
+      const createdCompanyId = String(
+        payload.company?.id || ""
+      ).trim();
+
+      setCompanyMessage(
+        "Company created successfully."
+      );
+
+      resetManualCompanyForm();
+      setShowAddCompanyForm(false);
+
+      if (createdCompanyId) {
+        await onCompanyCreated(createdCompanyId);
+      }
+    } catch (error) {
+      setCompanyError(
+        error instanceof Error
+          ? error.message
+          : "Could not create the company."
+      );
+    } finally {
+      setIsSavingCompany(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -13454,15 +13997,346 @@ function CompaniesSection({
         <div>
           <h2 className="text-xl font-bold">Companies</h2>
           <p className="mt-2 text-sm text-slate-600">
-            Company records created from ZoomInfo imports. Click a company name to open the detail view.
+            View imported and manually created company records. Click a company
+            name to open the detail view.
           </p>
         </div>
 
-        <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-700">
-          Showing <span className="font-bold">{companies.length}</span> of{" "}
-          <span className="font-bold">{totalCompanyCount}</span>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <button
+            type="button"
+            onClick={() => {
+              setShowAddCompanyForm((current) => !current);
+              setCompanyError("");
+              setCompanyMessage("");
+              setRequiresDuplicateConfirmation(false);
+            }}
+            disabled={isSavingCompany}
+            aria-expanded={showAddCompanyForm}
+            className="rounded-xl bg-blue-700 px-4 py-3 text-sm font-bold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+          >
+            {showAddCompanyForm
+              ? "Close Add Company"
+              : "Add Company"}
+          </button>
+
+          <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-700">
+            Showing <span className="font-bold">{companies.length}</span> of{" "}
+            <span className="font-bold">{totalCompanyCount}</span>
+          </div>
         </div>
       </div>
+
+      {companyMessage && (
+        <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900">
+          {companyMessage}
+        </p>
+      )}
+
+      {showAddCompanyForm && (
+        <div className="mt-6 rounded-2xl border border-blue-200 bg-blue-50 p-5">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-blue-700">
+              Manual Company Entry
+            </p>
+
+            <h3 className="mt-1 text-lg font-bold text-blue-950">
+              Add a company
+            </h3>
+
+            <p className="mt-1 text-sm leading-6 text-blue-900">
+              Company Name is required. Domain duplicates are blocked.
+              Matching company name, city, and state require confirmation.
+            </p>
+
+            {currentUserRole === "sales_rep" && (
+              <p className="mt-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-blue-900 ring-1 ring-blue-100">
+                Companies created by a Sales Rep are assigned automatically to
+                that signed-in Sales Rep.
+              </p>
+            )}
+          </div>
+
+          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <label className="text-sm font-semibold text-slate-700">
+              Company Name *
+              <input
+                value={manualCompanyForm.companyName}
+                onChange={(event) =>
+                  updateManualCompanyField(
+                    "companyName",
+                    event.target.value
+                  )
+                }
+                disabled={isSavingCompany}
+                className={manualCompanyInputClass}
+              />
+            </label>
+
+            <label className="text-sm font-semibold text-slate-700">
+              Website
+              <input
+                value={manualCompanyForm.website}
+                onChange={(event) =>
+                  updateManualCompanyField(
+                    "website",
+                    event.target.value
+                  )
+                }
+                placeholder="https://example.com"
+                disabled={isSavingCompany}
+                className={manualCompanyInputClass}
+              />
+            </label>
+
+            <label className="text-sm font-semibold text-slate-700">
+              Domain
+              <input
+                value={manualCompanyForm.domain}
+                onChange={(event) =>
+                  updateManualCompanyField(
+                    "domain",
+                    event.target.value
+                  )
+                }
+                placeholder="example.com"
+                disabled={isSavingCompany}
+                className={manualCompanyInputClass}
+              />
+            </label>
+
+            <label className="text-sm font-semibold text-slate-700">
+              Industry
+              <input
+                value={manualCompanyForm.industry}
+                onChange={(event) =>
+                  updateManualCompanyField(
+                    "industry",
+                    event.target.value
+                  )
+                }
+                disabled={isSavingCompany}
+                className={manualCompanyInputClass}
+              />
+            </label>
+
+            <label className="text-sm font-semibold text-slate-700">
+              Employee Count
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={manualCompanyForm.employeeCount}
+                onChange={(event) =>
+                  updateManualCompanyField(
+                    "employeeCount",
+                    event.target.value
+                  )
+                }
+                disabled={isSavingCompany}
+                className={manualCompanyInputClass}
+              />
+            </label>
+
+            <label className="text-sm font-semibold text-slate-700">
+              Company Phone
+              <input
+                value={manualCompanyForm.companyPhone}
+                onChange={(event) =>
+                  updateManualCompanyField(
+                    "companyPhone",
+                    event.target.value
+                  )
+                }
+                disabled={isSavingCompany}
+                className={manualCompanyInputClass}
+              />
+            </label>
+
+            <label className="text-sm font-semibold text-slate-700">
+              Address Line 1
+              <input
+                value={manualCompanyForm.addressLine1}
+                onChange={(event) =>
+                  updateManualCompanyField(
+                    "addressLine1",
+                    event.target.value
+                  )
+                }
+                disabled={isSavingCompany}
+                className={manualCompanyInputClass}
+              />
+            </label>
+
+            <label className="text-sm font-semibold text-slate-700">
+              Address Line 2
+              <input
+                value={manualCompanyForm.addressLine2}
+                onChange={(event) =>
+                  updateManualCompanyField(
+                    "addressLine2",
+                    event.target.value
+                  )
+                }
+                disabled={isSavingCompany}
+                className={manualCompanyInputClass}
+              />
+            </label>
+
+            <label className="text-sm font-semibold text-slate-700">
+              City
+              <input
+                value={manualCompanyForm.city}
+                onChange={(event) =>
+                  updateManualCompanyField(
+                    "city",
+                    event.target.value
+                  )
+                }
+                disabled={isSavingCompany}
+                className={manualCompanyInputClass}
+              />
+            </label>
+
+            <label className="text-sm font-semibold text-slate-700">
+              State
+              <input
+                value={manualCompanyForm.state}
+                onChange={(event) =>
+                  updateManualCompanyField(
+                    "state",
+                    event.target.value
+                  )
+                }
+                disabled={isSavingCompany}
+                className={manualCompanyInputClass}
+              />
+            </label>
+
+            <label className="text-sm font-semibold text-slate-700">
+              Postal Code
+              <input
+                value={manualCompanyForm.postalCode}
+                onChange={(event) =>
+                  updateManualCompanyField(
+                    "postalCode",
+                    event.target.value
+                  )
+                }
+                disabled={isSavingCompany}
+                className={manualCompanyInputClass}
+              />
+            </label>
+
+            <label className="text-sm font-semibold text-slate-700">
+              Country
+              <input
+                value={manualCompanyForm.country}
+                onChange={(event) =>
+                  updateManualCompanyField(
+                    "country",
+                    event.target.value
+                  )
+                }
+                disabled={isSavingCompany}
+                className={manualCompanyInputClass}
+              />
+            </label>
+
+            <label className="text-sm font-semibold text-slate-700">
+              Company Type
+              <input
+                value={manualCompanyForm.companyType}
+                onChange={(event) =>
+                  updateManualCompanyField(
+                    "companyType",
+                    event.target.value
+                  )
+                }
+                disabled={isSavingCompany}
+                className={manualCompanyInputClass}
+              />
+            </label>
+
+            <label className="text-sm font-semibold text-slate-700">
+              Status
+              <input
+                value={manualCompanyForm.status}
+                onChange={(event) =>
+                  updateManualCompanyField(
+                    "status",
+                    event.target.value
+                  )
+                }
+                disabled={isSavingCompany}
+                className={manualCompanyInputClass}
+              />
+            </label>
+
+            <label className="text-sm font-semibold text-slate-700 md:col-span-2 xl:col-span-3">
+              Notes
+              <textarea
+                rows={4}
+                value={manualCompanyForm.notes}
+                onChange={(event) =>
+                  updateManualCompanyField(
+                    "notes",
+                    event.target.value
+                  )
+                }
+                disabled={isSavingCompany}
+                className={manualCompanyInputClass}
+              />
+            </label>
+          </div>
+
+          {companyError && (
+            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+              <p className="font-semibold">{companyError}</p>
+
+              {requiresDuplicateConfirmation && (
+                <p className="mt-1 text-xs leading-5">
+                  Review the possible duplicate before creating another company
+                  record.
+                </p>
+              )}
+            </div>
+          )}
+
+          <div className="mt-5 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => saveManualCompany(false)}
+              disabled={isSavingCompany}
+              className="rounded-xl bg-blue-700 px-4 py-3 text-sm font-bold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+            >
+              {isSavingCompany
+                ? "Saving..."
+                : "Save Company"}
+            </button>
+
+            {requiresDuplicateConfirmation && (
+              <button
+                type="button"
+                onClick={() => saveManualCompany(true)}
+                disabled={isSavingCompany}
+                className="rounded-xl bg-amber-600 px-4 py-3 text-sm font-bold text-white shadow-sm hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+              >
+                Create Possible Duplicate
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={cancelManualCompanyForm}
+              disabled={isSavingCompany}
+              className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {roleVisibilityActive && (
         <div className="mt-6 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
@@ -14609,6 +15483,9 @@ function CompanyDetailSection({
   onRefreshCompanyDetail,
   isRefreshingCompanyDetail = false,
   onBack,
+  canManageCompanyRecord = false,
+  onCompanyUpdated,
+  onCompanyArchived,
   salesCoverageCanEdit = true,
   canMoveOpportunityStages = true,
   canManageProjectsLists = false,
@@ -14633,6 +15510,9 @@ function CompanyDetailSection({
   onRefreshCompanyDetail: (companyId: string) => void;
   isRefreshingCompanyDetail?: boolean;
   onBack: () => void;
+  canManageCompanyRecord?: boolean;
+  onCompanyUpdated: (companyId: string) => Promise<void>;
+  onCompanyArchived: () => Promise<void>;
   salesCoverageCanEdit?: boolean;
   canMoveOpportunityStages?: boolean;
   canManageProjectsLists?: boolean;
@@ -14690,6 +15570,19 @@ function CompanyDetailSection({
     "all" | "open" | "completed"
   >("all");
   const [unifiedTimelineSearch, setUnifiedTimelineSearch] = useState("");
+  const [showCompanyEditor, setShowCompanyEditor] = useState(false);
+  const [isSavingCompanyRecord, setIsSavingCompanyRecord] = useState(false);
+  const [isArchivingCompanyRecord, setIsArchivingCompanyRecord] = useState(false);
+  const [companyRecordMessage, setCompanyRecordMessage] = useState("");
+  const [companyRecordError, setCompanyRecordError] = useState("");
+  const [
+    companyRecordRequiresDuplicateConfirmation,
+    setCompanyRecordRequiresDuplicateConfirmation,
+  ] = useState(false);
+  const [companyEditForm, setCompanyEditForm] =
+    useState<ManualCompanyForm>(() =>
+      getCompanyEditForm(detail?.company)
+    );
   const [showAddContactForm, setShowAddContactForm] = useState(false);
   const [isSavingContact, setIsSavingContact] = useState(false);
   const [contactMessage, setContactMessage] = useState("");
@@ -14714,6 +15607,247 @@ function CompanyDetailSection({
     buyingRoleHypothesis: "",
     isPrimary: false,
   });
+
+  function getCompanyEditForm(companyRecord: any): ManualCompanyForm {
+    return {
+      companyName: String(companyRecord?.company_name || ""),
+      website: String(companyRecord?.website || ""),
+      domain: String(companyRecord?.domain || ""),
+      industry: String(companyRecord?.industry || ""),
+      employeeCount:
+        companyRecord?.employee_count === null ||
+        companyRecord?.employee_count === undefined
+          ? ""
+          : String(companyRecord.employee_count),
+      companyPhone: String(companyRecord?.company_phone || ""),
+      addressLine1: String(companyRecord?.address_line_1 || ""),
+      addressLine2: String(companyRecord?.address_line_2 || ""),
+      city: String(companyRecord?.city || ""),
+      state: String(companyRecord?.state || ""),
+      postalCode: String(companyRecord?.postal_code || ""),
+      country: String(companyRecord?.country || "United States"),
+      companyType: String(companyRecord?.company_type || ""),
+      status: String(companyRecord?.status || "new"),
+      notes: String(companyRecord?.notes || ""),
+    };
+  }
+
+  useEffect(() => {
+    setCompanyEditForm(
+      getCompanyEditForm(detail?.company)
+    );
+    setShowCompanyEditor(false);
+    setCompanyRecordMessage("");
+    setCompanyRecordError("");
+    setCompanyRecordRequiresDuplicateConfirmation(false);
+  }, [detail?.company?.id]);
+
+  function updateCompanyEditField(
+    field: keyof ManualCompanyForm,
+    value: string
+  ) {
+    setCompanyEditForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+
+    setCompanyRecordMessage("");
+    setCompanyRecordError("");
+    setCompanyRecordRequiresDuplicateConfirmation(false);
+  }
+
+  function startCompanyEditor() {
+    setCompanyEditForm(
+      getCompanyEditForm(detail?.company)
+    );
+    setCompanyRecordMessage("");
+    setCompanyRecordError("");
+    setCompanyRecordRequiresDuplicateConfirmation(false);
+    setShowCompanyEditor(true);
+  }
+
+  function cancelCompanyEditor() {
+    setCompanyEditForm(
+      getCompanyEditForm(detail?.company)
+    );
+    setCompanyRecordMessage("");
+    setCompanyRecordError("");
+    setCompanyRecordRequiresDuplicateConfirmation(false);
+    setShowCompanyEditor(false);
+  }
+
+  async function getVerifiedCompanyRecordHeaders() {
+    if (!hasBrowserSupabaseConfig()) {
+      throw new Error(
+        "Browser Supabase configuration is not available."
+      );
+    }
+
+    const supabase = getBrowserSupabaseClient();
+    const { data, error } = await supabase.auth.getSession();
+
+    if (error) {
+      throw new Error(
+        error.message ||
+          "Could not read the signed-in Supabase session."
+      );
+    }
+
+    const accessToken = data.session?.access_token;
+
+    if (!accessToken) {
+      throw new Error(
+        "A signed-in Supabase session is required."
+      );
+    }
+
+    return {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    };
+  }
+
+  async function saveCompanyRecord(
+    confirmPotentialDuplicate = false
+  ) {
+    const companyId = String(
+      detail?.company?.id || ""
+    ).trim();
+
+    if (
+      !companyId ||
+      !canManageCompanyRecord ||
+      isSavingCompanyRecord
+    ) {
+      return;
+    }
+
+    if (!companyEditForm.companyName.trim()) {
+      setCompanyRecordError(
+        "Company Name is required."
+      );
+      return;
+    }
+
+    setIsSavingCompanyRecord(true);
+    setCompanyRecordMessage("");
+    setCompanyRecordError("");
+
+    try {
+      const headers =
+        await getVerifiedCompanyRecordHeaders();
+
+      const response = await fetch("/api/companies", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          companyId,
+          ...companyEditForm,
+          confirmPotentialDuplicate,
+        }),
+      });
+
+      const payload = await response
+        .json()
+        .catch(() => ({}));
+
+      if (
+        response.status === 409 &&
+        payload.requiresConfirmation
+      ) {
+        setCompanyRecordRequiresDuplicateConfirmation(true);
+        setCompanyRecordError(
+          payload.error ||
+            "A possible duplicate company was found."
+        );
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          payload.error ||
+            "Could not update the company."
+        );
+      }
+
+      setCompanyRecordRequiresDuplicateConfirmation(false);
+      setCompanyRecordMessage(
+        "Company updated successfully."
+      );
+      setShowCompanyEditor(false);
+
+      await onCompanyUpdated(companyId);
+    } catch (error) {
+      setCompanyRecordError(
+        error instanceof Error
+          ? error.message
+          : "Could not update the company."
+      );
+    } finally {
+      setIsSavingCompanyRecord(false);
+    }
+  }
+
+  async function archiveCompanyRecord() {
+    const companyId = String(
+      detail?.company?.id || ""
+    ).trim();
+
+    if (
+      !companyId ||
+      !canManageCompanyRecord ||
+      isArchivingCompanyRecord
+    ) {
+      return;
+    }
+
+    const confirmed =
+      typeof window !== "undefined" &&
+      window.confirm(
+        "Archive this company? The company, its contacts, activities, and related records will remain in the CRM database, but the company will be removed from active CRM views."
+      );
+
+    if (!confirmed) return;
+
+    setIsArchivingCompanyRecord(true);
+    setCompanyRecordMessage("");
+    setCompanyRecordError("");
+
+    try {
+      const headers =
+        await getVerifiedCompanyRecordHeaders();
+
+      const response = await fetch("/api/companies", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          companyId,
+          archived: true,
+        }),
+      });
+
+      const payload = await response
+        .json()
+        .catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(
+          payload.error ||
+            "Could not archive the company."
+        );
+      }
+
+      await onCompanyArchived();
+    } catch (error) {
+      setCompanyRecordError(
+        error instanceof Error
+          ? error.message
+          : "Could not archive the company."
+      );
+    } finally {
+      setIsArchivingCompanyRecord(false);
+    }
+  }
 
   function resetManualContactForm() {
     setManualContactForm({
@@ -15760,8 +16894,275 @@ function CompanyDetailSection({
           >
             {isAnalyzingProspect ? "Analyzing..." : "Analyze Prospect"}
           </button>
+
+          {/* Version 3.23.3 company header controls */}
+          {canManageCompanyRecord && (
+            <>
+              <button
+                type="button"
+                onClick={
+                  showCompanyEditor
+                    ? cancelCompanyEditor
+                    : startCompanyEditor
+                }
+                disabled={
+                  isSavingCompanyRecord ||
+                  isArchivingCompanyRecord
+                }
+                className="rounded-xl border border-blue-300 bg-white px-4 py-2 text-sm font-semibold text-blue-700 shadow-sm hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {showCompanyEditor
+                  ? "Close Editor"
+                  : "Edit Company"}
+              </button>
+
+              <button
+                type="button"
+                onClick={archiveCompanyRecord}
+                disabled={
+                  isSavingCompanyRecord ||
+                  isArchivingCompanyRecord
+                }
+                className="rounded-xl border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-700 shadow-sm hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isArchivingCompanyRecord
+                  ? "Archiving..."
+                  : "Archive Company"}
+              </button>
+            </>
+          )}
         </div>
 
+        {/* Version 3.23.3 visible company editor */}
+        {canManageCompanyRecord &&
+          !showCompanyEditor &&
+          companyRecordMessage && (
+            <div className="mt-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-800">
+              {companyRecordMessage}
+            </div>
+          )}
+
+        {canManageCompanyRecord &&
+          !showCompanyEditor &&
+          companyRecordError && (
+            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800">
+              {companyRecordError}
+            </div>
+          )}
+
+        {canManageCompanyRecord && showCompanyEditor && (
+          <section className="mt-4 rounded-2xl border border-blue-200 bg-blue-50/50 p-5">
+            <div>
+              <h3 className="text-lg font-bold text-slate-900">
+                Edit Company
+              </h3>
+              <p className="mt-1 text-sm text-slate-600">
+                Review the prefilled company information and select Save Company.
+              </p>
+            </div>
+
+            {companyRecordError && (
+              <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                {companyRecordError}
+              </div>
+            )}
+
+            {companyRecordMessage && (
+              <div className="mt-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+                {companyRecordMessage}
+              </div>
+            )}
+
+            <form
+              className="mt-5 space-y-5"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void saveCompanyRecord(false);
+              }}
+            >
+              <div className="grid gap-4 md:grid-cols-2">
+                {(
+                  [
+                    {
+                      key: "companyName",
+                      label: "Company Name",
+                      type: "text",
+                      required: true,
+                    },
+                    {
+                      key: "companyType",
+                      label: "Company Type",
+                      type: "text",
+                    },
+                    {
+                      key: "website",
+                      label: "Website",
+                      type: "text",
+                    },
+                    {
+                      key: "domain",
+                      label: "Domain",
+                      type: "text",
+                    },
+                    {
+                      key: "industry",
+                      label: "Industry",
+                      type: "text",
+                    },
+                    {
+                      key: "employeeCount",
+                      label: "Employee Count",
+                      type: "number",
+                    },
+                    {
+                      key: "companyPhone",
+                      label: "Company Phone",
+                      type: "tel",
+                    },
+                    {
+                      key: "status",
+                      label: "Status",
+                      type: "text",
+                    },
+                    {
+                      key: "addressLine1",
+                      label: "Address Line 1",
+                      type: "text",
+                      wide: true,
+                    },
+                    {
+                      key: "addressLine2",
+                      label: "Address Line 2",
+                      type: "text",
+                      wide: true,
+                    },
+                    {
+                      key: "city",
+                      label: "City",
+                      type: "text",
+                    },
+                    {
+                      key: "state",
+                      label: "State",
+                      type: "text",
+                    },
+                    {
+                      key: "postalCode",
+                      label: "Postal Code",
+                      type: "text",
+                    },
+                    {
+                      key: "country",
+                      label: "Country",
+                      type: "text",
+                    },
+                  ] as Array<{
+                    key: keyof ManualCompanyForm;
+                    label: string;
+                    type: "text" | "number" | "tel";
+                    required?: boolean;
+                    wide?: boolean;
+                  }>
+                ).map((field) => (
+                  <label
+                    key={field.key}
+                    className={field.wide ? "md:col-span-2" : ""}
+                  >
+                    <span className="text-sm font-semibold text-slate-700">
+                      {field.label}
+                      {field.required ? " *" : ""}
+                    </span>
+
+                    <input
+                      type={field.type}
+                      value={companyEditForm[field.key]}
+                      required={field.required}
+                      min={
+                        field.key === "employeeCount"
+                          ? "0"
+                          : undefined
+                      }
+                      disabled={isSavingCompanyRecord}
+                      onChange={(event) =>
+                        updateCompanyEditField(
+                          field.key,
+                          event.target.value
+                        )
+                      }
+                      className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:bg-slate-100"
+                    />
+                  </label>
+                ))}
+
+                <label className="md:col-span-2">
+                  <span className="text-sm font-semibold text-slate-700">
+                    Notes
+                  </span>
+
+                  <textarea
+                    rows={5}
+                    value={companyEditForm.notes}
+                    disabled={isSavingCompanyRecord}
+                    onChange={(event) =>
+                      updateCompanyEditField(
+                        "notes",
+                        event.target.value
+                      )
+                    }
+                    className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:bg-slate-100"
+                  />
+                </label>
+              </div>
+
+              {companyRecordRequiresDuplicateConfirmation && (
+                <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
+                  <p className="text-sm font-bold text-amber-900">
+                    A possible duplicate company was found.
+                  </p>
+                  <p className="mt-1 text-sm text-amber-800">
+                    Review the company name, website, and domain. Use Save Anyway only when this should remain a separate company record.
+                  </p>
+                </div>
+              )}
+
+              <div className="flex flex-wrap justify-end gap-3 border-t border-blue-200 pt-4">
+                <button
+                  type="button"
+                  onClick={cancelCompanyEditor}
+                  disabled={isSavingCompanyRecord}
+                  className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+
+                {companyRecordRequiresDuplicateConfirmation ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void saveCompanyRecord(true)
+                    }
+                    disabled={isSavingCompanyRecord}
+                    className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isSavingCompanyRecord
+                      ? "Saving..."
+                      : "Save Anyway"}
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={isSavingCompanyRecord}
+                    className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isSavingCompanyRecord
+                      ? "Saving..."
+                      : "Save Company"}
+                  </button>
+                )}
+              </div>
+            </form>
+          </section>
+        )}
         <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">

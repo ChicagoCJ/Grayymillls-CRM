@@ -22,7 +22,10 @@ export async function GET(request: Request) {
     const companyId = searchParams.get("id");
 
     if (!companyId) {
-      return NextResponse.json({ error: "Missing company id." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Missing company id." },
+        { status: 400 }
+      );
     }
 
     const supabase = getSupabaseAdmin();
@@ -31,9 +34,17 @@ export async function GET(request: Request) {
       .from("companies")
       .select("*")
       .eq("id", companyId)
-      .single();
+      .is("archived_at", null)
+      .maybeSingle();
 
     if (companyError) throw companyError;
+
+    if (!company) {
+      return NextResponse.json(
+        { error: "Company not found or archived." },
+        { status: 404 }
+      );
+    }
 
     const { data: contacts, error: contactsError } = await supabase
       .from("contacts")
@@ -75,7 +86,8 @@ export async function GET(request: Request) {
 
     const { data: activities, error: activitiesError } = await supabase
       .from("activities")
-      .select(`
+      .select(
+        `
         *,
         contacts (
           id,
@@ -92,7 +104,8 @@ export async function GET(request: Request) {
             email
           )
         )
-      `)
+      `
+      )
       .eq("company_id", companyId)
       .is("archived_at", null)
       .order("created_at", { ascending: false })

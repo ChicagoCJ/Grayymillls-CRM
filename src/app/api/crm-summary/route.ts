@@ -1,4 +1,4 @@
-﻿import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -54,6 +54,7 @@ export async function GET() {
         )
       `
       )
+      .is("archived_at", null)
       .order("created_at", { ascending: false })
       .limit(100);
 
@@ -76,11 +77,14 @@ export async function GET() {
         direct_phone,
         mobile_phone,
         created_at,
-        companies (
-          company_name
+        companies!inner (
+          company_name,
+          archived_at
         )
       `
       )
+      .is("archived_at", null)
+      .is("companies.archived_at", null)
       .order("created_at", { ascending: false })
       .limit(100);
 
@@ -120,12 +124,14 @@ export async function GET() {
         due_date,
         completed_at,
         created_at,
-        companies (
-          company_name
+        companies!inner (
+          company_name,
+          archived_at
         )
       `
       )
       .is("archived_at", null)
+      .is("companies.archived_at", null)
       .is("completed_at", null)
       .order("due_date", { ascending: true, nullsFirst: false })
       .order("created_at", { ascending: false })
@@ -147,12 +153,14 @@ export async function GET() {
         due_date,
         completed_at,
         created_at,
-        companies (
-          company_name
+        companies!inner (
+          company_name,
+          archived_at
         )
       `
       )
       .is("archived_at", null)
+      .is("companies.archived_at", null)
       .is("completed_at", null)
       .eq("due_date", today)
       .order("created_at", { ascending: false })
@@ -174,12 +182,14 @@ export async function GET() {
         due_date,
         completed_at,
         created_at,
-        companies (
-          company_name
+        companies!inner (
+          company_name,
+          archived_at
         )
       `
       )
       .is("archived_at", null)
+      .is("companies.archived_at", null)
       .is("completed_at", null)
       .lt("due_date", today)
       .order("due_date", { ascending: true })
@@ -200,7 +210,10 @@ export async function GET() {
   } catch (error) {
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : "Failed to load CRM summary.",
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to load CRM summary.",
       },
       { status: 500 }
     );
