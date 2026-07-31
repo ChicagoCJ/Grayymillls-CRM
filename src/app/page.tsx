@@ -126,10 +126,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.23.6 - Company Editor Opening";
+  "Version 3.23.7 - Unsaved Company Edit Protection";
 
 const REVISION_NOTE =
-  "Scrolls the Company editor below the sticky headers and focuses the prefilled Company Name field when editing begins.";
+  "Warns before unsaved Company edits are discarded by Cancel, Close Editor, Back, or Archive Company actions.";
 
 type SignedInSessionStatus = {
   state: "checking" | "not_configured" | "signed_out" | "signed_in" | "error";
@@ -15658,6 +15658,53 @@ function CompanyDetailSection({
     setCompanyRecordRequiresDuplicateConfirmation(false);
   }
 
+  function hasUnsavedCompanyEdits() {
+    const originalForm =
+      getCompanyEditForm(detail?.company);
+
+    return (
+      Object.keys(originalForm) as Array<
+        keyof ManualCompanyForm
+      >
+    ).some(
+      (field) =>
+        companyEditForm[field] !== originalForm[field]
+    );
+  }
+
+  function confirmDiscardUnsavedCompanyEdits(
+    actionDescription: string
+  ) {
+    if (
+      !showCompanyEditor ||
+      !hasUnsavedCompanyEdits()
+    ) {
+      return true;
+    }
+
+    if (typeof window === "undefined") {
+      return false;
+    }
+
+    return window.confirm(
+      "You have unsaved company changes. Discard them and " +
+        actionDescription +
+        "?"
+    );
+  }
+
+  function handleCompanyDetailBack() {
+    if (
+      !confirmDiscardUnsavedCompanyEdits(
+        "leave this company"
+      )
+    ) {
+      return;
+    }
+
+    onBack();
+  }
+
   function startCompanyEditor() {
     setCompanyEditForm(
       getCompanyEditForm(detail?.company)
@@ -15683,6 +15730,14 @@ function CompanyDetailSection({
   }
 
   function cancelCompanyEditor() {
+    if (
+      !confirmDiscardUnsavedCompanyEdits(
+        "close the editor"
+      )
+    ) {
+      return;
+    }
+
     setCompanyEditForm(
       getCompanyEditForm(detail?.company)
     );
@@ -15824,6 +15879,14 @@ function CompanyDetailSection({
       );
 
     if (!confirmed) return;
+
+    if (
+      !confirmDiscardUnsavedCompanyEdits(
+        "continue archiving this company"
+      )
+    ) {
+      return;
+    }
 
     setIsArchivingCompanyRecord(true);
     setCompanyRecordMessage("");
@@ -16888,7 +16951,7 @@ function CompanyDetailSection({
             type="button"
             aria-label="Return to previous CRM view"
             title="Return to previous CRM view"
-            onClick={onBack}
+            onClick={handleCompanyDetailBack}
             className="inline-flex items-center justify-center rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
           >
             Back
