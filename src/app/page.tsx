@@ -126,10 +126,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.23.5 - Company Editor Scroll Fix";
+  "Version 3.23.6 - Company Editor Opening";
 
 const REVISION_NOTE =
-  "Moves the Company editor outside the sticky Company Detail header so the full form scrolls normally while editing.";
+  "Scrolls the Company editor below the sticky headers and focuses the prefilled Company Name field when editing begins.";
 
 type SignedInSessionStatus = {
   state: "checking" | "not_configured" | "signed_out" | "signed_in" | "error";
@@ -15571,6 +15571,8 @@ function CompanyDetailSection({
   >("all");
   const [unifiedTimelineSearch, setUnifiedTimelineSearch] = useState("");
   const [showCompanyEditor, setShowCompanyEditor] = useState(false);
+  const companyEditorRef = useRef<HTMLElement | null>(null);
+  const companyNameInputRef = useRef<HTMLInputElement | null>(null);
   const [isSavingCompanyRecord, setIsSavingCompanyRecord] = useState(false);
   const [isArchivingCompanyRecord, setIsArchivingCompanyRecord] = useState(false);
   const [companyRecordMessage, setCompanyRecordMessage] = useState("");
@@ -15664,6 +15666,20 @@ function CompanyDetailSection({
     setCompanyRecordError("");
     setCompanyRecordRequiresDuplicateConfirmation(false);
     setShowCompanyEditor(true);
+
+    window.requestAnimationFrame(() => {
+      companyEditorRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+
+      window.setTimeout(() => {
+        companyNameInputRef.current?.focus({
+          preventScroll: true,
+        });
+        companyNameInputRef.current?.select();
+      }, 350);
+    });
   }
 
   function cancelCompanyEditor() {
@@ -16997,7 +17013,10 @@ function CompanyDetailSection({
         )}
 
       {canManageCompanyRecord && showCompanyEditor && (
-        <section className="mt-4 rounded-2xl border border-blue-200 bg-blue-50/50 p-5">
+        <section
+          ref={companyEditorRef}
+          className="scroll-mt-80 mt-4 rounded-2xl border border-blue-200 bg-blue-50/50 p-5"
+        >
           <div>
             <h3 className="text-lg font-bold text-slate-900">
               Edit Company
@@ -17120,6 +17139,11 @@ function CompanyDetailSection({
                   </span>
 
                   <input
+                    ref={
+                      field.key === "companyName"
+                        ? companyNameInputRef
+                        : undefined
+                    }
                     type={field.type}
                     value={companyEditForm[field.key]}
                     required={field.required}
