@@ -126,10 +126,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.23.10 - Unsaved Changes Indicator";
+  "Version 3.23.11 - Save Requires Changes";
 
 const REVISION_NOTE =
-  "Shows a visible Unsaved changes indicator whenever Company editor values differ from the saved company record.";
+  "Disables Company Detail saving until editor values differ from the saved company record.";
 
 type SignedInSessionStatus = {
   state: "checking" | "not_configured" | "signed_out" | "signed_in" | "error";
@@ -15874,7 +15874,8 @@ function CompanyDetailSection({
     if (
       !companyId ||
       !canManageCompanyRecord ||
-      isSavingCompanyRecord
+      isSavingCompanyRecord ||
+      !hasUnsavedCompanyEdits()
     ) {
       return;
     }
@@ -17383,12 +17384,17 @@ function CompanyDetailSection({
               ) : (
                 <button
                   type="submit"
-                  disabled={isSavingCompanyRecord}
+                  disabled={
+                    isSavingCompanyRecord ||
+                    !hasUnsavedCompanyEdits()
+                  }
                   className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isSavingCompanyRecord
                     ? "Saving..."
-                    : "Save Company"}
+                    : hasUnsavedCompanyEdits()
+                      ? "Save Company"
+                      : "No Changes to Save"}
                 </button>
               )}
             </div>
