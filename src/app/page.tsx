@@ -126,10 +126,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.23.8 - Browser Leave Protection";
+  "Version 3.23.9 - CRM Navigation Protection";
 
 const REVISION_NOTE =
-  "Warns before a browser refresh, tab close, window close, or webpage navigation discards unsaved Company edits.";
+  "Warns before CRM tab navigation discards unsaved Company edits while preserving the existing browser-leave protection.";
 
 type SignedInSessionStatus = {
   state: "checking" | "not_configured" | "signed_out" | "signed_in" | "error";
@@ -784,6 +784,10 @@ type AssignedContactTag = any;
 export default function Home() {
   const [activeTab, setActiveTab] = useState<TabKey>("dashboard");
   const [companyDetailReturnTab, setCompanyDetailReturnTab] = useState<TabKey>("companies");
+  const [
+    hasUnsavedCompanyDetailEdits,
+    setHasUnsavedCompanyDetailEdits,
+  ] = useState(false);
   const [currentUserRole, setCurrentUserRole] = useState<AppUserRole>("sales_rep");
   const [currentUserId, setCurrentUserId] = useState("");
   const [currentUserDisplayName, setCurrentUserDisplayName] = useState(
@@ -1744,6 +1748,31 @@ async function loadCompanyOwnerFilterData() {
     setActiveTab(nextTab);
     setCompanyDetailReturnTab("companies");
     setSelectedCompanyDetail(null);
+  }
+
+  function handlePrimaryTabNavigation(
+    nextTab: TabKey
+  ) {
+    if (nextTab === activeTab) {
+      return;
+    }
+
+    if (
+      activeTab === "companyDetail" &&
+      hasUnsavedCompanyDetailEdits
+    ) {
+      const confirmed =
+        typeof window !== "undefined" &&
+        window.confirm(
+          "You have unsaved company changes. Discard them and switch CRM sections?"
+        );
+
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    setActiveTab(nextTab);
   }
 
   async function loadCompanyDetail(companyId: string) {
@@ -2742,7 +2771,7 @@ async function handleAnalyzeProspect() {
               type="button"
               key={tab.key}
               aria-current={activeTab === tab.key ? "page" : undefined}
-              onClick={() => setActiveTab(tab.key)}
+              onClick={() => handlePrimaryTabNavigation(tab.key)}
               className={`shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
                 activeTab === tab.key
                   ? "bg-blue-700 text-white shadow-md ring-2 ring-blue-200"
@@ -3090,6 +3119,9 @@ async function handleAnalyzeProspect() {
             onRefreshCompanyDetail={loadCompanyDetail}
             isRefreshingCompanyDetail={isLoadingCompanyDetail}
             onBack={returnFromCompanyDetail}
+            onCompanyEditDirtyChange={
+              setHasUnsavedCompanyDetailEdits
+            }
             canManageCompanyRecord={
               currentUserRole === "admin" ||
               currentUserRole === "sales_manager" ||
@@ -15483,6 +15515,7 @@ function CompanyDetailSection({
   onRefreshCompanyDetail,
   isRefreshingCompanyDetail = false,
   onBack,
+  onCompanyEditDirtyChange,
   canManageCompanyRecord = false,
   onCompanyUpdated,
   onCompanyArchived,
@@ -15510,6 +15543,9 @@ function CompanyDetailSection({
   onRefreshCompanyDetail: (companyId: string) => void;
   isRefreshingCompanyDetail?: boolean;
   onBack: () => void;
+  onCompanyEditDirtyChange: (
+    hasUnsavedChanges: boolean
+  ) => void;
   canManageCompanyRecord?: boolean;
   onCompanyUpdated: (companyId: string) => Promise<void>;
   onCompanyArchived: () => Promise<void>;
@@ -15671,6 +15707,24 @@ function CompanyDetailSection({
         companyEditForm[field] !== originalForm[field]
     );
   }
+
+  useEffect(() => {
+    onCompanyEditDirtyChange(
+      showCompanyEditor &&
+        hasUnsavedCompanyEdits()
+    );
+  }, [
+    showCompanyEditor,
+    companyEditForm,
+    detail?.company,
+    onCompanyEditDirtyChange,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      onCompanyEditDirtyChange(false);
+    };
+  }, [onCompanyEditDirtyChange]);
 
   function confirmDiscardUnsavedCompanyEdits(
     actionDescription: string
