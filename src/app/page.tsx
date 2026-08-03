@@ -126,10 +126,40 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.23.11 - Save Requires Changes";
+  "Version 3.23.12 - Sign-Out Edit Protection";
 
 const REVISION_NOTE =
-  "Disables Company Detail saving until editor values differ from the saved company record.";
+  "Warns before Sign Out discards unsaved Company edits and prevents a duplicate browser-leave warning after confirmation.";
+
+function setConfirmedCompanyEditBrowserExitAllowed(
+  allowed: boolean
+) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const browserWindow = window as Window & {
+    __graymillsConfirmedCompanyEditExit?: boolean;
+  };
+
+  browserWindow.__graymillsConfirmedCompanyEditExit =
+    allowed;
+}
+
+function isConfirmedCompanyEditBrowserExitAllowed() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const browserWindow = window as Window & {
+    __graymillsConfirmedCompanyEditExit?: boolean;
+  };
+
+  return (
+    browserWindow.__graymillsConfirmedCompanyEditExit ===
+    true
+  );
+}
 
 type SignedInSessionStatus = {
   state: "checking" | "not_configured" | "signed_out" | "signed_in" | "error";
@@ -2168,6 +2198,25 @@ async function handleAnalyzeProspect() {
   const [isMainNavSigningOut, setIsMainNavSigningOut] = useState(false);
 
   async function handleMainNavigationSignOut() {
+    let signOutSucceeded = false;
+
+    if (
+      activeTab === "companyDetail" &&
+      hasUnsavedCompanyDetailEdits
+    ) {
+      const confirmed =
+        typeof window !== "undefined" &&
+        window.confirm(
+          "You have unsaved company changes. Discard them and sign out?"
+        );
+
+      if (!confirmed) {
+        return;
+      }
+
+      setConfirmedCompanyEditBrowserExitAllowed(true);
+    }
+
     setIsMainNavSigningOut(true);
     setErrorMessage("");
 
@@ -2187,12 +2236,17 @@ async function handleAnalyzeProspect() {
         return;
       }
 
+      signOutSucceeded = true;
       window.location.reload();
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Could not sign out."
       );
     } finally {
+      if (!signOutSucceeded) {
+        setConfirmedCompanyEditBrowserExitAllowed(false);
+      }
+
       setIsMainNavSigningOut(false);
     }
   }
@@ -15758,6 +15812,12 @@ function CompanyDetailSection({
     function handleBeforeUnload(
       event: BeforeUnloadEvent
     ) {
+      if (
+        isConfirmedCompanyEditBrowserExitAllowed()
+      ) {
+        return;
+      }
+
       event.preventDefault();
       event.returnValue = true;
     }
