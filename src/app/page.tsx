@@ -126,10 +126,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.23.12 - Sign-Out Edit Protection";
+  "Version 3.23.13 - CRM Refresh Edit Protection";
 
 const REVISION_NOTE =
-  "Warns before Sign Out discards unsaved Company edits and prevents a duplicate browser-leave warning after confirmation.";
+  "Warns before a manual CRM refresh runs while Company Detail contains unsaved edits.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean
@@ -1769,6 +1769,29 @@ async function loadCompanyOwnerFilterData() {
     }
   }
 
+  async function handleMainNavigationRefresh() {
+    if (isLoadingSummary) {
+      return;
+    }
+
+    if (
+      activeTab === "companyDetail" &&
+      hasUnsavedCompanyDetailEdits
+    ) {
+      const confirmed =
+        typeof window !== "undefined" &&
+        window.confirm(
+          "You have unsaved company changes. Refresh CRM data now? Your edits will remain open but are not saved."
+        );
+
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    await loadCrmSummary();
+  }
+
   function getCompanyDetailReturnTab(currentReturnTab: TabKey) {
     return activeTab === "companyDetail" ? currentReturnTab : activeTab;
   }
@@ -2838,7 +2861,7 @@ async function handleAnalyzeProspect() {
 
           <button
             type="button"
-            onClick={loadCrmSummary}
+            onClick={handleMainNavigationRefresh}
             disabled={isLoadingSummary}
             aria-busy={isLoadingSummary}
             className="ml-auto shrink-0 whitespace-nowrap rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:text-slate-400"
