@@ -126,10 +126,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.23.7 - Unsaved Company Edit Protection";
+  "Version 3.23.8 - Browser Leave Protection";
 
 const REVISION_NOTE =
-  "Warns before unsaved Company edits are discarded by Cancel, Close Editor, Back, or Archive Company actions.";
+  "Warns before a browser refresh, tab close, window close, or webpage navigation discards unsaved Company edits.";
 
 type SignedInSessionStatus = {
   state: "checking" | "not_configured" | "signed_out" | "signed_in" | "error";
@@ -15692,6 +15692,38 @@ function CompanyDetailSection({
         "?"
     );
   }
+
+  useEffect(() => {
+    if (
+      !showCompanyEditor ||
+      !hasUnsavedCompanyEdits()
+    ) {
+      return;
+    }
+
+    function handleBeforeUnload(
+      event: BeforeUnloadEvent
+    ) {
+      event.preventDefault();
+      event.returnValue = true;
+    }
+
+    window.addEventListener(
+      "beforeunload",
+      handleBeforeUnload
+    );
+
+    return () => {
+      window.removeEventListener(
+        "beforeunload",
+        handleBeforeUnload
+      );
+    };
+  }, [
+    showCompanyEditor,
+    companyEditForm,
+    detail?.company,
+  ]);
 
   function handleCompanyDetailBack() {
     if (
