@@ -126,10 +126,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.23.9 - CRM Navigation Protection";
+  "Version 3.23.10 - Unsaved Changes Indicator";
 
 const REVISION_NOTE =
-  "Warns before CRM tab navigation discards unsaved Company edits while preserving the existing browser-leave protection.";
+  "Shows a visible Unsaved changes indicator whenever Company editor values differ from the saved company record.";
 
 type SignedInSessionStatus = {
   state: "checking" | "not_configured" | "signed_out" | "signed_in" | "error";
@@ -17166,13 +17166,26 @@ function CompanyDetailSection({
           ref={companyEditorRef}
           className="scroll-mt-80 mt-4 rounded-2xl border border-blue-200 bg-blue-50/50 p-5"
         >
-          <div>
-            <h3 className="text-lg font-bold text-slate-900">
-              Edit Company
-            </h3>
-            <p className="mt-1 text-sm text-slate-600">
-              Review the prefilled company information and select Save Company.
-            </p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h3 className="text-lg font-bold text-slate-900">
+                Edit Company
+              </h3>
+              <p className="mt-1 text-sm text-slate-600">
+                Review the prefilled company information and select Save Company.
+              </p>
+            </div>
+
+            {hasUnsavedCompanyEdits() && (
+              <span
+                role="status"
+                aria-live="polite"
+                data-testid="company-unsaved-changes-indicator"
+                className="inline-flex w-fit items-center rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-xs font-bold uppercase tracking-wide text-amber-900"
+              >
+                Unsaved changes
+              </span>
+            )}
           </div>
 
           {companyRecordError && (
