@@ -126,10 +126,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.23.13 - CRM Refresh Edit Protection";
+  "Version 3.23.14 - Company Refresh Edit Protection";
 
 const REVISION_NOTE =
-  "Warns before a manual CRM refresh runs while Company Detail contains unsaved edits.";
+  "Warns before Refresh Activity History reloads Company Detail and discards unsaved Company edits.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean
@@ -15916,6 +15916,45 @@ function CompanyDetailSection({
     setShowCompanyEditor(false);
   }
 
+  async function handleManualCompanyDetailRefresh() {
+    const companyId = String(
+      detail?.company?.id || ""
+    ).trim();
+
+    if (
+      !companyId ||
+      isRefreshingCompanyDetail
+    ) {
+      return;
+    }
+
+    const hadUnsavedCompanyEdits =
+      showCompanyEditor &&
+      hasUnsavedCompanyEdits();
+
+    if (
+      !confirmDiscardUnsavedCompanyEdits(
+        "refresh this Company record and Activity History"
+      )
+    ) {
+      return;
+    }
+
+    if (hadUnsavedCompanyEdits) {
+      setCompanyEditForm(
+        getCompanyEditForm(detail?.company)
+      );
+      setCompanyRecordMessage("");
+      setCompanyRecordError("");
+      setCompanyRecordRequiresDuplicateConfirmation(false);
+      setShowCompanyEditor(false);
+    }
+
+    await Promise.resolve(
+      onRefreshCompanyDetail(companyId)
+    );
+  }
+
   async function getVerifiedCompanyRecordHeaders() {
     if (!hasBrowserSupabaseConfig()) {
       throw new Error(
@@ -18904,7 +18943,7 @@ function CompanyDetailSection({
           <div className="flex flex-col gap-2 md:items-end">
             <button
               type="button"
-              onClick={() => onRefreshCompanyDetail(String(detail.company.id))}
+              onClick={() => void handleManualCompanyDetailRefresh()}
               disabled={isRefreshingCompanyDetail}
               className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-wait disabled:bg-slate-100 disabled:text-slate-400"
             >
