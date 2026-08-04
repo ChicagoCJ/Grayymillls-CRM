@@ -185,10 +185,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.23.19 - Contacts Navigation Polish";
+  "Version 3.23.20 - Company Detail Quick Actions";
 
 const REVISION_NOTE =
-  "Adds contact counts, a top-level Add Contact shortcut, and stronger Primary Contact visibility in Company Detail.";
+  "Adds quick actions for activities, contacts, company editing, phone copying, and website access in Company Detail.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean
@@ -15778,6 +15778,14 @@ function CompanyDetailSection({
     useState<ManualContactForm>(
       () => createEmptyManualContactForm()
     );
+  const [
+    companyQuickActionMessage,
+    setCompanyQuickActionMessage,
+  ] = useState("");
+
+  useEffect(() => {
+    setCompanyQuickActionMessage("");
+  }, [detail?.company?.id]);
 
   function getCompanyEditForm(companyRecord: any): ManualCompanyForm {
     return {
@@ -16382,6 +16390,117 @@ function CompanyDetailSection({
             block: "start",
           });
       });
+    }
+  }
+
+  function scrollToCompanyActivity() {
+    setCompanyQuickActionMessage("");
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      document
+        .getElementById("company-detail-activity")
+        ?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+    });
+  }
+
+  function getCompanyWebsiteUrl() {
+    const rawWebsite = String(
+      detail?.company?.website ||
+        detail?.company?.domain ||
+        ""
+    ).trim();
+
+    if (!rawWebsite) {
+      return "";
+    }
+
+    const candidateUrl = /^https?:\/\//i.test(rawWebsite)
+      ? rawWebsite
+      : `https://${rawWebsite.replace(/^\/+/, "")}`;
+
+    try {
+      const parsedUrl = new URL(candidateUrl);
+
+      if (
+        parsedUrl.protocol !== "http:" &&
+        parsedUrl.protocol !== "https:"
+      ) {
+        return "";
+      }
+
+      return parsedUrl.toString();
+    } catch {
+      return "";
+    }
+  }
+
+  async function copyCompanyPhone() {
+    const companyPhone = String(
+      detail?.company?.company_phone || ""
+    ).trim();
+
+    if (!companyPhone) {
+      setCompanyQuickActionMessage(
+        "No company phone number is available."
+      );
+      return;
+    }
+
+    if (
+      typeof window === "undefined" ||
+      typeof document === "undefined"
+    ) {
+      return;
+    }
+
+    try {
+      let copied = false;
+
+      try {
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(companyPhone);
+          copied = true;
+        }
+      } catch {
+        copied = false;
+      }
+
+      if (!copied) {
+        const temporaryTextArea =
+          document.createElement("textarea");
+
+        temporaryTextArea.value = companyPhone;
+        temporaryTextArea.setAttribute("readonly", "");
+        temporaryTextArea.style.position = "fixed";
+        temporaryTextArea.style.opacity = "0";
+
+        document.body.appendChild(temporaryTextArea);
+        temporaryTextArea.select();
+
+        copied = document.execCommand("copy");
+        temporaryTextArea.remove();
+      }
+
+      if (!copied) {
+        throw new Error(
+          "The browser did not allow clipboard access."
+        );
+      }
+
+      setCompanyQuickActionMessage(
+        `Company phone copied: ${companyPhone}`
+      );
+    } catch {
+      setCompanyQuickActionMessage(
+        "Could not copy the company phone. Browser clipboard access may be blocked."
+      );
     }
   }
 
@@ -17414,23 +17533,6 @@ function CompanyDetailSection({
           {/* Version 3.23.3 company header controls */}
           {canManageCompanyRecord && (
             <>
-              <button
-                type="button"
-                onClick={
-                  showCompanyEditor
-                    ? cancelCompanyEditor
-                    : startCompanyEditor
-                }
-                disabled={
-                  isSavingCompanyRecord ||
-                  isArchivingCompanyRecord
-                }
-                className="rounded-xl border border-blue-300 bg-white px-4 py-2 text-sm font-semibold text-blue-700 shadow-sm hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {showCompanyEditor
-                  ? "Close Editor"
-                  : "Edit Company"}
-              </button>
 
               <button
                 type="button"
@@ -17479,36 +17581,134 @@ function CompanyDetailSection({
             />
           </div>
         </div>
-        <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-300 pt-3">
-          <a href="#company-detail-snapshot" className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">
-            Snapshot
-          </a>
-          <a href="#company-detail-sales-coverage" className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">
-            Coverage
-          </a>
-          <a href="#company-detail-funnel" className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">
-            Funnel
-          </a>
-          <a href="#company-detail-activity" className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">
-            Activity
-          </a>
-          <a
-            href="#company-detail-contacts"
-            className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+        <div className="mt-3 border-t border-slate-300 pt-3">
+          <p className="text-[11px] font-black uppercase tracking-wide text-slate-500">
+            Company Detail Quick Actions
+          </p>
+
+          <div
+            aria-label="Company Detail quick actions"
+            className="mt-2 flex flex-nowrap gap-2 overflow-x-auto pb-1"
           >
-            <span>Contacts</span>
-            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-black text-blue-800">
-              {detail.contacts.length}
-            </span>
-          </a>
-          <button
-            type="button"
-            onClick={() => startAddingContact()}
-            disabled={isSavingContact}
-            className="rounded-lg bg-blue-700 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-blue-300"
-          >
-            + Add Contact
-          </button>
+            <button
+              type="button"
+              onClick={scrollToCompanyActivity}
+              disabled={!canManageCompanyActivities}
+              title={
+                canManageCompanyActivities
+                  ? "Go to the Add Activity form"
+                  : "Activity management is unavailable for this company"
+              }
+              className="shrink-0 whitespace-nowrap rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+            >
+              Add Activity
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setCompanyQuickActionMessage("");
+                startAddingContact();
+              }}
+              disabled={isSavingContact}
+              className="shrink-0 whitespace-nowrap rounded-lg bg-blue-700 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-blue-300"
+            >
+              Add Contact
+            </button>
+
+            {canManageCompanyRecord && (
+              <button
+                type="button"
+                onClick={
+                  showCompanyEditor
+                    ? cancelCompanyEditor
+                    : startCompanyEditor
+                }
+                disabled={
+                  isSavingCompanyRecord ||
+                  isArchivingCompanyRecord
+                }
+                className="shrink-0 whitespace-nowrap rounded-lg border border-blue-300 bg-white px-3 py-2 text-xs font-bold text-blue-700 shadow-sm hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {showCompanyEditor
+                  ? "Close Editor"
+                  : "Edit Company"}
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={copyCompanyPhone}
+              disabled={
+                !String(
+                  company.company_phone || ""
+                ).trim()
+              }
+              title={
+                String(
+                  company.company_phone || ""
+                ).trim()
+                  ? "Copy the company phone number"
+                  : "No company phone number is available"
+              }
+              className="shrink-0 whitespace-nowrap rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+            >
+              Copy Phone
+            </button>
+
+            {getCompanyWebsiteUrl() ? (
+              <a
+                href={getCompanyWebsiteUrl()}
+                target="_blank"
+                rel="noreferrer"
+                className="shrink-0 whitespace-nowrap rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+              >
+                Open Website
+              </a>
+            ) : (
+              <button
+                type="button"
+                disabled
+                title="No valid company website is available"
+                className="shrink-0 cursor-not-allowed whitespace-nowrap rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold text-slate-400 shadow-sm ring-1 ring-slate-200"
+              >
+                Open Website
+              </button>
+            )}
+          </div>
+
+          {companyQuickActionMessage && (
+            <p
+              role="status"
+              className="mt-2 w-fit rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-800 ring-1 ring-blue-100"
+            >
+              {companyQuickActionMessage}
+            </p>
+          )}
+
+          <div className="mt-5 flex flex-wrap gap-2 border-t border-slate-300 pt-4">
+            <a href="#company-detail-snapshot" className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">
+              Snapshot
+            </a>
+            <a href="#company-detail-sales-coverage" className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">
+              Coverage
+            </a>
+            <a href="#company-detail-funnel" className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">
+              Funnel
+            </a>
+            <a href="#company-detail-activity" className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">
+              Activity
+            </a>
+            <a
+              href="#company-detail-contacts"
+              className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+            >
+              <span>Contacts</span>
+              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-black text-blue-800">
+                {detail.contacts.length}
+              </span>
+            </a>
+          </div>
         </div>
       </div>
 
@@ -18185,7 +18385,7 @@ function CompanyDetailSection({
         </div>
       )}
 
-      <div id="company-detail-snapshot" className="scroll-mt-80"></div>
+      <div id="company-detail-snapshot" className="scroll-mt-24 md:scroll-mt-[26rem]"></div>
       <div className="grid gap-6 lg:grid-cols-3">
         <DetailCard title="Company Snapshot">
           <DetailRow label="Website" value={company.website} />
@@ -18641,7 +18841,7 @@ function CompanyDetailSection({
 
       <div
         id="company-detail-sales-coverage"
-        className="scroll-mt-[260px]"
+        className="scroll-mt-24 md:scroll-mt-[26rem]"
       >
         <CompanySalesAssignmentPanel
           companyId={String(detail.company.id)}
@@ -18650,7 +18850,7 @@ function CompanyDetailSection({
         />
       </div>
 
-      <div id="company-detail-funnel" className="scroll-mt-80"></div>
+      <div id="company-detail-funnel" className="scroll-mt-24 md:scroll-mt-[26rem]"></div>
       <CompanyOpportunityPanel
         canMoveOpportunityStages={canMoveOpportunityStages}
         apiPermissionHeaders={apiPermissionHeaders}
@@ -18664,7 +18864,7 @@ function CompanyDetailSection({
 
 
       <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
-        <div id="company-detail-activity" className="scroll-mt-80"></div>
+        <div id="company-detail-activity" className="scroll-mt-24 md:scroll-mt-[26rem]"></div>
         <h3 className="text-xl font-bold">Add Activity / Follow-Up</h3>
         <p className="mt-2 text-sm text-slate-600">
           Save notes, calls, emails, meetings, tasks, and quote follow-ups directly to this company record.
@@ -19654,7 +19854,7 @@ function CompanyDetailSection({
 
       <div
         id="company-detail-contacts"
-        className="scroll-mt-80 max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm"
+        className="scroll-mt-24 md:scroll-mt-[26rem] max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm"
       >
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
