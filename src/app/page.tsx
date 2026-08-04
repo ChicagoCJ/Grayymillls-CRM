@@ -89,6 +89,17 @@ type ActivityForm = {
   relatedContactIds: string[];
 };
 
+function createEmptyActivityForm(): ActivityForm {
+  return {
+    activityType: "note",
+    subject: "",
+    notes: "",
+    dueDate: "",
+    primaryContactId: "",
+    relatedContactIds: [],
+  };
+}
+
 type ManualContactForm = {
   firstName: string;
   lastName: string;
@@ -126,10 +137,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.23.15 - Company Archive Edit Protection";
+  "Version 3.23.16 - Activity Draft Protection";
 
 const REVISION_NOTE =
-  "Uses one clear confirmation before archiving a Company when unsaved Company edits are present.";
+  "Protects new and edited activity drafts from accidental discard while leaving or changing Company Detail.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean
@@ -815,8 +826,8 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<TabKey>("dashboard");
   const [companyDetailReturnTab, setCompanyDetailReturnTab] = useState<TabKey>("companies");
   const [
-    hasUnsavedCompanyDetailEdits,
-    setHasUnsavedCompanyDetailEdits,
+    hasUnsavedCompanyDetailChanges,
+    setHasUnsavedCompanyDetailChanges,
   ] = useState(false);
   const [currentUserRole, setCurrentUserRole] = useState<AppUserRole>("sales_rep");
   const [currentUserId, setCurrentUserId] = useState("");
@@ -1087,6 +1098,11 @@ export default function Home() {
     primaryContactId: "",
     relatedContactIds: [],
   });
+
+  useEffect(() => {
+    setActivityForm(createEmptyActivityForm());
+  }, [selectedCompanyDetail?.company?.id]);
+
   const [crmSummary, setCrmSummary] = useState<CrmSummary>({
     companies: [],
     contacts: [],
@@ -1776,12 +1792,12 @@ async function loadCompanyOwnerFilterData() {
 
     if (
       activeTab === "companyDetail" &&
-      hasUnsavedCompanyDetailEdits
+      hasUnsavedCompanyDetailChanges
     ) {
       const confirmed =
         typeof window !== "undefined" &&
         window.confirm(
-          "You have unsaved company changes. Refresh CRM data now? Your edits will remain open but are not saved."
+          "You have unsaved Company Detail changes. Refresh CRM data now? Your changes will remain open but are not saved."
         );
 
       if (!confirmed) {
@@ -1798,6 +1814,7 @@ async function loadCompanyOwnerFilterData() {
 
   function returnFromCompanyDetail() {
     const nextTab = companyDetailReturnTab === "companyDetail" ? "companies" : companyDetailReturnTab;
+    setActivityForm(createEmptyActivityForm());
     setActiveTab(nextTab);
     setCompanyDetailReturnTab("companies");
     setSelectedCompanyDetail(null);
@@ -1812,17 +1829,21 @@ async function loadCompanyOwnerFilterData() {
 
     if (
       activeTab === "companyDetail" &&
-      hasUnsavedCompanyDetailEdits
+      hasUnsavedCompanyDetailChanges
     ) {
       const confirmed =
         typeof window !== "undefined" &&
         window.confirm(
-          "You have unsaved company changes. Discard them and switch CRM sections?"
+          "You have unsaved Company Detail changes. Discard them and switch CRM sections?"
         );
 
       if (!confirmed) {
         return;
       }
+    }
+
+    if (activeTab === "companyDetail") {
+      setActivityForm(createEmptyActivityForm());
     }
 
     setActiveTab(nextTab);
@@ -2225,12 +2246,12 @@ async function handleAnalyzeProspect() {
 
     if (
       activeTab === "companyDetail" &&
-      hasUnsavedCompanyDetailEdits
+      hasUnsavedCompanyDetailChanges
     ) {
       const confirmed =
         typeof window !== "undefined" &&
         window.confirm(
-          "You have unsaved company changes. Discard them and sign out?"
+          "You have unsaved Company Detail changes. Discard them and sign out?"
         );
 
       if (!confirmed) {
@@ -3196,8 +3217,8 @@ async function handleAnalyzeProspect() {
             onRefreshCompanyDetail={loadCompanyDetail}
             isRefreshingCompanyDetail={isLoadingCompanyDetail}
             onBack={returnFromCompanyDetail}
-            onCompanyEditDirtyChange={
-              setHasUnsavedCompanyDetailEdits
+            onCompanyDetailDirtyChange={
+              setHasUnsavedCompanyDetailChanges
             }
             canManageCompanyRecord={
               currentUserRole === "admin" ||
@@ -15592,7 +15613,7 @@ function CompanyDetailSection({
   onRefreshCompanyDetail,
   isRefreshingCompanyDetail = false,
   onBack,
-  onCompanyEditDirtyChange,
+  onCompanyDetailDirtyChange,
   canManageCompanyRecord = false,
   onCompanyUpdated,
   onCompanyArchived,
@@ -15620,7 +15641,7 @@ function CompanyDetailSection({
   onRefreshCompanyDetail: (companyId: string) => void;
   isRefreshingCompanyDetail?: boolean;
   onBack: () => void;
-  onCompanyEditDirtyChange: (
+  onCompanyDetailDirtyChange: (
     hasUnsavedChanges: boolean
   ) => void;
   canManageCompanyRecord?: boolean;
@@ -15785,23 +15806,109 @@ function CompanyDetailSection({
     );
   }
 
+  function hasUnsavedNewCompanyActivityDraft() {
+    return (
+      activityForm.activityType !== "note" ||
+      activityForm.subject.length > 0 ||
+      activityForm.notes.length > 0 ||
+      activityForm.dueDate.length > 0 ||
+      activityForm.primaryContactId.length > 0 ||
+      activityForm.relatedContactIds.length > 0
+    );
+  }
+
+  function hasUnsavedCompanyActivityEdit() {
+    const selectedActivity = (
+      detail?.activities ?? []
+    ).find(
+      (activity: any) =>
+        String(activity.id) ===
+        editingCompanyActivityId
+    );
+
+    if (!selectedActivity) {
+      return false;
+    }
+
+    const originalRelatedContactIds = (
+      Array.isArray(selectedActivity.related_contacts)
+        ? selectedActivity.related_contacts
+            .map((contact: any) => String(contact.id))
+            .filter(Boolean)
+        : []
+    ).sort();
+
+    const draftRelatedContactIds = [
+      ...companyActivityEditForm.relatedContactIds,
+    ].sort();
+
+    return (
+      companyActivityEditForm.activityType !==
+        getEditableCompanyActivityType(
+          selectedActivity.activity_type
+        ) ||
+      companyActivityEditForm.subject !==
+        String(selectedActivity.subject || "") ||
+      companyActivityEditForm.notes !==
+        String(selectedActivity.notes || "") ||
+      companyActivityEditForm.dueDate !==
+        (selectedActivity.due_date
+          ? String(selectedActivity.due_date).slice(0, 10)
+          : "") ||
+      companyActivityEditForm.primaryContactId !==
+        String(selectedActivity.contact_id || "") ||
+      JSON.stringify(draftRelatedContactIds) !==
+        JSON.stringify(originalRelatedContactIds)
+    );
+  }
+
+  function hasUnsavedCompanyDetailChanges() {
+    return (
+      (showCompanyEditor &&
+        hasUnsavedCompanyEdits()) ||
+      hasUnsavedNewCompanyActivityDraft() ||
+      hasUnsavedCompanyActivityEdit()
+    );
+  }
+
+  function confirmDiscardUnsavedCompanyDetailChanges(
+    actionDescription: string
+  ) {
+    if (!hasUnsavedCompanyDetailChanges()) {
+      return true;
+    }
+
+    if (typeof window === "undefined") {
+      return false;
+    }
+
+    return window.confirm(
+      "You have unsaved Company Detail changes. Discard them and " +
+        actionDescription +
+        "?"
+    );
+  }
+
   useEffect(() => {
-    onCompanyEditDirtyChange(
-      showCompanyEditor &&
-        hasUnsavedCompanyEdits()
+    onCompanyDetailDirtyChange(
+      hasUnsavedCompanyDetailChanges()
     );
   }, [
     showCompanyEditor,
     companyEditForm,
+    activityForm,
+    editingCompanyActivityId,
+    companyActivityEditForm,
     detail?.company,
-    onCompanyEditDirtyChange,
+    detail?.activities,
+    onCompanyDetailDirtyChange,
   ]);
 
   useEffect(() => {
     return () => {
-      onCompanyEditDirtyChange(false);
+      onCompanyDetailDirtyChange(false);
     };
-  }, [onCompanyEditDirtyChange]);
+  }, [onCompanyDetailDirtyChange]);
 
   function confirmDiscardUnsavedCompanyEdits(
     actionDescription: string
@@ -15825,10 +15932,7 @@ function CompanyDetailSection({
   }
 
   useEffect(() => {
-    if (
-      !showCompanyEditor ||
-      !hasUnsavedCompanyEdits()
-    ) {
+    if (!hasUnsavedCompanyDetailChanges()) {
       return;
     }
 
@@ -15859,12 +15963,16 @@ function CompanyDetailSection({
   }, [
     showCompanyEditor,
     companyEditForm,
+    activityForm,
+    editingCompanyActivityId,
+    companyActivityEditForm,
     detail?.company,
+    detail?.activities,
   ]);
 
   function handleCompanyDetailBack() {
     if (
-      !confirmDiscardUnsavedCompanyEdits(
+      !confirmDiscardUnsavedCompanyDetailChanges(
         "leave this company"
       )
     ) {
@@ -16081,15 +16189,14 @@ function CompanyDetailSection({
       return;
     }
 
-    const hasUnsavedCompanyChanges =
-      showCompanyEditor &&
-      hasUnsavedCompanyEdits();
+    const hasUnsavedCompanyDetailChangesBeforeArchive =
+      hasUnsavedCompanyDetailChanges();
 
     const confirmed =
       typeof window !== "undefined" &&
       window.confirm(
-        hasUnsavedCompanyChanges
-          ? "Archive this company and discard your unsaved company changes? The company, its contacts, activities, and related records will remain in the CRM database, but the company will be removed from active CRM views."
+        hasUnsavedCompanyDetailChangesBeforeArchive
+          ? "Archive this company and discard your unsaved Company Detail changes? The company, its contacts, activities, and related records will remain in the CRM database, but the company will be removed from active CRM views."
           : "Archive this company? The company, its contacts, activities, and related records will remain in the CRM database, but the company will be removed from active CRM views."
       );
 
@@ -16835,14 +16942,19 @@ function CompanyDetailSection({
   }
 
   function clearCompanyActivityForm() {
-    setActivityForm({
-      activityType: "note",
-      subject: "",
-      notes: "",
-      dueDate: "",
-      primaryContactId: "",
-      relatedContactIds: [],
-    });
+    if (
+      hasUnsavedNewCompanyActivityDraft() &&
+      (
+        typeof window === "undefined" ||
+        !window.confirm(
+          "Discard this unsaved activity draft?"
+        )
+      )
+    ) {
+      return;
+    }
+
+    setActivityForm(createEmptyActivityForm());
   }
 
   function applyCompanyActivityPreset(
@@ -16925,28 +17037,8 @@ function CompanyDetailSection({
   const selectedEditingCompanyActivity = companyActivities.find(
     (activity: any) => String(activity.id) === editingCompanyActivityId
   );
-  const companyActivityEditHasChanges = Boolean(
-    selectedEditingCompanyActivity &&
-      (companyActivityEditForm.activityType !==
-        getEditableCompanyActivityType(selectedEditingCompanyActivity.activity_type) ||
-        companyActivityEditForm.subject !== String(selectedEditingCompanyActivity.subject || "") ||
-        companyActivityEditForm.notes !== String(selectedEditingCompanyActivity.notes || "") ||
-        companyActivityEditForm.dueDate !==
-          (selectedEditingCompanyActivity.due_date
-            ? String(selectedEditingCompanyActivity.due_date).slice(0, 10)
-            : "") ||
-        companyActivityEditForm.primaryContactId !==
-          String(selectedEditingCompanyActivity.contact_id || "") ||
-        JSON.stringify([...companyActivityEditForm.relatedContactIds].sort()) !==
-          JSON.stringify(
-            (Array.isArray(selectedEditingCompanyActivity.related_contacts)
-              ? selectedEditingCompanyActivity.related_contacts
-                  .map((contact: any) => String(contact.id))
-                  .filter(Boolean)
-              : []
-            ).sort()
-          ))
-  );
+  const companyActivityEditHasChanges =
+    hasUnsavedCompanyActivityEdit();
   const companyActivityHistoryTypeFilters = [
     { label: "All Types", value: "All Types" },
     { label: "Notes", value: "note" },
@@ -18690,6 +18782,12 @@ function CompanyDetailSection({
             />
           </div>
         </div>
+
+        {hasUnsavedNewCompanyActivityDraft() && (
+          <p className="mt-4 w-fit rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
+            Unsaved activity draft
+          </p>
+        )}
 
         {!canSaveCompanyActivity && (
           <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
