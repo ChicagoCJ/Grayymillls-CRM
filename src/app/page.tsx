@@ -185,10 +185,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.23.18 - Company Contacts Navigation";
+  "Version 3.23.19 - Contacts Navigation Polish";
 
 const REVISION_NOTE =
-  "Adds Contacts to the Company Detail navigation bar for direct access to company people.";
+  "Adds contact counts, a top-level Add Contact shortcut, and stronger Primary Contact visibility in Company Detail.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean
@@ -16357,6 +16357,34 @@ function CompanyDetailSection({
     );
   }
 
+  function startAddingContact() {
+    if (
+      !confirmDiscardUnsavedContactChanges(
+        "start a new contact"
+      )
+    ) {
+      return;
+    }
+
+    resetManualContactForm();
+    setEditingContactId("");
+    setManagingContactId("");
+    setShowAddContactForm(true);
+    setContactMessage("");
+    setContactError("");
+
+    if (typeof window !== "undefined") {
+      window.requestAnimationFrame(() => {
+        document
+          .getElementById("company-detail-contacts")
+          ?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+      });
+    }
+  }
+
   async function getVerifiedContactHeaders() {
     if (!hasBrowserSupabaseConfig()) {
       throw new Error("Browser Supabase configuration is not available.");
@@ -17353,7 +17381,7 @@ function CompanyDetailSection({
     <section className="grid gap-6">
       <div
         data-testid="company-detail-sticky-header"
-        className="sticky top-20 z-30 max-w-full overflow-hidden rounded-2xl border border-slate-300 bg-slate-100/95 p-4 shadow-md backdrop-blur supports-[backdrop-filter]:bg-slate-100/90"
+        className="max-w-full overflow-hidden rounded-2xl border border-slate-300 bg-slate-100/95 p-4 shadow-md backdrop-blur supports-[backdrop-filter]:bg-slate-100/90 md:sticky md:top-20 md:z-30"
       >
         <div className="flex flex-wrap gap-3">
           <button
@@ -17464,9 +17492,23 @@ function CompanyDetailSection({
           <a href="#company-detail-activity" className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">
             Activity
           </a>
-          <a href="#company-detail-contacts" className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">
-            Contacts
+          <a
+            href="#company-detail-contacts"
+            className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+          >
+            <span>Contacts</span>
+            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-black text-blue-800">
+              {detail.contacts.length}
+            </span>
           </a>
+          <button
+            type="button"
+            onClick={() => startAddingContact()}
+            disabled={isSavingContact}
+            className="rounded-lg bg-blue-700 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-blue-300"
+          >
+            + Add Contact
+          </button>
         </div>
       </div>
 
@@ -19629,12 +19671,7 @@ function CompanyDetailSection({
               if (showAddContactForm) {
                 cancelContactForm();
               } else {
-                resetManualContactForm();
-                setEditingContactId("");
-                setManagingContactId("");
-                setShowAddContactForm(true);
-                setContactMessage("");
-                setContactError("");
+                startAddingContact();
               }
             }}
             disabled={isSavingContact}
@@ -19919,15 +19956,22 @@ function CompanyDetailSection({
         ) : (
           <div className="mt-4 grid gap-3">
             {detail.contacts.map((contact: any) => (
-              <div key={String(contact.id)} className="rounded-xl border border-slate-200 p-4">
+              <div
+                key={String(contact.id)}
+                className={`rounded-xl border p-4 ${
+                  contact.is_primary
+                    ? "border-emerald-300 bg-emerald-50/70 shadow-sm"
+                    : "border-slate-200 bg-white"
+                }`}
+              >
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
                     <p className="font-semibold">{displayValue(contact.full_name)}</p>
                     <p className="mt-1 text-sm text-slate-600">{displayValue(contact.title)}</p>
                   </div>
                   {contact.is_primary ? (
-                    <span className="rounded-full bg-green-50 px-2.5 py-1 text-xs font-bold text-green-800 ring-1 ring-green-200">
-                      Primary
+                    <span className="rounded-full bg-emerald-600 px-3 py-1 text-xs font-bold text-white shadow-sm ring-1 ring-emerald-700">
+                      Primary Contact
                     </span>
                   ) : null}
                 </div>
