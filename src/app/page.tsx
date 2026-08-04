@@ -118,6 +118,54 @@ type ManualContactForm = {
   isPrimary: boolean;
 };
 
+function createEmptyManualContactForm(): ManualContactForm {
+  return {
+    firstName: "",
+    lastName: "",
+    title: "",
+    managementLevel: "",
+    department: "",
+    functionArea: "",
+    email: "",
+    directPhone: "",
+    mobilePhone: "",
+    personCity: "",
+    personState: "",
+    personCountry: "",
+    linkedinUrl: "",
+    buyingRoleHypothesis: "",
+    isPrimary: false,
+  };
+}
+
+function getManualContactForm(
+  contactRecord: any
+): ManualContactForm {
+  return {
+    firstName: String(contactRecord?.first_name || ""),
+    lastName: String(contactRecord?.last_name || ""),
+    title: String(contactRecord?.title || ""),
+    managementLevel: String(
+      contactRecord?.management_level || ""
+    ),
+    department: String(contactRecord?.department || ""),
+    functionArea: String(contactRecord?.function_area || ""),
+    email: String(contactRecord?.email || ""),
+    directPhone: String(contactRecord?.direct_phone || ""),
+    mobilePhone: String(contactRecord?.mobile_phone || ""),
+    personCity: String(contactRecord?.person_city || ""),
+    personState: String(contactRecord?.person_state || ""),
+    personCountry: String(
+      contactRecord?.person_country || ""
+    ),
+    linkedinUrl: String(contactRecord?.linkedin_url || ""),
+    buyingRoleHypothesis: String(
+      contactRecord?.buying_role_hypothesis || ""
+    ),
+    isPrimary: Boolean(contactRecord?.is_primary),
+  };
+}
+
 type ManualCompanyForm = {
   companyName: string;
   website: string;
@@ -137,10 +185,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.23.16 - Activity Draft Protection";
+  "Version 3.23.17 - Contact Draft Protection";
 
 const REVISION_NOTE =
-  "Protects new and edited activity drafts from accidental discard while leaving or changing Company Detail.";
+  "Protects new and edited Contact drafts from accidental discard while leaving or changing Company Detail.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean
@@ -15726,23 +15774,10 @@ function CompanyDetailSection({
   const [editingContactId, setEditingContactId] = useState("");
   const [archivingContactId, setArchivingContactId] = useState("");
   const [managingContactId, setManagingContactId] = useState("");
-  const [manualContactForm, setManualContactForm] = useState<ManualContactForm>({
-    firstName: "",
-    lastName: "",
-    title: "",
-    managementLevel: "",
-    department: "",
-    functionArea: "",
-    email: "",
-    directPhone: "",
-    mobilePhone: "",
-    personCity: "",
-    personState: "",
-    personCountry: "",
-    linkedinUrl: "",
-    buyingRoleHypothesis: "",
-    isPrimary: false,
-  });
+  const [manualContactForm, setManualContactForm] =
+    useState<ManualContactForm>(
+      () => createEmptyManualContactForm()
+    );
 
   function getCompanyEditForm(companyRecord: any): ManualCompanyForm {
     return {
@@ -15776,6 +15811,15 @@ function CompanyDetailSection({
     setCompanyRecordMessage("");
     setCompanyRecordError("");
     setCompanyRecordRequiresDuplicateConfirmation(false);
+
+    setManualContactForm(
+      createEmptyManualContactForm()
+    );
+    setEditingContactId("");
+    setManagingContactId("");
+    setShowAddContactForm(false);
+    setContactMessage("");
+    setContactError("");
   }, [detail?.company?.id]);
 
   function updateCompanyEditField(
@@ -15862,12 +15906,69 @@ function CompanyDetailSection({
     );
   }
 
+  function hasUnsavedContactChanges() {
+    if (!showAddContactForm) {
+      return false;
+    }
+
+    let originalForm =
+      createEmptyManualContactForm();
+
+    if (editingContactId) {
+      const originalContact = (
+        Array.isArray(detail?.contacts)
+          ? detail.contacts
+          : []
+      ).find(
+        (contact: any) =>
+          String(contact.id || "") ===
+          editingContactId
+      );
+
+      if (!originalContact) {
+        return false;
+      }
+
+      originalForm =
+        getManualContactForm(originalContact);
+    }
+
+    return (
+      Object.keys(originalForm) as Array<
+        keyof ManualContactForm
+      >
+    ).some(
+      (field) =>
+        manualContactForm[field] !==
+        originalForm[field]
+    );
+  }
+
+  function confirmDiscardUnsavedContactChanges(
+    actionDescription: string
+  ) {
+    if (!hasUnsavedContactChanges()) {
+      return true;
+    }
+
+    if (typeof window === "undefined") {
+      return false;
+    }
+
+    return window.confirm(
+      "You have unsaved contact changes. Discard them and " +
+        actionDescription +
+        "?"
+    );
+  }
+
   function hasUnsavedCompanyDetailChanges() {
     return (
       (showCompanyEditor &&
         hasUnsavedCompanyEdits()) ||
       hasUnsavedNewCompanyActivityDraft() ||
-      hasUnsavedCompanyActivityEdit()
+      hasUnsavedCompanyActivityEdit() ||
+      hasUnsavedContactChanges()
     );
   }
 
@@ -15899,8 +16000,12 @@ function CompanyDetailSection({
     activityForm,
     editingCompanyActivityId,
     companyActivityEditForm,
+    showAddContactForm,
+    editingContactId,
+    manualContactForm,
     detail?.company,
     detail?.activities,
+    detail?.contacts,
     onCompanyDetailDirtyChange,
   ]);
 
@@ -15966,8 +16071,12 @@ function CompanyDetailSection({
     activityForm,
     editingCompanyActivityId,
     companyActivityEditForm,
+    showAddContactForm,
+    editingContactId,
+    manualContactForm,
     detail?.company,
     detail?.activities,
+    detail?.contacts,
   ]);
 
   function handleCompanyDetailBack() {
@@ -16243,23 +16352,9 @@ function CompanyDetailSection({
   }
 
   function resetManualContactForm() {
-    setManualContactForm({
-      firstName: "",
-      lastName: "",
-      title: "",
-      managementLevel: "",
-      department: "",
-      functionArea: "",
-      email: "",
-      directPhone: "",
-      mobilePhone: "",
-      personCity: "",
-      personState: "",
-      personCountry: "",
-      linkedinUrl: "",
-      buyingRoleHypothesis: "",
-      isPrimary: false,
-    });
+    setManualContactForm(
+      createEmptyManualContactForm()
+    );
   }
 
   async function getVerifiedContactHeaders() {
@@ -16287,46 +16382,61 @@ function CompanyDetailSection({
   }
 
   function startEditingContact(contact: any) {
+    if (
+      !confirmDiscardUnsavedContactChanges(
+        "edit another contact"
+      )
+    ) {
+      return;
+    }
+
     setManagingContactId("");
     setEditingContactId(String(contact.id || ""));
     setShowAddContactForm(true);
     setContactMessage("");
     setContactError("");
-    setManualContactForm({
-      firstName: String(contact.first_name || ""),
-      lastName: String(contact.last_name || ""),
-      title: String(contact.title || ""),
-      managementLevel: String(contact.management_level || ""),
-      department: String(contact.department || ""),
-      functionArea: String(contact.function_area || ""),
-      email: String(contact.email || ""),
-      directPhone: String(contact.direct_phone || ""),
-      mobilePhone: String(contact.mobile_phone || ""),
-      personCity: String(contact.person_city || ""),
-      personState: String(contact.person_state || ""),
-      personCountry: String(contact.person_country || ""),
-      linkedinUrl: String(contact.linkedin_url || ""),
-      buyingRoleHypothesis: String(contact.buying_role_hypothesis || ""),
-      isPrimary: Boolean(contact.is_primary),
-    });
+    setManualContactForm(
+      getManualContactForm(contact)
+    );
   }
 
-  function cancelContactForm() {
+  function cancelContactForm(
+    skipConfirmation = false
+  ) {
+    if (
+      !skipConfirmation &&
+      !confirmDiscardUnsavedContactChanges(
+        editingContactId
+          ? "close the Contact editor"
+          : "close the Add Contact form"
+      )
+    ) {
+      return false;
+    }
+
     resetManualContactForm();
     setEditingContactId("");
     setShowAddContactForm(false);
     setContactError("");
+
+    return true;
   }
 
   async function archiveContact(contactId: string) {
     const companyId = String(detail?.company?.id || "").trim();
     if (!companyId || !contactId || archivingContactId) return;
 
+    const isArchivingEditedContactWithChanges =
+      editingContactId === contactId &&
+      hasUnsavedContactChanges();
+
     const confirmed =
       typeof window === "undefined"
         ? false
         : window.confirm(
-            "Archive this contact? The contact will be removed from active company views but retained in the CRM database."
+            isArchivingEditedContactWithChanges
+              ? "Archive this contact and discard your unsaved contact changes? The contact will be removed from active company views but retained in the CRM database."
+              : "Archive this contact? The contact will be removed from active company views but retained in the CRM database."
           );
 
     if (!confirmed) return;
@@ -16353,7 +16463,7 @@ function CompanyDetailSection({
       }
 
       if (editingContactId === contactId) {
-        cancelContactForm();
+        cancelContactForm(true);
       }
 
       if (managingContactId === contactId) {
@@ -19766,6 +19876,12 @@ function CompanyDetailSection({
               </label>
             </div>
 
+            {hasUnsavedContactChanges() && (
+              <p className="mt-4 w-fit rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
+                Unsaved contact changes
+              </p>
+            )}
+
             <div className="mt-5 flex flex-wrap gap-3">
               <button
                 type="button"
@@ -19782,7 +19898,7 @@ function CompanyDetailSection({
 
               <button
                 type="button"
-                onClick={cancelContactForm}
+                onClick={() => cancelContactForm()}
                 disabled={isSavingContact}
                 className="rounded-xl bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
               >
