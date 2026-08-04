@@ -185,10 +185,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.23.17 - Contact Draft Protection";
+  "Version 3.23.18 - Company Contacts Navigation";
 
 const REVISION_NOTE =
-  "Protects new and edited Contact drafts from accidental discard while leaving or changing Company Detail.";
+  "Adds Contacts to the Company Detail navigation bar for direct access to company people.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean
@@ -17464,6 +17464,9 @@ function CompanyDetailSection({
           <a href="#company-detail-activity" className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">
             Activity
           </a>
+          <a href="#company-detail-contacts" className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">
+            Contacts
+          </a>
         </div>
       </div>
 
@@ -19607,7 +19610,10 @@ function CompanyDetailSection({
         )}
       </div>
 
-      <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+      <div
+        id="company-detail-contacts"
+        className="scroll-mt-80 max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm"
+      >
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="text-xl font-bold">Contacts</h3>
