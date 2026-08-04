@@ -126,10 +126,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.23.14 - Company Refresh Edit Protection";
+  "Version 3.23.15 - Company Archive Edit Protection";
 
 const REVISION_NOTE =
-  "Warns before Refresh Activity History reloads Company Detail and discards unsaved Company edits.";
+  "Uses one clear confirmation before archiving a Company when unsaved Company edits are present.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean
@@ -16081,21 +16081,19 @@ function CompanyDetailSection({
       return;
     }
 
+    const hasUnsavedCompanyChanges =
+      showCompanyEditor &&
+      hasUnsavedCompanyEdits();
+
     const confirmed =
       typeof window !== "undefined" &&
       window.confirm(
-        "Archive this company? The company, its contacts, activities, and related records will remain in the CRM database, but the company will be removed from active CRM views."
+        hasUnsavedCompanyChanges
+          ? "Archive this company and discard your unsaved company changes? The company, its contacts, activities, and related records will remain in the CRM database, but the company will be removed from active CRM views."
+          : "Archive this company? The company, its contacts, activities, and related records will remain in the CRM database, but the company will be removed from active CRM views."
       );
 
     if (!confirmed) return;
-
-    if (
-      !confirmDiscardUnsavedCompanyEdits(
-        "continue archiving this company"
-      )
-    ) {
-      return;
-    }
 
     setIsArchivingCompanyRecord(true);
     setCompanyRecordMessage("");
