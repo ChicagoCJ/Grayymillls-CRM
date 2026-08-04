@@ -185,10 +185,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.23.20 - Company Detail Quick Actions";
+  "Version 3.23.21 - Company Detail Section Status";
 
 const REVISION_NOTE =
-  "Adds quick actions for activities, contacts, company editing, phone copying, and website access in Company Detail.";
+  "Adds live counts for contacts, open and overdue activities, and funnel items to Company Detail navigation.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean
@@ -15782,9 +15782,14 @@ function CompanyDetailSection({
     companyQuickActionMessage,
     setCompanyQuickActionMessage,
   ] = useState("");
+  const [
+    companyFunnelItemCount,
+    setCompanyFunnelItemCount,
+  ] = useState(0);
 
   useEffect(() => {
     setCompanyQuickActionMessage("");
+    setCompanyFunnelItemCount(0);
   }, [detail?.company?.id]);
 
   function getCompanyEditForm(companyRecord: any): ManualCompanyForm {
@@ -17686,18 +17691,46 @@ function CompanyDetailSection({
             </p>
           )}
 
-          <div className="mt-5 flex flex-wrap gap-2 border-t border-slate-300 pt-4">
+          <div aria-label="Company Detail section status and navigation" className="mt-5 flex flex-nowrap gap-2 overflow-x-auto border-t border-slate-300 pb-1 pt-4 md:flex-wrap md:overflow-visible md:pb-0">
             <a href="#company-detail-snapshot" className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">
               Snapshot
             </a>
             <a href="#company-detail-sales-coverage" className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">
               Coverage
             </a>
-            <a href="#company-detail-funnel" className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">
-              Funnel
+            <a
+              href="#company-detail-funnel"
+              className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+            >
+              <span>Funnel</span>
+              <span
+                title="Funnel items"
+                className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-black text-violet-800"
+              >
+                {companyFunnelItemCount}
+              </span>
             </a>
-            <a href="#company-detail-activity" className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">
-              Activity
+            <a
+              href="#company-detail-activity"
+              className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+            >
+              <span>Activity</span>
+              <span
+                title="Open activities"
+                className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-black text-emerald-800"
+              >
+                {companyOpenActivities.length} open
+              </span>
+              <span
+                title="Overdue activities"
+                className={`rounded-full px-2 py-0.5 text-[11px] font-black ${
+                  companyOverdueActivities.length > 0
+                    ? "bg-red-100 text-red-800"
+                    : "bg-slate-100 text-slate-600"
+                }`}
+              >
+                {companyOverdueActivities.length} overdue
+              </span>
             </a>
             <a
               href="#company-detail-contacts"
@@ -18854,6 +18887,7 @@ function CompanyDetailSection({
       <CompanyOpportunityPanel
         canMoveOpportunityStages={canMoveOpportunityStages}
         apiPermissionHeaders={apiPermissionHeaders}
+        onOpportunityCountChange={setCompanyFunnelItemCount}
         companyId={String(detail.company.id)}
         companyName={displayValue(detail.company.company_name)}
         contacts={detail.contacts}
@@ -21616,6 +21650,7 @@ function CompanyOpportunityPanel({
   primaryProspect,
   canMoveOpportunityStages = true,
   apiPermissionHeaders = () => ({}),
+  onOpportunityCountChange,
 }: {
   companyId: string;
   companyName: string;
@@ -21624,6 +21659,7 @@ function CompanyOpportunityPanel({
   primaryProspect: Record<string, string | number | null> | null;
   canMoveOpportunityStages?: boolean;
   apiPermissionHeaders?: () => Record<string, string>;
+  onOpportunityCountChange?: (count: number) => void;
 }) {
   const [stages, setStages] = useState<SalesFunnelStage[]>([]);
   const [opportunities, setOpportunities] = useState<SalesOpportunity[]>([]);
@@ -21650,6 +21686,15 @@ function CompanyOpportunityPanel({
     businessCase: "",
     owner: "",
   });
+
+  useEffect(() => {
+    onOpportunityCountChange?.(
+      opportunities.length
+    );
+  }, [
+    onOpportunityCountChange,
+    opportunities.length,
+  ]);
 
   const defaultStage = useMemo(() => {
     return stages.find((stage) => stage.stage_key === "new_unqualified") ?? stages[0] ?? null;
