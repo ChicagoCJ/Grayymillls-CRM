@@ -402,6 +402,254 @@ export async function POST(request: Request) {
 
     if (companyTagsError) throw companyTagsError;
 
+    const {
+      data: classificationRows,
+      error: classificationError,
+    } = await supabase
+      .from("company_graymills_classifications")
+      .select(
+        `
+          id,
+          company_id,
+          graymills_category_id,
+          industry_id,
+          sub_industry_id,
+          created_at,
+          updated_at,
+          graymills_category_definitions (
+            id,
+            category_key,
+            category_name,
+            sort_order,
+            status
+          ),
+          company_industry_definitions (
+            id,
+            industry_name,
+            status
+          ),
+          company_sub_industry_definitions (
+            id,
+            sub_industry_name,
+            status
+          )
+        `
+      )
+      .eq("company_id", payload.companyId);
+
+    if (classificationError) throw classificationError;
+
+    function oneRelatedRecordForAnalysis(
+      value: unknown
+    ): Record<string, any> | null {
+      if (Array.isArray(value)) {
+        const firstRecord = value[0];
+
+        return firstRecord && typeof firstRecord === "object"
+          ? (firstRecord as Record<string, any>)
+          : null;
+      }
+
+      if (value && typeof value === "object") {
+        return value as Record<string, any>;
+      }
+
+      return null;
+    }
+
+    const activeClassificationRows = (classificationRows ?? []).filter(
+      (row: any) => {
+        const category = oneRelatedRecordForAnalysis(
+          row.graymills_category_definitions
+        );
+
+        return category?.status === "active";
+      }
+    );
+
+    if (activeClassificationRows.length === 0) {
+      return NextResponse.json(
+        {
+          error:
+            "Assign one active Graymills Category before running AI analysis.",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (activeClassificationRows.length > 1) {
+      return NextResponse.json(
+        {
+          error:
+            "This company has more than one active Graymills Category. Resolve it to one Category before running AI analysis.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const classificationRow = activeClassificationRows[0] as any;
+
+    const category = oneRelatedRecordForAnalysis(
+      classificationRow.graymills_category_definitions
+    );
+
+    const industry = oneRelatedRecordForAnalysis(
+      classificationRow.company_industry_definitions
+    );
+
+    const subIndustry = oneRelatedRecordForAnalysis(
+      classificationRow.company_sub_industry_definitions
+    );
+
+    const categoryKey = String(category?.category_key || "").trim();
+    const categoryName = String(
+      category?.category_name || "Unknown Graymills Category"
+    ).trim();
+
+    const categoryKnowledgeProductAreas: Record<string, string> = {
+      parts_washers: "Parts Washers",
+      pumps: "Pumps and Metalworking Fluid Systems",
+      graphics: "Inking Systems",
+      job_shop_fab: "Job Shop / Contract Manufacturing",
+    };
+
+    const knowledgeProductArea =
+      categoryKnowledgeProductAreas[categoryKey] || null;
+
+    if (!knowledgeProductArea) {
+      return NextResponse.json(
+        {
+          error:
+            `No AI knowledge routing is configured for Graymills Category "${categoryName}".`,
+        },
+        { status: 400 }
+      );
+    }
+
+    const knowledgeProductAreas = [
+      "All",
+      knowledgeProductArea,
+    ];
+
+    const currentClassification = {
+      classificationId: String(classificationRow.id),
+      categoryId: String(classificationRow.graymills_category_id),
+      categoryKey,
+      categoryName,
+      categoryStatus: String(category?.status || "unknown"),
+      industryId: classificationRow.industry_id
+        ? String(classificationRow.industry_id)
+        : null,
+      industryName: industry?.industry_name
+        ? String(industry.industry_name)
+        : null,
+      industryStatus: industry?.status
+        ? String(industry.status)
+        : null,
+      subIndustryId: classificationRow.sub_industry_id
+        ? String(classificationRow.sub_industry_id)
+        : null,
+      subIndustryName: subIndustry?.sub_industry_name
+        ? String(subIndustry.sub_industry_name)
+        : null,
+      subIndustryStatus: subIndustry?.status
+        ? String(subIndustry.status)
+        : null,
+    };
+
+    const {
+      data: activeIndustryOptions,
+      error: industryOptionsError,
+    } = await supabase
+      .from("company_industry_definitions")
+      .select(
+        "id, graymills_category_id, industry_name, sort_order, status"
+      )
+      .eq(
+        "graymills_category_id",
+        classificationRow.graymills_category_id
+      )
+      .eq("status", "active")
+      .order("sort_order", { ascending: true })
+      .order("industry_name", { ascending: true });
+
+    if (industryOptionsError) throw industryOptionsError;
+
+    const activeIndustryIds = (activeIndustryOptions ?? [])
+      .map((option: any) => String(option.id || ""))
+      .filter(Boolean);
+
+    let activeSubIndustryOptions: any[] = [];
+
+    if (activeIndustryIds.length > 0) {
+      const {
+        data: subIndustryOptionRows,
+        error: subIndustryOptionsError,
+      } = await supabase
+        .from("company_sub_industry_definitions")
+        .select(
+          "id, industry_id, sub_industry_name, sort_order, status"
+        )
+        .in("industry_id", activeIndustryIds)
+        .eq("status", "active")
+        .order("sort_order", { ascending: true })
+        .order("sub_industry_name", { ascending: true })
+        .limit(250);
+
+      if (subIndustryOptionsError) {
+        throw subIndustryOptionsError;
+      }
+
+      activeSubIndustryOptions = subIndustryOptionRows ?? [];
+    }
+
+    const {
+      data: opportunities,
+      error: opportunitiesError,
+    } = await supabase
+      .from("sales_opportunities")
+      .select(
+        `
+          id,
+          opportunity_name,
+          opportunity_type,
+          product_line,
+          likely_product_path,
+          primary_use_case,
+          stage_id,
+          estimated_value,
+          probability,
+          expected_close_date,
+          next_step,
+          next_step_due_date,
+          customer_need,
+          business_case,
+          competitive_situation,
+          decision_criteria,
+          buying_committee_notes,
+          source,
+          owner,
+          status,
+          created_at,
+          updated_at,
+          sales_funnel_stages (
+            id,
+            stage_name,
+            stage_key,
+            sort_order,
+            default_probability,
+            is_open_stage,
+            is_won_stage,
+            is_lost_stage
+          )
+        `
+      )
+      .eq("company_id", payload.companyId)
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    if (opportunitiesError) throw opportunitiesError;
+
     const savedBuyerPersonaNames = Array.isArray(company.buyer_personas)
       ? Array.from(
           new Set(
@@ -450,6 +698,7 @@ export async function POST(request: Request) {
       .select("title, product_area, summary, raw_text, structured_data")
       .eq("approved_for_ai", true)
       .eq("status", "active")
+      .in("product_area", knowledgeProductAreas)
       .limit(10);
 
     if (knowledgeDocumentsError) throw knowledgeDocumentsError;
@@ -461,6 +710,7 @@ export async function POST(request: Request) {
       )
       .eq("approved_for_ai", true)
       .eq("status", "active")
+      .in("product_area", knowledgeProductAreas)
       .limit(25);
 
     if (productFamiliesError) throw productFamiliesError;
@@ -472,6 +722,7 @@ export async function POST(request: Request) {
       )
       .eq("approved_for_ai", true)
       .eq("status", "active")
+      .in("product_area", knowledgeProductAreas)
       .limit(25);
 
     if (applicationRulesError) throw applicationRulesError;
@@ -481,6 +732,7 @@ export async function POST(request: Request) {
       .select("context_name, context_type, product_area, prompt_text, usage_notes")
       .eq("approved_for_ai", true)
       .eq("status", "active")
+      .in("product_area", knowledgeProductAreas)
       .limit(25);
 
     if (promptContextError) throw promptContextError;
@@ -488,24 +740,102 @@ export async function POST(request: Request) {
     const systemPrompt = `
 You are the Graymills prospect analysis engine for an industrial B2B CRM.
 
-Use the provided CRM data and approved Graymills knowledge context only.
-Return a careful sales hypothesis, not a final engineering recommendation.
+Methodology version:
+openai_analyze_prospect_rev_3_23_23_category_pcg_v1
 
-Hard rules:
-- Do not invent Graymills model numbers, specifications, certifications, capacities, dimensions, regulatory claims, chemistry compatibility, or guaranteed savings.
-- Use careful language: likely, may, potential fit, worth validating, depending on parts, soils, throughput, chemistry, safety, and workflow.
-- If data is missing, say what must be validated.
-- Treat user-entered CRM notes, activities, saved Account Type, saved Buyer Personas, contacts, and assigned tags as evidence.
-- Clearly distinguish evidence from inference. Do not claim that a likely pain point, application, stakeholder concern, or project exists unless CRM evidence supports it.
-- Use the saved Account Type to separate end-customer selling logic from distributor or channel selling logic.
-- Use the saved Buyer Personas and their Admin-defined descriptions to shape likely priorities, discovery questions, buying committee hypotheses, objections, first-call language, and next-best action.
-- Do not silently replace saved Buyer Personas with generic roles. When a persona is marked archived or legacy, retain it as CRM evidence but flag uncertainty.
-- Prioritize real operating value: uptime, labor, cleaning consistency, print quality, contamination control, maintenance simplicity, EHS support, total cost of ownership, and payback logic.
-- Make the output useful for a Graymills salesperson preparing a first call.
+Use only the supplied CRM evidence, opportunity context, company classifications, and approved Graymills knowledge. External web research is not enabled in this revision. Do not imply that outside research was performed.
+
+AUTHORITATIVE CLASSIFICATION RULES:
+
+- Graymills Category is manually assigned and controls the entire analysis route.
+- Do not change, question, compare, score, or recommend a different Graymills Category.
+- Do not introduce products, applications, language, or proof from another Category.
+- The current Industry and Sub-Industry are manually maintained CRM classifications.
+- Never state that the Industry or Sub-Industry was changed.
+- When the current Industry is supported, recommend retaining it.
+- When evidence conflicts with it, recommend human review and explain why.
+- When Industry is blank, recommend one active supplied Industry option when a credible fit exists.
+- When no active option fits, say that administrator review may be needed.
+- Apply the same review logic to Sub-Industry.
+- Never invent or silently create a classification.
+
+EVIDENCE RULES:
+
+- Separate verified CRM facts, approved Graymills facts, strong inference, working hypothesis, and unknown information.
+- Company tags, NAICS, SIC, imported industry data, contacts, activities, notes, opportunities, and funnel records are evidence inputs, but may be incomplete or outdated.
+- NAICS, SIC, and broad industry labels are clues, not proof of a plant process.
+- Do not claim that a process, pain, project, stakeholder concern, outsourcing arrangement, trigger event, or urgency exists unless the supplied evidence supports it.
+- When evidence is incomplete, identify what needs validation.
+- Do not invent names of people. A better contact may be hypothesized only as a job position or role.
+- Use actual supplied contacts first and explain how they may participate in the buying process.
+
+PAIN → CLAIM → GAIN / PROOF:
+
+- likely_pain_points is Pain.
+- Include relevant operational, business, financial, and personal risks.
+- Label those four pain levels clearly.
+- Financial and personal risks must remain hypotheses unless directly supported.
+- Never invent dollar amounts, ROI, savings, payback, emotional states, career risk, or performance results.
+
+- suggested_sales_angle is Claim.
+- State the credible customer improvement Graymills may support.
+- Do not make the Claim a list of products or capabilities.
+- Keep it within the assigned Graymills Category and the evidence available.
+
+- reason_to_believe is Gain / Proof.
+- Use only supplied approved Graymills knowledge and documented CRM facts.
+- Explain what the evidence supports and what it does not prove.
+- Do not invent models, specifications, dimensions, capacities, chemistry compatibility, certifications, delivery, tolerances, lead times, or guaranteed outcomes.
+
+APPLICATION AND CONTACT RULES:
+
+- Identify one strongest application hypothesis within the assigned Category.
+- A secondary path is allowed only when genuinely supported.
+- Do not create a catalog-style list of everything Graymills sells.
+- Use opportunity customer need, business case, funnel stage, decision criteria, competitive information, next steps, and buying committee notes when present.
+- Use the known contact as the starting point.
+- When another stakeholder may be better for discovery, recommend a job position and explain why.
+- Do not invent a named person.
+- Discovery questions must close the most important evidence gaps and identify the role best able to answer when practical.
+- next_best_action must be one concrete, low-friction action.
+- Trigger events must be confirmed, suggested, or explicitly absent.
+
+OUTPUT FIELD RULES:
+
+- product_line must exactly equal the authoritative Graymills Category name.
+- likely_relevance must begin with an Industry review using one of:
+  RETAIN, REVIEW RECOMMENDED, or MISSING.
+- likely_relevance must state the current Industry, any recommended Industry, confidence, supporting evidence, and important unknowns.
+- buyer_persona must identify the known CRM contact first, then any better job-position hypothesis.
+- buying_committee_hypothesis must distinguish known contacts from inferred roles.
+- likely_pain_points must contain labeled Operational, Business, Financial, and Personal sections.
+- suggested_sales_angle must contain the Claim.
+- reason_to_believe must contain Gain / Proof.
+- copyable_sales_block must be organized as Pain, Claim, Gain / Proof, and Next Step.
+- what_they_do must not overstate what the facility makes or does.
+- what_not_to_say must prevent unsupported sales claims.
+- Write for a Graymills salesperson preparing a credible first conversation.
 `;
 
     const userPrompt = `
 Analyze this prospect and return JSON only.
+
+AUTHORITATIVE GRAYMILLS CLASSIFICATION:
+${stringifyForPrompt(currentClassification)}
+
+CATEGORY-ROUTED KNOWLEDGE AREA:
+${stringifyForPrompt({
+  assignedCategory: categoryName,
+  categoryKey,
+  categorySpecificProductArea: knowledgeProductArea,
+  loadedProductAreas: knowledgeProductAreas,
+})}
+
+ACTIVE INDUSTRY OPTIONS FOR THIS CATEGORY:
+${stringifyForPrompt(activeIndustryOptions ?? [])}
+
+ACTIVE SUB-INDUSTRY OPTIONS FOR THIS CATEGORY:
+${stringifyForPrompt(activeSubIndustryOptions ?? [])}
 
 CRM COMPANY:
 ${stringifyForPrompt(company)}
@@ -516,49 +846,52 @@ ${stringifyForPrompt(contacts ?? [])}
 RECENT CRM ACTIVITIES AND USER-ENTERED NOTES:
 ${stringifyForPrompt(activities ?? [])}
 
-ASSIGNED COMPANY TAGS:
+OPPORTUNITIES AND FUNNEL CONTEXT:
+${stringifyForPrompt(opportunities ?? [])}
+
+SECONDARY CRM TAGS:
 ${stringifyForPrompt(companyTags ?? [])}
 
 SAVED ACCOUNT TYPE:
 ${stringifyForPrompt(company.account_type ?? "Unknown")}
 
-SAVED BUYER PERSONA NAMES:
+SAVED BUYER PERSONAS:
 ${stringifyForPrompt(savedBuyerPersonaNames)}
 
-BUYER PERSONA DEFINITIONS AND STATUS:
+BUYER PERSONA DEFINITIONS:
 ${stringifyForPrompt(buyerPersonaContext)}
 
 EXISTING PROSPECT RECORD:
 ${stringifyForPrompt(existingProspect ?? {})}
 
-APPROVED GRAYMILLS KNOWLEDGE DOCUMENTS:
+APPROVED CATEGORY-SCOPED GRAYMILLS KNOWLEDGE DOCUMENTS:
 ${stringifyForPrompt(knowledgeDocuments ?? [])}
 
-APPROVED PRODUCT FAMILY CONTEXT:
+APPROVED CATEGORY-SCOPED PRODUCT FAMILIES:
 ${stringifyForPrompt(productFamilies ?? [])}
 
-APPROVED APPLICATION RULES:
+APPROVED CATEGORY-SCOPED APPLICATION RULES:
 ${stringifyForPrompt(applicationRules ?? [])}
 
-APPROVED PROMPT CONTEXT:
+APPROVED SHARED AND CATEGORY-SCOPED PROMPT CONTEXT:
 ${stringifyForPrompt(promptContext ?? [])}
 
-Scoring guidance:
-- A+ / 90-100: unusually strong likely fit with clear product path and buyer relevance.
-- A / 75-89: strong likely fit, enough signal for prioritized outreach.
-- B / 55-74: plausible fit, needs discovery.
-- C / 35-54: weak or unclear fit.
-- D / 0-34: likely poor fit based on available data.
+Analysis sequence:
 
-Output guidance:
-- buyer_persona should summarize the saved CRM Buyer Personas and explain their likely role in this account. Do not output a generic list that ignores the saved values.
-- likely_priorities should connect each saved persona to concerns supported by its definition and the available CRM evidence.
-- discovery_questions should include persona-specific questions and identify which stakeholder each question is for when practical.
-- buying_committee_hypothesis should prioritize saved personas. Add an inferred role only when the CRM evidence supports it, and label the role as inferred in the role text.
-- suggested_sales_angle, first_call_opener, email_message, and next_best_action should match the saved Account Type and Buyer Personas.
-- reason_to_believe should identify the strongest CRM evidence used and should acknowledge important missing evidence.
+1. Preserve the authoritative Graymills Category.
+2. Review the current Industry and Sub-Industry.
+3. Determine what the supplied CRM evidence verifies about the company and facility.
+4. Identify likely processes without presenting inference as fact.
+5. Review opportunities, activities, contacts, and Buyer Personas.
+6. Identify one strongest application hypothesis within the assigned Category.
+7. Identify the known contact and any better discovery position.
+8. Develop operational, business, financial, and personal Pain.
+9. Develop the Claim.
+10. Support it with approved Gain / Proof.
+11. State unknowns, disqualifiers, discovery questions, and one next action.
+12. Keep every output within the assigned Graymills Category.
 
-Keep all language commercially useful, technically cautious, and application-driven.
+When category-specific approved knowledge is absent, say so clearly and limit the analysis to shared guardrails, CRM evidence, and discovery questions. Do not fill the gap with general knowledge.
 `;
 
     const response = await openai.responses.create({
@@ -645,7 +978,8 @@ Keep all language commercially useful, technically cautious, and application-dri
         prospect_id: prospectId,
         is_ai_generated: true,
         ai_generated_at: new Date().toISOString(),
-        ai_generation_source: "openai_analyze_prospect_rev_2_99_metric_snapshot",
+        ai_generation_source:
+          "openai_analyze_prospect_rev_3_23_23_category_pcg_v1",
         analysis_account_type: String(company.account_type || "Unknown"),
         analysis_buyer_personas: savedBuyerPersonaNames,
         analysis_priority_score: analysis.priority_score,

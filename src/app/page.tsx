@@ -185,10 +185,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.23.21 - Company Detail Section Status";
+  "Version 3.23.23 - Category-Scoped AI Methodology";
 
 const REVISION_NOTE =
-  "Adds live counts for contacts, open and overdue activities, and funnel items to Company Detail navigation.";
+  "Routes prospect analysis through the authoritative Graymills Category, filters approved knowledge by Category, and applies Pain, Claim, Gain / Proof using classification, contact, activity, and opportunity context.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean
