@@ -185,10 +185,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.23.23 - Category-Scoped AI Methodology";
+  "Version 3.23.24 - External Company Research";
 
 const REVISION_NOTE =
-  "Routes prospect analysis through the authoritative Graymills Category, filters approved knowledge by Category, and applies Pain, Claim, Gain / Proof using classification, contact, activity, and opportunity context.";
+  "Adds a separate source-grounded company and facility research pass, saves research evidence and sources, and supplies verified findings to the category-scoped Pain, Claim, Gain / Proof analysis.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean

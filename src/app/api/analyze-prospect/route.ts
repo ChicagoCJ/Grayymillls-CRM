@@ -337,6 +337,372 @@ function buildSchema() {
   };
 }
 
+const EXTERNAL_RESEARCH_METHODOLOGY_VERSION =
+  "openai_analyze_prospect_rev_3_23_24_web_research_pcg_v1";
+
+type ExternalResearchSource = {
+  title: string | null;
+  url: string;
+  source_type: string | null;
+  retrieved_at: string;
+};
+
+type ExternalResearchResult = {
+  companySummary: string;
+  facilityProfile: string;
+  whatTheyMake: string[];
+  likelyProcesses: Record<string, any>[];
+  evidence: Record<string, any>[];
+  triggerEvents: Record<string, any>[];
+  unknowns: string[];
+  researchNotes: string;
+};
+
+function externalResearchRecord(
+  value: unknown
+): Record<string, any> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  return value as Record<string, any>;
+}
+
+function externalResearchText(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function externalResearchStringArray(value: unknown) {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item) => externalResearchText(item))
+    .filter(Boolean);
+}
+
+function externalResearchObjectArray(value: unknown) {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item) => externalResearchRecord(item))
+    .filter(
+      (item): item is Record<string, any> =>
+        Boolean(item)
+    );
+}
+
+function emptyExternalResearchResult(): ExternalResearchResult {
+  return {
+    companySummary: "",
+    facilityProfile: "",
+    whatTheyMake: [],
+    likelyProcesses: [],
+    evidence: [],
+    triggerEvents: [],
+    unknowns: [],
+    researchNotes: "",
+  };
+}
+
+function normalizeExternalResearchResult(
+  value: unknown
+): ExternalResearchResult {
+  const record = externalResearchRecord(value);
+
+  if (!record) {
+    return emptyExternalResearchResult();
+  }
+
+  return {
+    companySummary: externalResearchText(
+      record.company_summary
+    ),
+    facilityProfile: externalResearchText(
+      record.facility_profile
+    ),
+    whatTheyMake: externalResearchStringArray(
+      record.what_they_make
+    ),
+    likelyProcesses: externalResearchObjectArray(
+      record.likely_processes
+    ),
+    evidence: externalResearchObjectArray(
+      record.evidence
+    ),
+    triggerEvents: externalResearchObjectArray(
+      record.trigger_events
+    ),
+    unknowns: externalResearchStringArray(
+      record.unknowns
+    ),
+    researchNotes: externalResearchText(
+      record.research_notes
+    ),
+  };
+}
+
+function buildExternalCompanyResearchSchema() {
+  const evidenceClasses = [
+    "verified_external_fact",
+    "strong_inference",
+    "working_hypothesis",
+    "unknown",
+  ];
+
+  const confidenceLevels = [
+    "high",
+    "medium",
+    "low",
+  ];
+
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      company_summary: {
+        type: "string",
+      },
+      facility_profile: {
+        type: "string",
+      },
+      what_they_make: {
+        type: "array",
+        items: {
+          type: "string",
+        },
+      },
+      likely_processes: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            process_name: {
+              type: "string",
+            },
+            process_location: {
+              type: "string",
+              enum: [
+                "likely_in_house",
+                "possibly_outsourced",
+                "unknown",
+              ],
+            },
+            evidence_class: {
+              type: "string",
+              enum: evidenceClasses,
+            },
+            confidence: {
+              type: "string",
+              enum: confidenceLevels,
+            },
+            rationale: {
+              type: "string",
+            },
+          },
+          required: [
+            "process_name",
+            "process_location",
+            "evidence_class",
+            "confidence",
+            "rationale",
+          ],
+        },
+      },
+      evidence: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            finding: {
+              type: "string",
+            },
+            facility_scope: {
+              type: "string",
+            },
+            evidence_class: {
+              type: "string",
+              enum: evidenceClasses,
+            },
+            confidence: {
+              type: "string",
+              enum: confidenceLevels,
+            },
+            supporting_detail: {
+              type: "string",
+            },
+          },
+          required: [
+            "finding",
+            "facility_scope",
+            "evidence_class",
+            "confidence",
+            "supporting_detail",
+          ],
+        },
+      },
+      trigger_events: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            event: {
+              type: "string",
+            },
+            status: {
+              type: "string",
+              enum: [
+                "confirmed",
+                "suggested",
+              ],
+            },
+            date_or_period: {
+              type: "string",
+            },
+            relevance: {
+              type: "string",
+            },
+            confidence: {
+              type: "string",
+              enum: confidenceLevels,
+            },
+          },
+          required: [
+            "event",
+            "status",
+            "date_or_period",
+            "relevance",
+            "confidence",
+          ],
+        },
+      },
+      unknowns: {
+        type: "array",
+        items: {
+          type: "string",
+        },
+      },
+      research_notes: {
+        type: "string",
+      },
+    },
+    required: [
+      "company_summary",
+      "facility_profile",
+      "what_they_make",
+      "likely_processes",
+      "evidence",
+      "trigger_events",
+      "unknowns",
+      "research_notes",
+    ],
+  };
+}
+
+function externalResearchUsedWebSearch(response: unknown) {
+  const responseRecord = externalResearchRecord(response);
+  const output = Array.isArray(responseRecord?.output)
+    ? responseRecord.output
+    : [];
+
+  return output.some((item) => {
+    const itemRecord = externalResearchRecord(item);
+    return itemRecord?.type === "web_search_call";
+  });
+}
+
+function extractExternalResearchSources(
+  response: unknown,
+  retrievedAt: string
+): ExternalResearchSource[] {
+  const responseRecord = externalResearchRecord(response);
+  const output = Array.isArray(responseRecord?.output)
+    ? responseRecord.output
+    : [];
+
+  const sourceMap =
+    new Map<string, ExternalResearchSource>();
+
+  function addSource(value: unknown) {
+    const sourceRecord = externalResearchRecord(value);
+
+    if (!sourceRecord) return;
+
+    const nestedCitation = externalResearchRecord(
+      sourceRecord.url_citation
+    );
+
+    const citation = nestedCitation || sourceRecord;
+    const url = externalResearchText(citation.url);
+
+    if (!/^https?:\/\//i.test(url)) {
+      return;
+    }
+
+    const normalizedUrl = url.replace(/#.*$/, "");
+
+    if (sourceMap.has(normalizedUrl)) {
+      return;
+    }
+
+    const title =
+      externalResearchText(citation.title) ||
+      externalResearchText(sourceRecord.title) ||
+      null;
+
+    const sourceType =
+      externalResearchText(citation.type) ||
+      externalResearchText(sourceRecord.type) ||
+      null;
+
+    sourceMap.set(normalizedUrl, {
+      title,
+      url: normalizedUrl,
+      source_type: sourceType,
+      retrieved_at: retrievedAt,
+    });
+  }
+
+  for (const outputItem of output) {
+    const item = externalResearchRecord(outputItem);
+
+    if (!item) continue;
+
+    if (item.type === "web_search_call") {
+      const action = externalResearchRecord(item.action);
+      const sources = Array.isArray(action?.sources)
+        ? action.sources
+        : [];
+
+      for (const source of sources) {
+        addSource(source);
+      }
+    }
+
+    const content = Array.isArray(item.content)
+      ? item.content
+      : [];
+
+    for (const contentItem of content) {
+      const contentRecord =
+        externalResearchRecord(contentItem);
+
+      const annotations =
+        Array.isArray(contentRecord?.annotations)
+          ? contentRecord.annotations
+          : [];
+
+      for (const annotation of annotations) {
+        addSource(annotation);
+      }
+    }
+  }
+
+  return Array.from(sourceMap.values());
+}
+
 export async function POST(request: Request) {
   const permission = enforceApiPermission(
     request,
@@ -737,13 +1103,243 @@ export async function POST(request: Request) {
 
     if (promptContextError) throw promptContextError;
 
+    const researchPerformedAt =
+      new Date().toISOString();
+
+    const researchModel =
+      process.env.OPENAI_RESEARCH_MODEL?.trim() ||
+      "gpt-5.1";
+
+    const companyForResearch =
+      company as Record<string, any>;
+
+    const researchCompanyInput = {
+      companyName:
+        companyForResearch.company_name ?? null,
+      website:
+        companyForResearch.website ?? null,
+      domain:
+        companyForResearch.domain ?? null,
+      address:
+        companyForResearch.address ??
+        companyForResearch.address_line_1 ??
+        null,
+      city:
+        companyForResearch.city ?? null,
+      state:
+        companyForResearch.state ?? null,
+      postalCode:
+        companyForResearch.postal_code ?? null,
+      country:
+        companyForResearch.country ?? null,
+      naics:
+        companyForResearch.naics ??
+        companyForResearch.naics_code ??
+        companyForResearch.primary_naics ??
+        null,
+      sic:
+        companyForResearch.sic ??
+        companyForResearch.sic_code ??
+        null,
+      importedIndustry:
+        companyForResearch.industry ??
+        companyForResearch.primary_industry ??
+        null,
+      importedSubIndustry:
+        companyForResearch.primary_sub_industry ??
+        null,
+    };
+
+    let researchResult =
+      emptyExternalResearchResult();
+
+    let researchStatus:
+      | "completed"
+      | "no_sources"
+      | "failed" = "failed";
+
+    let webSearchUsed = false;
+    let researchResponseId: string | null = null;
+    let researchFailureMessage: string | null = null;
+
+    let researchSources:
+      ExternalResearchSource[] = [];
+
+    const researchSystemPrompt = `
+You are the external company and facility research pass
+for the Graymills industrial B2B CRM.
+
+Research only the company and relevant facility.
+Do not recommend Graymills products in this pass.
+Do not perform Pain, Claim, or Gain / Proof analysis.
+
+Research priorities:
+
+1. Confirm the company identity.
+2. Distinguish the parent company from the specific facility.
+3. Determine what the company or facility makes or does.
+4. Identify manufacturing or operating processes supported by evidence.
+5. Identify likely in-house, possibly outsourced, and unknown processes.
+6. Identify current trigger events only when supported by sources.
+7. Record important unknowns that require salesperson discovery.
+
+Evidence rules:
+
+- Prefer the official company website and facility pages.
+- Then use credible business, trade, government, certification,
+  economic-development, and local sources.
+- Do not treat NAICS, SIC, directories, or broad industry labels
+  as proof of a specific plant process.
+- Do not invent equipment, capacity, production volume, pain,
+  financial impact, outsourcing, urgency, or customer problems.
+- Keep verified facts separate from inference and hypothesis.
+- Research business and facility facts, not private personal details.
+- Treat similarly named companies as possible identity conflicts.
+- When the exact facility cannot be confirmed, say so.
+- Use concise paraphrases rather than copied passages.
+`;
+
+    const researchUserPrompt = `
+Current research date:
+${researchPerformedAt.slice(0, 10)}
+
+Research this company and relevant facility.
+
+COMPANY IDENTITY AND LOCATION:
+${stringifyForPrompt(researchCompanyInput)}
+
+AUTHORITATIVE GRAYMILLS CLASSIFICATION:
+${stringifyForPrompt(currentClassification)}
+
+The Graymills Category is context for relevance only.
+Do not change it and do not recommend Graymills products.
+
+Return structured JSON containing:
+
+- Company summary
+- Facility profile
+- What the company or facility makes
+- Likely processes
+- Evidence classifications
+- Current trigger events
+- Important unknowns
+- Research notes
+`;
+
+    try {
+      const researchResponse =
+        await openai.responses.create({
+          model: researchModel,
+          tools: [
+            {
+              type: "web_search",
+              search_context_size: "medium",
+            },
+          ],
+          tool_choice: "auto",
+          include: [
+            "web_search_call.action.sources",
+          ],
+          input: [
+            {
+              role: "system",
+              content: researchSystemPrompt,
+            },
+            {
+              role: "user",
+              content: researchUserPrompt,
+            },
+          ],
+          text: {
+            format: {
+              type: "json_schema",
+              name:
+                "graymills_external_company_research",
+              strict: true,
+              schema:
+                buildExternalCompanyResearchSchema(),
+            },
+          },
+        });
+
+      researchResponseId =
+        externalResearchText(
+          (researchResponse as any).id
+        ) || null;
+
+      webSearchUsed =
+        externalResearchUsedWebSearch(
+          researchResponse
+        );
+
+      researchSources =
+        extractExternalResearchSources(
+          researchResponse,
+          researchPerformedAt
+        );
+
+      const rawResearchOutput =
+        researchResponse.output_text?.trim();
+
+      if (!rawResearchOutput) {
+        throw new Error(
+          "The external research pass returned no JSON output."
+        );
+      }
+
+      const researchJsonText =
+        rawResearchOutput
+          .replace(/^```(?:json)?\s*/i, "")
+          .replace(/\s*```$/i, "");
+
+      researchResult =
+        normalizeExternalResearchResult(
+          JSON.parse(researchJsonText)
+        );
+
+      webSearchUsed =
+        webSearchUsed ||
+        researchSources.length > 0;
+
+      researchStatus =
+        webSearchUsed &&
+        researchSources.length > 0
+          ? "completed"
+          : "no_sources";
+    } catch (researchError) {
+      researchStatus = "failed";
+
+      researchFailureMessage =
+        researchError instanceof Error
+          ? researchError.message
+          : "External research failed.";
+
+      researchResult = {
+        ...emptyExternalResearchResult(),
+        researchNotes:
+          "External research was attempted but did not complete. " +
+          "The commercial analysis must rely on CRM evidence and " +
+          "approved Graymills knowledge only.",
+      };
+    }
+
+    const researchAuditForPrompt = {
+      status: researchStatus,
+      performedAt: researchPerformedAt,
+      model: researchModel,
+      responseId: researchResponseId,
+      webSearchUsed,
+      sourceCount: researchSources.length,
+      failureMessage: researchFailureMessage,
+    };
+
     const systemPrompt = `
 You are the Graymills prospect analysis engine for an industrial B2B CRM.
 
 Methodology version:
 openai_analyze_prospect_rev_3_23_23_category_pcg_v1
 
-Use only the supplied CRM evidence, opportunity context, company classifications, and approved Graymills knowledge. External web research is not enabled in this revision. Do not imply that outside research was performed.
+Use the supplied CRM evidence, opportunity context, company classifications, approved Graymills knowledge, and the separate external-research package. Treat external research according to its recorded status. When research failed or returned no sources, do not imply that external research was completed.
 
 AUTHORITATIVE CLASSIFICATION RULES:
 
@@ -819,6 +1415,25 @@ OUTPUT FIELD RULES:
 
     const userPrompt = `
 Analyze this prospect and return JSON only.
+
+EXTERNAL RESEARCH AUDIT:
+${stringifyForPrompt(researchAuditForPrompt)}
+
+EXTERNAL COMPANY AND FACILITY RESEARCH:
+${stringifyForPrompt(researchResult)}
+
+EXTERNAL RESEARCH SOURCES:
+${stringifyForPrompt(researchSources)}
+
+External research rules:
+
+- Use verified external findings as evidence.
+- Label strong inference and working hypothesis accurately.
+- Do not treat all URLs consulted as proving every conclusion.
+- Do not invent facts when the research status is failed or no_sources.
+- Distinguish the relevant facility from the parent company.
+- Use trigger events only when the research package supports them.
+- Do not let external research change the assigned Graymills Category.
 
 AUTHORITATIVE GRAYMILLS CLASSIFICATION:
 ${stringifyForPrompt(currentClassification)}
@@ -979,7 +1594,43 @@ When category-specific approved knowledge is absent, say so clearly and limit th
         is_ai_generated: true,
         ai_generated_at: new Date().toISOString(),
         ai_generation_source:
-          "openai_analyze_prospect_rev_3_23_23_category_pcg_v1",
+          EXTERNAL_RESEARCH_METHODOLOGY_VERSION,
+        research_status: researchStatus,
+        research_performed_at: researchPerformedAt,
+        web_search_used: webSearchUsed,
+        research_model: researchModel,
+        research_response_id: researchResponseId,
+        research_summary:
+          researchResult.companySummary || null,
+        research_facility_profile:
+          researchResult.facilityProfile || null,
+        research_likely_processes:
+          researchResult.likelyProcesses,
+        research_evidence: {
+          whatTheyMake:
+            researchResult.whatTheyMake,
+          evidence:
+            researchResult.evidence,
+          triggerEvents:
+            researchResult.triggerEvents,
+          unknowns:
+            researchResult.unknowns,
+          researchNotes:
+            researchResult.researchNotes,
+          failureMessage:
+            researchFailureMessage,
+        },
+        research_sources: researchSources,
+        analysis_methodology_version:
+          EXTERNAL_RESEARCH_METHODOLOGY_VERSION,
+        analysis_graymills_category_key:
+          categoryKey,
+        analysis_graymills_category_name:
+          categoryName,
+        analysis_industry_name:
+          currentClassification.industryName,
+        analysis_sub_industry_name:
+          currentClassification.subIndustryName,
         analysis_account_type: String(company.account_type || "Unknown"),
         analysis_buyer_personas: savedBuyerPersonaNames,
         analysis_priority_score: analysis.priority_score,
