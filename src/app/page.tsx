@@ -185,10 +185,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.23.24 - External Company Research";
+  "Version 3.23.25D - Research Sources Pop-Out";
 
 const REVISION_NOTE =
-  "Adds a separate source-grounded company and facility research pass, saves research evidence and sources, and supplies verified findings to the category-scoped Pain, Claim, Gain / Proof analysis.";
+  "Displays saved external research, evidence confidence, source links, classification snapshots, and structured Pain, Claim, Gain / Proof sections on Company Detail.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean
@@ -2962,8 +2962,8 @@ async function handleAnalyzeProspect() {
                 </h2>
                 <p className="mt-1 text-sm leading-6 text-green-900">
                   Current user: <span className="font-semibold">{currentUserDisplayName}</span>
-                  {" "}· Role: <span className="font-semibold">{formatAppUserRole(currentUserRole)}</span>
-                  {" "}· Status: <span className="font-semibold">{signedInProductionUser.status || "Not detected"}</span>
+                  {" "}Â· Role: <span className="font-semibold">{formatAppUserRole(currentUserRole)}</span>
+                  {" "}Â· Status: <span className="font-semibold">{signedInProductionUser.status || "Not detected"}</span>
                 </p>
                 <p className="mt-1 text-xs leading-5 text-green-800">
                   {signedInProductionUser.message}
@@ -5120,7 +5120,7 @@ function AdminProjectsListsSection({
                       </div>
 
                       <p className="mt-2 text-sm text-slate-600">
-                        Owner: {ownerName} · Sort order:{" "}
+                        Owner: {ownerName} Â· Sort order:{" "}
                         {item.sort_order ?? 100}
                       </p>
 
@@ -9814,8 +9814,8 @@ const filteredOpportunities = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (Number.isNaN(closeDay.getTime())) return { label: formatDate(closeDate), className: "text-slate-600" };
-    if (closeDay.getTime() < today.getTime()) return { label: `Overdue · ${formatDate(closeDate)}`, className: "font-semibold text-red-700" };
-    if (closeDay.getTime() === today.getTime()) return { label: `Due today · ${formatDate(closeDate)}`, className: "font-semibold text-amber-700" };
+    if (closeDay.getTime() < today.getTime()) return { label: `Overdue Â· ${formatDate(closeDate)}`, className: "font-semibold text-red-700" };
+    if (closeDay.getTime() === today.getTime()) return { label: `Due today Â· ${formatDate(closeDate)}`, className: "font-semibold text-amber-700" };
     return { label: formatDate(closeDate), className: "text-slate-600" };
   }
 
@@ -9929,12 +9929,12 @@ const filteredOpportunities = useMemo(() => {
                             )}
                           </div>
                           <p className="mt-1 text-xs text-slate-600">
-                            {savedView.view_mode === "list" ? "List" : "Board"} ·{" "}
+                            {savedView.view_mode === "list" ? "List" : "Board"} Â·{" "}
                             {savedView.card_density === "compact"
                               ? "Compact"
                               : "Comfortable"}{" "}
-                            · Status: {savedView.status_filter} · Stage:{" "}
-                            {savedView.stage_filter} · Type: {savedView.type_filter}
+                            Â· Status: {savedView.status_filter} Â· Stage:{" "}
+                            {savedView.stage_filter} Â· Type: {savedView.type_filter}
                           </p>
                           {savedView.search_term && (
                             <p className="mt-1 text-xs text-slate-600">
@@ -10631,7 +10631,7 @@ const filteredOpportunities = useMemo(() => {
                                 }`}>
                                   <span className="font-semibold">Next:</span>{" "}
                                   {opportunity.next_step || "Missing"}
-                                  {" · "}
+                                  {" Â· "}
                                   {opportunity.next_step_due_date ? formatDate(opportunity.next_step_due_date) : "No due date"}
                                 </p>
                               </div>
@@ -11363,7 +11363,7 @@ function ReleaseNotesSection() {
       changes: [
         "Save the current Funnel configuration under a reusable name.",
         "Apply, rename, update, set as default, clear default, or delete saved views.",
-        "Automatically restore the signed-in user’s default Funnel view.",
+        "Automatically restore the signed-in userâ€™s default Funnel view.",
         "Protect all saved-view reads and writes with verified Supabase authentication and server-side ownership enforcement.",
       ],
       testNotes: [
@@ -12092,7 +12092,7 @@ function MySalesWorkspaceSection({
           </p>
           {workspace?.user?.displayName && (
             <p className="mt-2 text-xs font-semibold text-slate-500">
-              {workspace.user.displayName} · {formatTitleFromKey(workspace.user.role || "")}
+              {workspace.user.displayName} Â· {formatTitleFromKey(workspace.user.role || "")}
             </p>
           )}
         </div>
@@ -13125,8 +13125,8 @@ function ManagedIndustryDefinitionsPanel({
                       {definition.industry_name}
                     </p>
                     <p className="text-xs text-slate-500">
-                      {parentCategory?.category_name || "Legacy / Unassigned"} ·
-                      {" "}Sort {definition.sort_order} · {definition.status}
+                      {parentCategory?.category_name || "Legacy / Unassigned"} Â·
+                      {" "}Sort {definition.sort_order} Â· {definition.status}
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -13195,7 +13195,7 @@ function ManagedIndustryDefinitionsPanel({
 
                   return (
                     <option key={definition.id} value={definition.id}>
-                      {parentCategory?.category_name || "Unassigned"} —{" "}
+                      {parentCategory?.category_name || "Unassigned"} â€”{" "}
                       {definition.industry_name}
                     </option>
                   );
@@ -13291,9 +13291,9 @@ function ManagedIndustryDefinitionsPanel({
                       {definition.sub_industry_name}
                     </p>
                     <p className="text-xs text-slate-500">
-                      {parentCategory?.category_name || "Unassigned"} —{" "}
-                      {parentIndustry?.industry_name || "Unassigned"} · Sort{" "}
-                      {definition.sort_order} · {definition.status}
+                      {parentCategory?.category_name || "Unassigned"} â€”{" "}
+                      {parentIndustry?.industry_name || "Unassigned"} Â· Sort{" "}
+                      {definition.sort_order} Â· {definition.status}
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -15742,6 +15742,7 @@ function CompanyDetailSection({
   const [graymillsCustomerNumberMessage, setGraymillsCustomerNumberMessage] = useState("");
   const [graymillsCustomerNumberError, setGraymillsCustomerNumberError] = useState("");
   const [showAiAnalysisHistory, setShowAiAnalysisHistory] = useState(false);
+  const [showResearchSources, setShowResearchSources] = useState(false);
   const [unifiedTimeline, setUnifiedTimeline] = useState<any[]>([]);
   const [isLoadingUnifiedTimeline, setIsLoadingUnifiedTimeline] = useState(false);
   const [unifiedTimelineError, setUnifiedTimelineError] = useState("");
@@ -15790,7 +15791,42 @@ function CompanyDetailSection({
   useEffect(() => {
     setCompanyQuickActionMessage("");
     setCompanyFunnelItemCount(0);
+    setShowResearchSources(false);
   }, [detail?.company?.id]);
+
+  useEffect(() => {
+    if (!showResearchSources) {
+      return;
+    }
+
+    function handleResearchSourceKeyDown(
+      event: KeyboardEvent
+    ) {
+      if (event.key === "Escape") {
+        setShowResearchSources(false);
+      }
+    }
+
+    const previousBodyOverflow =
+      document.body.style.overflow;
+
+    document.body.style.overflow = "hidden";
+
+    document.addEventListener(
+      "keydown",
+      handleResearchSourceKeyDown
+    );
+
+    return () => {
+      document.body.style.overflow =
+        previousBodyOverflow;
+
+      document.removeEventListener(
+        "keydown",
+        handleResearchSourceKeyDown
+      );
+    };
+  }, [showResearchSources]);
 
   function getCompanyEditForm(companyRecord: any): ManualCompanyForm {
     return {
@@ -17459,6 +17495,117 @@ function CompanyDetailSection({
     ? parseJsonArray(intelligence?.likely_objections)
     : [];
 
+  const researchStatus = String(
+    intelligence?.research_status || ""
+  )
+    .trim()
+    .toLowerCase();
+
+  const researchStatusLabel = researchStatus
+    ? formatTitleFromKey(researchStatus)
+    : "Not recorded";
+
+  const researchStatusClassName =
+    researchStatus === "completed"
+      ? "bg-emerald-100 text-emerald-800 ring-emerald-200"
+      : researchStatus === "failed"
+        ? "bg-red-100 text-red-800 ring-red-200"
+        : researchStatus === "no_sources"
+          ? "bg-amber-100 text-amber-800 ring-amber-200"
+          : "bg-slate-100 text-slate-700 ring-slate-200";
+
+  const researchPerformedAt =
+    intelligence?.research_performed_at
+      ? new Date(
+          String(intelligence.research_performed_at)
+        ).toLocaleString()
+      : "Not recorded";
+
+  const researchModel =
+    String(
+      intelligence?.research_model || ""
+    ).trim() || "Not recorded";
+
+  const researchMethodologyVersion =
+    String(
+      intelligence?.analysis_methodology_version || ""
+    ).trim() || "Not recorded";
+
+  const researchSummary =
+    intelligence?.research_summary;
+
+  const researchFacilityProfile =
+    intelligence?.research_facility_profile;
+
+  const researchLikelyProcesses =
+    parseJsonArray(
+      intelligence?.research_likely_processes
+    );
+
+  const researchEvidenceRecord =
+    isRecord(intelligence?.research_evidence)
+      ? intelligence.research_evidence
+      : {};
+
+  const researchWhatTheyMake =
+    parseJsonArray(
+      researchEvidenceRecord.whatTheyMake
+    );
+
+  const researchEvidenceItems =
+    parseJsonArray(
+      researchEvidenceRecord.evidence
+    );
+
+  const researchTriggerEvents =
+    parseJsonArray(
+      researchEvidenceRecord.triggerEvents
+    );
+
+  const researchUnknowns =
+    parseJsonArray(
+      researchEvidenceRecord.unknowns
+    );
+
+  const researchNotes =
+    String(
+      researchEvidenceRecord.researchNotes || ""
+    ).trim();
+
+  const researchFailureMessage =
+    String(
+      researchEvidenceRecord.failureMessage || ""
+    ).trim();
+
+  const researchSources =
+    parseJsonArray(
+      intelligence?.research_sources
+    ).filter((item) => {
+      if (!isRecord(item)) {
+        return false;
+      }
+
+      return /^https?:\/\//i.test(
+        String(item.url || "")
+      );
+    });
+
+  const analysisCategorySnapshot =
+    String(
+      intelligence?.analysis_graymills_category_name || ""
+    ).trim() || "Not recorded";
+
+  const analysisIndustrySnapshot =
+    String(
+      intelligence?.analysis_industry_name || ""
+    ).trim() || "Not recorded";
+
+  const analysisSubIndustrySnapshot =
+    String(
+      intelligence?.analysis_sub_industry_name || ""
+    ).trim() || "Not recorded";
+
+
   const detailAccountTypeLens = getCompanyEffectiveAccountTypeLens(company);
   const detailBuyerPersonas = getCompanyEffectiveBuyerPersonas(detailAccountTypeLens, company);
   const detailBuyerPersonaContext = detailBuyerPersonas.map((persona) => {
@@ -17505,7 +17652,7 @@ function CompanyDetailSection({
     <section className="grid gap-6">
       <div
         data-testid="company-detail-sticky-header"
-        className="max-w-full overflow-hidden rounded-2xl border border-slate-300 bg-slate-100/95 p-4 shadow-md backdrop-blur supports-[backdrop-filter]:bg-slate-100/90 md:sticky md:top-20 md:z-30"
+        className="max-w-full overflow-hidden rounded-2xl border border-slate-300 bg-slate-100/95 p-4 shadow-md"
       >
         <div className="flex flex-wrap gap-3">
           <button
@@ -18549,7 +18696,7 @@ function CompanyDetailSection({
                     classification.subIndustryName,
                   ]
                     .filter(Boolean)
-                    .join(" → ");
+                    .join(" â†’ ");
 
                   const hasArchivedValue =
                     classification.categoryStatus === "archived" ||
@@ -19030,7 +19177,7 @@ function CompanyDetailSection({
               {detail.contacts.map((contact: any) => (
                 <option key={String(contact.id)} value={String(contact.id)}>
                   {displayValue(contact.full_name || contact.email)}
-                  {contact.is_primary ? " — Company Primary" : ""}
+                  {contact.is_primary ? " â€” Company Primary" : ""}
                 </option>
               ))}
             </select>
@@ -19070,7 +19217,7 @@ function CompanyDetailSection({
                       />
                       <span>
                         {displayValue(contact.full_name || contact.email)}
-                        {isPrimarySelection ? " — Primary Contact" : ""}
+                        {isPrimarySelection ? " â€” Primary Contact" : ""}
                       </span>
                     </label>
                   );
@@ -19278,7 +19425,7 @@ function CompanyDetailSection({
 
         <div className="mt-3 text-xs text-slate-500">
           Showing {filteredUnifiedTimeline.length} of {unifiedTimeline.length} timeline items
-          {" · "}
+          {" Â· "}
           {unifiedTimelineOpenCount} open
         </div>
 
@@ -20149,7 +20296,7 @@ function CompanyDetailSection({
                     })
                   }
                 />
-                Set as this company’s primary contact
+                Set as this companyâ€™s primary contact
               </label>
             </div>
 
@@ -20298,56 +20445,458 @@ function CompanyDetailSection({
 
       {hasAiAnalysis ? (
         <>
-          <div className="grid gap-6 lg:grid-cols-2">
-            <DetailCard title="What They Do">
-              <p className="text-sm leading-6 text-slate-700">
-                {displayValue(intelligence?.what_they_do)}
+          {researchStatus ? (
+            <>
+              <div className="max-w-full overflow-hidden rounded-2xl border border-sky-200 bg-sky-50 p-6 shadow-sm">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-sky-700">
+                      External Research Audit
+                    </p>
+
+                    <h3 className="mt-1 text-xl font-bold text-slate-900">
+                      Company and Facility Research
+                    </h3>
+
+                    <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                      External findings are displayed separately from CRM facts,
+                      approved Graymills proof, and commercial hypotheses.
+                    </p>
+                  </div>
+
+                  <span
+                    className={
+                      `w-fit rounded-full px-3 py-1 text-xs font-bold ring-1 ${researchStatusClassName}`
+                    }
+                  >
+                    {researchStatusLabel}
+                  </span>
+                </div>
+
+                <div className="mt-5 grid min-w-0 gap-3 sm:grid-cols-2 min-[1800px]:grid-cols-5">
+                  <div className="rounded-xl border border-sky-100 bg-white p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Performed
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-slate-800">
+                      {researchPerformedAt}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-sky-100 bg-white p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Research Model
+                    </p>
+                    <p className="mt-1 break-words text-sm font-semibold text-slate-800">
+                      {researchModel}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-sky-100 bg-white p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Web Search
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-slate-800">
+                      {intelligence?.web_search_used === true
+                        ? "Used"
+                        : intelligence?.web_search_used === false
+                          ? "Not used"
+                          : "Not recorded"}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={
+                      researchSources.length === 0
+                    }
+                    onClick={() =>
+                      setShowResearchSources(true)
+                    }
+                    className="rounded-xl border border-sky-100 bg-white p-3 text-left hover:border-sky-300 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Sources
+                    </p>
+
+                    <p className="mt-1 text-sm font-semibold text-sky-800">
+                      {researchSources.length}
+                    </p>
+
+                    <p className="mt-1 text-xs font-semibold text-sky-700">
+                      Open source drawer
+                    </p>
+                  </button>
+
+                  <div className="rounded-xl border border-sky-100 bg-white p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Methodology
+                    </p>
+                    <p className="mt-1 break-words text-xs font-semibold leading-5 text-slate-800">
+                      {researchMethodologyVersion}
+                    </p>
+                  </div>
+                </div>
+
+                {researchFailureMessage && (
+                  <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4">
+                    <p className="text-xs font-bold uppercase tracking-wide text-red-700">
+                      Research Failure Detail
+                    </p>
+                    <MultilineAnalysisText
+                      value={researchFailureMessage}
+                      className="mt-2"
+                    />
+                  </div>
+                )}
+
+                {researchNotes && (
+                  <div className="mt-4 rounded-xl border border-sky-100 bg-white p-4">
+                    <p className="text-xs font-bold uppercase tracking-wide text-sky-700">
+                      Research Notes
+                    </p>
+                    <MultilineAnalysisText
+                      value={researchNotes}
+                      className="mt-2"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="grid min-w-0 gap-6 min-[1800px]:grid-cols-2">
+                <DetailCard title="Company Research Summary">
+                  <MultilineAnalysisText
+                    value={researchSummary}
+                    fallback="No company research summary was saved."
+                  />
+                </DetailCard>
+
+                <DetailCard title="Facility Profile">
+                  <MultilineAnalysisText
+                    value={researchFacilityProfile}
+                    fallback="No facility-specific profile was saved."
+                  />
+                </DetailCard>
+              </div>
+
+              <div className="grid min-w-0 gap-6 min-[1800px]:grid-cols-2">
+                <ReadableListCard
+                  title="What They Make / Do"
+                  items={researchWhatTheyMake}
+                  primaryKeys={[]}
+                  secondaryKeys={[]}
+                />
+
+                <ReadableListCard
+                  title="Likely Processes"
+                  items={researchLikelyProcesses}
+                  primaryKeys={[
+                    "process_name",
+                    "name",
+                    "process",
+                  ]}
+                  secondaryKeys={[
+                    "rationale",
+                    "supporting_detail",
+                    "reason",
+                  ]}
+                />
+              </div>
+
+              <div className="grid min-w-0 gap-6 min-[1800px]:grid-cols-2">
+                <ReadableListCard
+                  title="Research Evidence and Confidence"
+                  items={researchEvidenceItems}
+                  primaryKeys={[
+                    "finding",
+                    "title",
+                    "evidence",
+                  ]}
+                  secondaryKeys={[
+                    "supporting_detail",
+                    "rationale",
+                    "detail",
+                  ]}
+                />
+
+                <ReadableListCard
+                  title="External Trigger Events"
+                  items={researchTriggerEvents}
+                  primaryKeys={[
+                    "event",
+                    "trigger",
+                    "title",
+                  ]}
+                  secondaryKeys={[
+                    "relevance",
+                    "reason",
+                    "detail",
+                  ]}
+                />
+              </div>
+
+              <ReadableListCard
+                title="Research Unknowns"
+                items={researchUnknowns}
+                primaryKeys={[]}
+                secondaryKeys={[]}
+              />
+
+              {researchSources.length === 0 ? (
+                <div className="max-w-full overflow-hidden rounded-2xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
+                  <h3 className="text-lg font-bold text-amber-900">
+                    Research Sources
+                  </h3>
+
+                  <p className="mt-2 text-sm leading-6 text-amber-800">
+                    No external source links were saved for this analysis.
+                  </p>
+                </div>
+              ) : null}
+
+              {showResearchSources &&
+                researchSources.length > 0 && (
+                  <div
+                    className="fixed inset-0 z-[70] bg-slate-950/55"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="research-sources-drawer-title"
+                    onMouseDown={(event) => {
+                      if (
+                        event.target ===
+                        event.currentTarget
+                      ) {
+                        setShowResearchSources(false);
+                      }
+                    }}
+                  >
+                    <aside className="ml-auto flex h-full w-full max-w-2xl flex-col bg-white shadow-2xl">
+                      <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 bg-white p-5 sm:p-6">
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-wide text-sky-700">
+                            External Research
+                          </p>
+
+                          <h3
+                            id="research-sources-drawer-title"
+                            className="mt-1 text-xl font-bold text-slate-900"
+                          >
+                            Research Sources
+                          </h3>
+
+                          <p className="mt-1 text-sm text-slate-600">
+                            {researchSources.length} sources were saved for this analysis.
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setShowResearchSources(false)
+                          }
+                          className="shrink-0 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-300 hover:bg-slate-50"
+                          aria-label="Close research sources"
+                        >
+                          Close
+                        </button>
+                      </div>
+
+                      <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+                        <p className="mb-4 rounded-xl bg-sky-50 p-3 text-sm leading-6 text-sky-900">
+                          Select a source to open the external material in a new browser tab.
+                        </p>
+
+                        <div className="grid min-w-0 gap-3">
+                          {researchSources.map(
+                            (item, index) => {
+                              const source =
+                                isRecord(item)
+                                  ? item
+                                  : {};
+
+                              const sourceUrl =
+                                String(
+                                  source.url ?? ""
+                                ).trim();
+
+                              const sourceTitle =
+                                String(
+                                  source.title ?? ""
+                                ).trim() ||
+                                sourceUrl ||
+                                `Research source ${index + 1}`;
+
+                              const sourceType =
+                                String(
+                                  source.source_type ?? ""
+                                ).trim();
+
+                              const retrievedAt =
+                                String(
+                                  source.retrieved_at ?? ""
+                                ).trim();
+
+                              return (
+                                <a
+                                  key={`${sourceUrl}-${index}`}
+                                  href={sourceUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="block min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-4 hover:border-sky-300 hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+                                >
+                                  <p className="break-words [overflow-wrap:anywhere] text-sm font-semibold text-sky-800">
+                                    {sourceTitle}
+                                  </p>
+
+                                  <p className="mt-1 break-all text-xs leading-5 text-slate-500">
+                                    {sourceUrl}
+                                  </p>
+
+                                  {(sourceType ||
+                                    retrievedAt) && (
+                                    <p className="mt-2 text-xs text-slate-500">
+                                      {[
+                                        sourceType
+                                          ? `Type: ${sourceType}`
+                                          : "",
+                                        retrievedAt
+                                          ? `Retrieved: ${retrievedAt}`
+                                          : "",
+                                      ]
+                                        .filter(Boolean)
+                                        .join(" | ")}
+                                    </p>
+                                  )}
+                                </a>
+                              );
+                            }
+                          )}
+                        </div>
+                      </div>
+                    </aside>
+                  </div>
+                )}
+            </>
+          ) : (
+            <div className="max-w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-6 shadow-sm">
+              <h3 className="text-lg font-bold text-slate-900">
+                External Research Audit
+              </h3>
+
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                This analysis predates Version 3.23.24, so external company
+                research, evidence confidence, and source links were not saved.
+                Rerun Analyze Prospect to create the research record.
               </p>
+            </div>
+          )}
+
+          <div className="max-w-full overflow-hidden rounded-2xl border border-violet-200 bg-violet-50 p-6 shadow-sm">
+            <p className="text-xs font-bold uppercase tracking-wide text-violet-700">
+              Classification Snapshot
+            </p>
+
+            <h3 className="mt-1 text-xl font-bold text-slate-900">
+              Graymills Category and Industry Review
+            </h3>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <div className="rounded-xl border border-violet-100 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Graymills Category Used
+                </p>
+                <p className="mt-1 font-bold text-slate-900">
+                  {analysisCategorySnapshot}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-violet-100 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Industry Used
+                </p>
+                <p className="mt-1 font-bold text-slate-900">
+                  {analysisIndustrySnapshot}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-violet-100 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Sub-Industry Used
+                </p>
+                <p className="mt-1 font-bold text-slate-900">
+                  {analysisSubIndustrySnapshot}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-xl border border-violet-100 bg-white p-4">
+              <p className="text-xs font-bold uppercase tracking-wide text-violet-700">
+                Industry Review
+              </p>
+
+              <MultilineAnalysisText
+                value={intelligence?.likely_relevance}
+                fallback="No Industry review was recorded."
+                className="mt-2"
+              />
+            </div>
+          </div>
+
+          <div className="grid min-w-0 gap-6 min-[1800px]:grid-cols-2">
+            <DetailCard title="Commercial Summary - What They Do">
+              <MultilineAnalysisText
+                value={intelligence?.what_they_do}
+              />
             </DetailCard>
 
-            <DetailCard title="Likely Graymills Relevance">
-              <p className="text-sm leading-6 text-slate-700">
-                {displayValue(intelligence?.likely_relevance)}
-              </p>
+            <DetailCard title="Buyer Persona and Contact Strategy">
+              <MultilineAnalysisText
+                value={intelligence?.buyer_persona}
+              />
             </DetailCard>
 
-            <DetailCard title="Likely Parts / Components Cleaned">
-              <p className="text-sm leading-6 text-slate-700">
-                {displayValue(intelligence?.likely_parts_cleaned)}
-              </p>
+            <DetailCard title="Likely Parts / Components">
+              <MultilineAnalysisText
+                value={intelligence?.likely_parts_cleaned}
+              />
             </DetailCard>
 
             <DetailCard title="Likely Soils / Contaminants">
-              <p className="text-sm leading-6 text-slate-700">
-                {displayValue(intelligence?.likely_soils_contaminants)}
-              </p>
-            </DetailCard>
-
-            <DetailCard title="Likely Cleaning Pain Points">
-              <p className="text-sm leading-6 text-slate-700">
-                {displayValue(intelligence?.likely_pain_points)}
-              </p>
-            </DetailCard>
-
-            <DetailCard title="Suggested Sales Angle">
-              <p className="text-sm leading-6 text-slate-700">
-                {displayValue(intelligence?.suggested_sales_angle)}
-              </p>
-            </DetailCard>
-
-            <DetailCard title="Buyer Persona">
-              <p className="text-sm leading-6 text-slate-700">
-                {displayValue(intelligence?.buyer_persona)}
-              </p>
-            </DetailCard>
-
-            <DetailCard title="Reason to Believe">
-              <p className="text-sm leading-6 text-slate-700">
-                {displayValue(intelligence?.reason_to_believe)}
-              </p>
+              <MultilineAnalysisText
+                value={intelligence?.likely_soils_contaminants}
+              />
             </DetailCard>
           </div>
 
+          <div className="max-w-full overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+              Pain
+            </p>
+
+            <h3 className="mt-1 text-xl font-bold text-slate-900">
+              Operational, Business, Financial, and Personal Pain
+            </h3>
+
+            <div className="mt-4">
+              <PainFrameworkDisplay
+                value={intelligence?.likely_pain_points}
+              />
+            </div>
+          </div>
+
+          <div className="grid min-w-0 gap-6 min-[1800px]:grid-cols-2">
+            <DetailCard title="Claim - Suggested Sales Angle">
+              <MultilineAnalysisText
+                value={intelligence?.suggested_sales_angle}
+              />
+            </DetailCard>
+
+            <DetailCard title="Gain / Proof - Reason to Believe">
+              <MultilineAnalysisText
+                value={intelligence?.reason_to_believe}
+              />
+            </DetailCard>
+          </div>
           <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
             <h3 className="text-xl font-bold">Discovery Questions</h3>
             {discoveryQuestions.length === 0 ? (
@@ -21461,7 +22010,7 @@ function OpportunityActivitiesPanel({
                 {contacts.map((contact: any) => (
                   <option key={String(contact.id)} value={String(contact.id)}>
                     {displayValue(contact.full_name || contact.email)}
-                    {contact.is_primary ? " — Company Primary" : ""}
+                    {contact.is_primary ? " â€” Company Primary" : ""}
                   </option>
                 ))}
               </select>
@@ -21502,7 +22051,7 @@ function OpportunityActivitiesPanel({
                         />
                         <span>
                           {displayValue(contact.full_name || contact.email)}
-                          {isPrimarySelection ? " — Primary Contact" : ""}
+                          {isPrimarySelection ? " â€” Primary Contact" : ""}
                         </span>
                       </label>
                     );
@@ -22143,7 +22692,7 @@ function CompanyOpportunityPanel({
                 {contacts.map((contact: any) => (
                   <option key={String(contact.id)} value={String(contact.id)}>
                     {displayValue(contact.full_name || contact.email)}
-                    {contact.is_primary ? " — Company Primary" : ""}
+                    {contact.is_primary ? " â€” Company Primary" : ""}
                   </option>
                 ))}
               </select>
@@ -22182,7 +22731,7 @@ function CompanyOpportunityPanel({
                         />
                         <span>
                           {displayValue(contact.full_name || contact.email)}
-                          {isPrimarySelection ? " — Primary Contact" : ""}
+                          {isPrimarySelection ? " â€” Primary Contact" : ""}
                         </span>
                       </label>
                     );
@@ -22480,7 +23029,7 @@ function CompanyOpportunityPanel({
                               {contacts.map((contact: any) => (
                                 <option key={String(contact.id)} value={String(contact.id)}>
                                   {displayValue(contact.full_name || contact.email)}
-                                  {contact.is_primary ? " — Company Primary" : ""}
+                                  {contact.is_primary ? " â€” Company Primary" : ""}
                                 </option>
                               ))}
                             </select>
@@ -22521,7 +23070,7 @@ function CompanyOpportunityPanel({
                                       />
                                       <span>
                                         {displayValue(contact.full_name || contact.email)}
-                                        {isPrimarySelection ? " — Primary Contact" : ""}
+                                        {isPrimarySelection ? " â€” Primary Contact" : ""}
                                       </span>
                                     </label>
                                   );
@@ -24049,6 +24598,248 @@ function ContactTagAssignmentRow({
   );
 }
 
+function ResearchLinkedText({
+  value,
+}: {
+  value: unknown;
+}) {
+  const text =
+    value === null || value === undefined
+      ? ""
+      : String(value);
+
+  const markdownLinkPattern =
+    /(\[[^\]]+\]\(https?:\/\/[^)\s]+\))/g;
+
+  return (
+    <>
+      {text
+        .split(markdownLinkPattern)
+        .map((part, index) => {
+          const linkMatch = part.match(
+            /^\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)$/
+          );
+
+          if (!linkMatch) {
+            return (
+              <span key={`research-text-${index}`}>
+                {part}
+              </span>
+            );
+          }
+
+          return (
+            <a
+              key={`research-link-${index}`}
+              href={linkMatch[2]}
+              target="_blank"
+              rel="noreferrer"
+              className="font-semibold text-sky-700 underline decoration-sky-300 underline-offset-2 hover:text-sky-900"
+            >
+              {linkMatch[1]}
+            </a>
+          );
+        })}
+    </>
+  );
+}
+
+function MultilineAnalysisText({
+  value,
+  fallback = "Not recorded",
+  className = "",
+}: {
+  value: unknown;
+  fallback?: string;
+  className?: string;
+}) {
+  const text =
+    typeof value === "string" ||
+    typeof value === "number"
+      ? String(value).trim()
+      : "";
+
+  return (
+    <p
+      className={
+        `whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-6 text-slate-700 ${className}`
+      }
+    >
+      <ResearchLinkedText
+        value={text || fallback}
+      />
+    </p>
+  );
+}
+
+type PainFrameworkSection = {
+  label: string;
+  text: string;
+};
+
+function parsePainFrameworkSections(
+  value: unknown
+): {
+  sections: PainFrameworkSection[];
+  unstructured: string;
+} {
+  const originalText =
+    typeof value === "string"
+      ? value.replace(/\r\n/g, "\n").trim()
+      : "";
+
+  if (!originalText) {
+    return {
+      sections: [],
+      unstructured: "",
+    };
+  }
+
+  const normalizedText = originalText.replace(
+    /\s+(?=(?:[-*]\s*)?(?:#{1,6}\s*)?(?:\*\*)?(?:Operational|Business|Financial|Personal)(?:\s+(?:Pain|Risk|Impact))?\s*:)/gi,
+    "\n"
+  );
+
+  const markerPattern =
+    /(?:^|\n)\s*(?:[-*]\s*)?(?:#{1,6}\s*)?(?:\*\*)?(Operational|Business|Financial|Personal)(?:\s+(?:Pain|Risk|Impact))?\s*:?\s*(?:\*\*)?\s*:?\s*/gi;
+
+  const matches = Array.from(
+    normalizedText.matchAll(markerPattern)
+  );
+
+  if (matches.length === 0) {
+    return {
+      sections: [],
+      unstructured: originalText,
+    };
+  }
+
+  const sections = matches
+    .map((match, index) => {
+      const start =
+        (match.index ?? 0) +
+        match[0].length;
+
+      const nextMatch =
+        matches[index + 1];
+
+      const end =
+        nextMatch?.index ??
+        normalizedText.length;
+
+      return {
+        label: String(match[1] || "").trim(),
+        text: normalizedText
+          .slice(start, end)
+          .trim(),
+      };
+    })
+    .filter(
+      (section) =>
+        section.label &&
+        section.text
+    );
+
+  return {
+    sections,
+    unstructured:
+      sections.length > 0
+        ? ""
+        : originalText,
+  };
+}
+
+function PainFrameworkDisplay({
+  value,
+}: {
+  value: unknown;
+}) {
+  const parsed =
+    parsePainFrameworkSections(value);
+
+  if (
+    parsed.sections.length === 0 &&
+    !parsed.unstructured
+  ) {
+    return (
+      <p className="text-sm leading-6 text-slate-600">
+        No Pain analysis was recorded.
+      </p>
+    );
+  }
+
+  if (parsed.unstructured) {
+    return (
+      <div className="grid gap-3">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <p className="text-xs font-bold uppercase tracking-wide text-amber-800">
+            Combined Pain Analysis
+          </p>
+
+          <MultilineAnalysisText
+            value={parsed.unstructured}
+            className="mt-2"
+          />
+        </div>
+
+        <p className="text-xs leading-5 text-slate-500">
+          This older analysis did not save separate
+          Operational, Business, Financial, and Personal
+          sections.
+        </p>
+      </div>
+    );
+  }
+
+  const labels = [
+    "Operational",
+    "Business",
+    "Financial",
+    "Personal",
+  ];
+
+  const colorClasses: Record<string, string> = {
+    Operational:
+      "border-blue-200 bg-blue-50 text-blue-800",
+    Business:
+      "border-violet-200 bg-violet-50 text-violet-800",
+    Financial:
+      "border-amber-200 bg-amber-50 text-amber-800",
+    Personal:
+      "border-rose-200 bg-rose-50 text-rose-800",
+  };
+
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      {labels.map((label) => {
+        const section =
+          parsed.sections.find(
+            (item) =>
+              item.label.toLowerCase() ===
+              label.toLowerCase()
+          );
+
+        return (
+          <div
+            key={label}
+            className={
+              `rounded-xl border p-4 ${colorClasses[label]}`
+            }
+          >
+            <p className="text-xs font-bold uppercase tracking-wide">
+              {label} Pain
+            </p>
+
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+              {section?.text ||
+                "Not separately recorded in this analysis."}
+            </p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 function SmallScoreCard({ label, value }: { label: string; value: string }) {
 
   return (
@@ -24096,15 +24887,18 @@ function ReadableListCard({
   primaryKeys: string[];
   secondaryKeys: string[];
 }) {
-
   return (
-    <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
-      <h3 className="text-lg font-bold">{title}</h3>
+    <div className="min-w-0 max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
+      <h3 className="break-words text-lg font-bold">
+        {title}
+      </h3>
 
       {items.length === 0 ? (
-        <p className="mt-3 text-sm text-slate-600">No items generated.</p>
+        <p className="mt-3 text-sm text-slate-600">
+          No items generated.
+        </p>
       ) : (
-        <div className="mt-4 grid gap-3">
+        <div className="mt-4 grid min-w-0 gap-3">
           {items.map((item, index) => (
             <ReadableListItem
               key={index}
@@ -24130,40 +24924,73 @@ function ReadableListItem({
 }) {
   if (!isRecord(item)) {
     return (
-      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-        <p className="text-sm leading-6 text-slate-700">{displayValue(item)}</p>
+      <div className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <p className="break-words [overflow-wrap:anywhere] text-sm leading-6 text-slate-700">
+          <ResearchLinkedText
+            value={displayValue(item)}
+          />
+        </p>
       </div>
     );
   }
 
-  const primaryKey = primaryKeys.find((key) => item[key]);
-  const secondaryKey = secondaryKeys.find((key) => item[key]);
+  const primaryKey =
+    primaryKeys.find((key) => item[key]);
 
-  const primaryText = primaryKey ? displayValue(item[primaryKey]) : "Item";
-  const secondaryText = secondaryKey ? displayValue(item[secondaryKey]) : "";
+  const secondaryKey =
+    secondaryKeys.find((key) => item[key]);
 
-  const remainingEntries = Object.entries(item).filter(
-    ([key]) => key !== primaryKey && key !== secondaryKey
-  );
+  const primaryText =
+    primaryKey
+      ? displayValue(item[primaryKey])
+      : "Item";
+
+  const secondaryText =
+    secondaryKey
+      ? displayValue(item[secondaryKey])
+      : "";
+
+  const remainingEntries =
+    Object.entries(item).filter(
+      ([key]) =>
+        key !== primaryKey &&
+        key !== secondaryKey
+    );
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-      <p className="font-semibold text-slate-900">{primaryText}</p>
+    <div className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-4">
+      <p className="break-words [overflow-wrap:anywhere] font-semibold text-slate-900">
+        <ResearchLinkedText
+          value={primaryText}
+        />
+      </p>
 
       {secondaryText && (
-        <p className="mt-2 text-sm leading-6 text-slate-700">{secondaryText}</p>
+        <p className="mt-2 break-words [overflow-wrap:anywhere] text-sm leading-6 text-slate-700">
+          <ResearchLinkedText
+            value={secondaryText}
+          />
+        </p>
       )}
 
       {remainingEntries.length > 0 && (
-        <div className="mt-3 grid gap-2 text-sm text-slate-600">
-          {remainingEntries.map(([key, value]) => (
-            <div key={key}>
-              <span className="font-semibold text-slate-700">
-                {formatTitleFromKey(key)}:
-              </span>{" "}
-              <span>{displayValue(value)}</span>
-            </div>
-          ))}
+        <div className="mt-3 grid min-w-0 gap-2 text-sm text-slate-600">
+          {remainingEntries.map(
+            ([key, value]) => (
+              <div
+                key={key}
+                className="min-w-0 break-words [overflow-wrap:anywhere]"
+              >
+                <span className="font-semibold text-slate-700">
+                  {formatTitleFromKey(key)}:
+                </span>{" "}
+
+                <ResearchLinkedText
+                  value={displayValue(value)}
+                />
+              </div>
+            )
+          )}
         </div>
       )}
     </div>
