@@ -2,6 +2,7 @@
 
 
 import { getBrowserSupabaseClient, hasBrowserSupabaseConfig } from "../lib/supabase-browser";
+import AdminKnowledgeLibrarySection from "./components/AdminKnowledgeLibrarySection";
 import { ChangeEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 type TabKey = "dashboard" | "companies" | "contacts" | "funnel" | "import" | "help" | "releaseNotes" | "admin" | "companyDetail";
@@ -185,10 +186,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.23.25D - Research Sources Pop-Out";
+  "Version 3.23.26D - Controlled Knowledge Library";
 
 const REVISION_NOTE =
-  "Displays saved external research, evidence confidence, source links, classification snapshots, and structured Pain, Claim, Gain / Proof sections on Company Detail.";
+  "Adds an Admin-controlled Graymills knowledge library with private document uploads, category-scoped routing, draft review, explicit AI approval, archive and restore, and lifecycle history.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean
@@ -3317,6 +3318,9 @@ async function handleAnalyzeProspect() {
         {activeTab === "admin" && (
           <section className="grid max-w-full gap-6 overflow-hidden">
             <UserRolePermissionsReference />
+            <AdminKnowledgeLibrarySection
+              canManageKnowledge={currentPermissions.canManageAdminSettings}
+            />
             <AdminUsersSection
               canManageAdminUsers={currentPermissions.canManageAdminSettings}
               apiPermissionHeaders={apiPermissionHeaders}
