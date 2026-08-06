@@ -186,10 +186,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.23.27 - Job Shop Approved Knowledge";
+  "Version 3.23.28 - AI Knowledge Traceability";
 
 const REVISION_NOTE =
-  "Adds source-backed Job Shop Fab Pain–Claim–Gain knowledge and verifies that AI retrieval is isolated to the Job Shop Fab category.";
+  "Adds an auditable snapshot of the approved Graymills knowledge documents and category routing used for each AI prospect analysis.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean
@@ -17609,6 +17609,60 @@ function CompanyDetailSection({
       intelligence?.analysis_sub_industry_name || ""
     ).trim() || "Not recorded";
 
+  const analysisKnowledgeDocuments =
+    parseJsonArray(
+      intelligence?.analysis_knowledge_documents
+    ).filter((item) => isRecord(item));
+
+  const analysisKnowledgeRouting =
+    isRecord(
+      intelligence?.analysis_knowledge_routing
+    )
+      ? intelligence.analysis_knowledge_routing
+      : {};
+
+  const analysisKnowledgeDocumentCountRaw =
+    Number(
+      intelligence?.analysis_knowledge_document_count
+    );
+
+  const analysisKnowledgeDocumentCount =
+    Number.isFinite(
+      analysisKnowledgeDocumentCountRaw
+    )
+      ? analysisKnowledgeDocumentCountRaw
+      : analysisKnowledgeDocuments.length;
+
+  const analysisKnowledgeCapturedAt =
+    intelligence?.analysis_knowledge_captured_at
+      ? new Date(
+          String(
+            intelligence.analysis_knowledge_captured_at
+          )
+        ).toLocaleString()
+      : "";
+
+  const analysisKnowledgeRoutedArea =
+    String(
+      analysisKnowledgeRouting.categorySpecificProductArea ||
+        ""
+    ).trim() || "Not recorded";
+
+  const analysisKnowledgeLoadedAreas =
+    Array.isArray(
+      analysisKnowledgeRouting.loadedProductAreas
+    )
+      ? analysisKnowledgeRouting.loadedProductAreas
+          .map((item: unknown) =>
+            String(item || "").trim()
+          )
+          .filter(Boolean)
+      : [];
+
+  const hasAnalysisKnowledgeSnapshot =
+    Boolean(
+      intelligence?.analysis_knowledge_captured_at
+    );
 
   const detailAccountTypeLens = getCompanyEffectiveAccountTypeLens(company);
   const detailBuyerPersonas = getCompanyEffectiveBuyerPersonas(detailAccountTypeLens, company);
@@ -20845,6 +20899,214 @@ function CompanyDetailSection({
               />
             </div>
           </div>
+
+          {hasAnalysisKnowledgeSnapshot ? (
+            <div className="max-w-full overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50 p-6 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">
+                Knowledge Used
+              </p>
+
+              <h3 className="mt-1 text-xl font-bold text-slate-900">
+                Approved Graymills Knowledge Snapshot
+              </h3>
+
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-700">
+                These are the approved knowledge documents that were supplied to this AI analysis.
+                The snapshot is preserved with the analysis even if the Knowledge Library changes later.
+              </p>
+
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
+                <div className="rounded-xl border border-emerald-100 bg-white p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Documents Used
+                  </p>
+                  <p className="mt-1 text-lg font-bold text-slate-900">
+                    {analysisKnowledgeDocumentCount}
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-emerald-100 bg-white p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Routed Knowledge Area
+                  </p>
+                  <p className="mt-1 break-words text-sm font-bold text-slate-900">
+                    {analysisKnowledgeRoutedArea}
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-emerald-100 bg-white p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Snapshot Captured
+                  </p>
+                  <p className="mt-1 text-sm font-bold text-slate-900">
+                    {analysisKnowledgeCapturedAt || "Not recorded"}
+                  </p>
+                </div>
+              </div>
+
+              {analysisKnowledgeLoadedAreas.length > 0 && (
+                <div className="mt-4 rounded-xl border border-emerald-100 bg-white p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Allowed Product Areas
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-slate-800">
+                    {analysisKnowledgeLoadedAreas.join(" | ")}
+                  </p>
+                </div>
+              )}
+
+              {analysisKnowledgeDocuments.length === 0 ? (
+                <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                  <p className="text-sm leading-6 text-amber-900">
+                    No approved category-specific knowledge document was supplied to this analysis.
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-4 grid gap-3">
+                  {analysisKnowledgeDocuments.map(
+                    (item, index) => {
+                      const document =
+                        isRecord(item)
+                          ? item
+                          : {};
+
+                      const documentId =
+                        String(
+                          document.documentId || ""
+                        ).trim();
+
+                      const documentTitle =
+                        String(
+                          document.title || ""
+                        ).trim() ||
+                        `Knowledge document ${index + 1}`;
+
+                      const documentProductArea =
+                        String(
+                          document.productArea || ""
+                        ).trim() ||
+                        "Product area not recorded";
+
+                      const documentVersion =
+                        String(
+                          document.versionLabel || ""
+                        ).trim();
+
+                      const sourceFileName =
+                        String(
+                          document.sourceFileName || ""
+                        ).trim();
+
+                      const fileSha256 =
+                        String(
+                          document.fileSha256 || ""
+                        ).trim();
+
+                      const approvedAt =
+                        String(
+                          document.approvedAt || ""
+                        ).trim();
+
+                      const approvedAtDisplay =
+                        approvedAt
+                          ? new Date(
+                              approvedAt
+                            ).toLocaleString()
+                          : "Not recorded";
+
+                      const documentStatus =
+                        String(
+                          document.status || ""
+                        ).trim() ||
+                        "Not recorded";
+
+                      return (
+                        <div
+                          key={
+                            documentId ||
+                            `${documentTitle}-${index}`
+                          }
+                          className="rounded-xl border border-emerald-100 bg-white p-4"
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="break-words text-sm font-bold text-slate-900">
+                                {documentTitle}
+                              </p>
+
+                              <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                                {documentProductArea}
+                              </p>
+                            </div>
+
+                            <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">
+                              {documentStatus}
+                            </span>
+                          </div>
+
+                          <div className="mt-3 grid gap-3 md:grid-cols-2">
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Version
+                              </p>
+                              <p className="mt-1 break-words text-sm text-slate-800">
+                                {documentVersion || "Not recorded"}
+                              </p>
+                            </div>
+
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Approved
+                              </p>
+                              <p className="mt-1 break-words text-sm text-slate-800">
+                                {approvedAtDisplay}
+                              </p>
+                            </div>
+                          </div>
+
+                          {sourceFileName && (
+                            <div className="mt-3">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Source File
+                              </p>
+                              <p className="mt-1 break-all text-sm text-slate-800">
+                                {sourceFileName}
+                              </p>
+                            </div>
+                          )}
+
+                          {fileSha256 && (
+                            <div className="mt-3">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                SHA-256 Integrity Hash
+                              </p>
+                              <p className="mt-1 break-all font-mono text-xs leading-5 text-slate-600">
+                                {fileSha256}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="max-w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-6 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                Knowledge Used
+              </p>
+
+              <h3 className="mt-1 text-xl font-bold text-slate-900">
+                Knowledge Snapshot Not Available
+              </h3>
+
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                This analysis predates Version 3.23.28, so the approved Graymills knowledge documents used by the AI were not saved with the historical analysis. Rerun Analyze Prospect to create the traceability snapshot.
+              </p>
+            </div>
+          )}
 
           <div className="grid min-w-0 gap-6 min-[1800px]:grid-cols-2">
             <DetailCard title="Commercial Summary - What They Do">

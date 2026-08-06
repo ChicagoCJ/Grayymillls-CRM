@@ -1061,13 +1061,127 @@ export async function POST(request: Request) {
 
     const { data: knowledgeDocuments, error: knowledgeDocumentsError } = await supabase
       .from("graymills_knowledge_documents")
-      .select("title, product_area, summary, raw_text, structured_data")
+      .select(
+        `
+          id,
+          title,
+          product_area,
+          summary,
+          raw_text,
+          structured_data,
+          version_label,
+          scope_type,
+          graymills_category_id,
+          category_key_snapshot,
+          category_name_snapshot,
+          source_file_name,
+          source_kind,
+          file_sha256,
+          approved_at,
+          approved_by_name,
+          updated_at
+        `
+      )
       .eq("approved_for_ai", true)
       .eq("status", "active")
+      .is("archived_at", null)
       .in("product_area", knowledgeProductAreas)
+      .order("product_area", { ascending: true })
+      .order("title", { ascending: true })
       .limit(10);
 
     if (knowledgeDocumentsError) throw knowledgeDocumentsError;
+
+    const analysisKnowledgeCapturedAt =
+      new Date().toISOString();
+
+    const knowledgeDocumentsForPrompt =
+      (knowledgeDocuments ?? []).map(
+        (document: any) => ({
+          title: document.title,
+          product_area: document.product_area,
+          summary: document.summary,
+          raw_text: document.raw_text,
+          structured_data: document.structured_data,
+        })
+      );
+
+    const analysisKnowledgeDocuments =
+      (knowledgeDocuments ?? []).map(
+        (document: any) => ({
+          documentId: String(document.id),
+          title: String(document.title || ""),
+          productArea:
+            document.product_area
+              ? String(document.product_area)
+              : null,
+          scopeType:
+            document.scope_type
+              ? String(document.scope_type)
+              : null,
+          graymillsCategoryId:
+            document.graymills_category_id
+              ? String(document.graymills_category_id)
+              : null,
+          categoryKey:
+            document.category_key_snapshot
+              ? String(document.category_key_snapshot)
+              : null,
+          categoryName:
+            document.category_name_snapshot
+              ? String(document.category_name_snapshot)
+              : null,
+          versionLabel:
+            document.version_label
+              ? String(document.version_label)
+              : null,
+          sourceFileName:
+            document.source_file_name
+              ? String(document.source_file_name)
+              : null,
+          sourceKind:
+            document.source_kind
+              ? String(document.source_kind)
+              : null,
+          fileSha256:
+            document.file_sha256
+              ? String(document.file_sha256)
+              : null,
+          approvedForAi: true,
+          status: "active",
+          approvedAt:
+            document.approved_at ?? null,
+          approvedByName:
+            document.approved_by_name
+              ? String(document.approved_by_name)
+              : null,
+          documentUpdatedAt:
+            document.updated_at ?? null,
+          isSharedKnowledge:
+            document.product_area === "All",
+        })
+      );
+
+    const analysisKnowledgeRouting = {
+      assignedCategoryId:
+        currentClassification.categoryId,
+      assignedCategoryKey:
+        categoryKey,
+      assignedCategoryName:
+        categoryName,
+      categorySpecificProductArea:
+        knowledgeProductArea,
+      loadedProductAreas:
+        knowledgeProductAreas,
+      selectionRules: {
+        approvedForAi: true,
+        status: "active",
+        archivedAt: null,
+        maximumDocuments: 10,
+      },
+      capturedAt:
+        analysisKnowledgeCapturedAt,
+    };
 
     const { data: productFamilies, error: productFamiliesError } = await supabase
       .from("graymills_product_families")
@@ -1480,7 +1594,7 @@ EXISTING PROSPECT RECORD:
 ${stringifyForPrompt(existingProspect ?? {})}
 
 APPROVED CATEGORY-SCOPED GRAYMILLS KNOWLEDGE DOCUMENTS:
-${stringifyForPrompt(knowledgeDocuments ?? [])}
+${stringifyForPrompt(knowledgeDocumentsForPrompt)}
 
 APPROVED CATEGORY-SCOPED PRODUCT FAMILIES:
 ${stringifyForPrompt(productFamilies ?? [])}
@@ -1633,6 +1747,14 @@ When category-specific approved knowledge is absent, say so clearly and limit th
           currentClassification.subIndustryName,
         analysis_account_type: String(company.account_type || "Unknown"),
         analysis_buyer_personas: savedBuyerPersonaNames,
+        analysis_knowledge_documents:
+          analysisKnowledgeDocuments,
+        analysis_knowledge_routing:
+          analysisKnowledgeRouting,
+        analysis_knowledge_document_count:
+          analysisKnowledgeDocuments.length,
+        analysis_knowledge_captured_at:
+          analysisKnowledgeCapturedAt,
         analysis_priority_score: analysis.priority_score,
         analysis_priority_tier: analysis.priority_tier,
         analysis_fit_rating: analysis.fit_rating,
