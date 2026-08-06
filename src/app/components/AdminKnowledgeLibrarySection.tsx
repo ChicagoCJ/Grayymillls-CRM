@@ -428,6 +428,7 @@ export default function AdminKnowledgeLibrarySection({
           document.document_type,
           document.product_area,
           document.category_name_snapshot,
+          document.category_key_snapshot,
           document.source_file_name,
           document.source_url,
           document.summary,
@@ -468,6 +469,205 @@ export default function AdminKnowledgeLibrarySection({
       (document) =>
         document.status === "archived"
     ).length;
+
+  const sharedApprovedDocumentCount =
+    documents.filter(
+      (document) =>
+        (
+          document.scope_type === "all" ||
+          document.product_area === "All"
+        ) &&
+        document.status === "active" &&
+        document.approved_for_ai &&
+        !document.archived_at
+    ).length;
+
+  const knowledgeCoverageRows =
+    useMemo(
+      () =>
+        activeCategories.map((category) => {
+          const categoryDocuments =
+            documents.filter(
+              (document) =>
+                document.scope_type ===
+                  "category" &&
+                (
+                  document.graymills_category_id ===
+                    category.id ||
+                  document.category_key_snapshot ===
+                    category.category_key
+                )
+            );
+
+          function isCurrentlyRevokedDraft(
+            document: KnowledgeDocument
+          ) {
+            if (
+              document.status !== "draft" ||
+              document.approved_for_ai
+            ) {
+              return false;
+            }
+
+            const latestReviewStateEvent =
+              [...document.events]
+                .filter(
+                  (event) =>
+                    event.event_type ===
+                      "approval_revoked" ||
+                    event.event_type ===
+                      "restored" ||
+                    event.event_type ===
+                      "created"
+                )
+                .sort(
+                  (left, right) =>
+                    new Date(
+                      right.created_at
+                    ).getTime() -
+                    new Date(
+                      left.created_at
+                    ).getTime()
+                )[0];
+
+            return (
+              latestReviewStateEvent
+                ?.event_type ===
+              "approval_revoked"
+            );
+          }
+
+          const approvedDocuments =
+            categoryDocuments.filter(
+              (document) =>
+                document.status === "active" &&
+                document.approved_for_ai &&
+                !document.archived_at
+            );
+
+          const revokedDocuments =
+            categoryDocuments.filter(
+              isCurrentlyRevokedDraft
+            );
+
+          const revokedDocumentIds =
+            new Set(
+              revokedDocuments.map(
+                (document) => document.id
+              )
+            );
+
+          const draftReviewDocuments =
+            categoryDocuments.filter(
+              (document) =>
+                document.status === "draft" &&
+                !document.approved_for_ai &&
+                !revokedDocumentIds.has(
+                  document.id
+                )
+            );
+
+          const archivedDocuments =
+            categoryDocuments.filter(
+              (document) =>
+                document.status ===
+                  "archived" ||
+                Boolean(
+                  document.archived_at
+                )
+            );
+
+          const extractionIssueDocuments =
+            categoryDocuments.filter(
+              (document) =>
+                document.status !==
+                  "archived" &&
+                (
+                  document.extraction_status ===
+                    "failed" ||
+                  String(
+                    document.extraction_error ||
+                      ""
+                  ).trim().length > 0
+                )
+            );
+
+          const latestApprovalAt =
+            approvedDocuments
+              .map(
+                (document) =>
+                  document.approved_at
+              )
+              .filter(
+                (
+                  value
+                ): value is string =>
+                  Boolean(value)
+              )
+              .sort(
+                (left, right) =>
+                  new Date(
+                    right
+                  ).getTime() -
+                  new Date(
+                    left
+                  ).getTime()
+              )[0] || null;
+
+          const isReady =
+            approvedDocuments.length > 0 &&
+            extractionIssueDocuments.length ===
+              0;
+
+          return {
+            category,
+            isReady,
+            approvedCount:
+              approvedDocuments.length,
+            draftReviewCount:
+              draftReviewDocuments.length,
+            revokedCount:
+              revokedDocuments.length,
+            archivedCount:
+              archivedDocuments.length,
+            extractionIssueCount:
+              extractionIssueDocuments.length,
+            latestApprovalAt,
+          };
+        }),
+      [
+        activeCategories,
+        documents,
+      ]
+    );
+
+  const readyKnowledgeCategoryCount =
+    knowledgeCoverageRows.filter(
+      (row) => row.isReady
+    ).length;
+
+  const libraryFiltersActive =
+    Boolean(
+      searchText.trim() ||
+      statusFilter !== "all" ||
+      scopeFilter !== "any"
+    );
+
+  function filterLibraryToCategory(
+    category: KnowledgeCategory
+  ) {
+    setSearchText(
+      category.category_key
+    );
+    setStatusFilter("all");
+    setScopeFilter("category");
+  }
+
+  function clearLibraryFilters() {
+    setSearchText("");
+    setStatusFilter("all");
+    setScopeFilter("any");
+  }
 
   function resetKnowledgeForm() {
     setForm(createEmptyKnowledgeForm());
@@ -894,6 +1094,203 @@ export default function AdminKnowledgeLibrarySection({
             {archivedDocumentCount}
           </p>
         </div>
+      </div>
+
+      <div className="border-b border-slate-200 bg-white p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-700">
+              AI Knowledge Coverage
+            </p>
+
+            <h3 className="mt-1 text-lg font-bold text-slate-950">
+              Category Readiness
+            </h3>
+
+            <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
+              Ready means the Graymills Category has at least
+              one active, approved, unarchived category-specific
+              knowledge document and no current extraction
+              problems. Shared All knowledge is supplemental and
+              does not replace category-specific coverage.
+            </p>
+          </div>
+
+          <div className="grid w-fit grid-cols-2 gap-3">
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                Categories Ready
+              </p>
+              <p className="mt-1 text-xl font-bold text-emerald-900">
+                {readyKnowledgeCategoryCount} /{" "}
+                {activeCategories.length}
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
+                Shared All
+              </p>
+              <p className="mt-1 text-xl font-bold text-blue-900">
+                {sharedApprovedDocumentCount}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={clearLibraryFilters}
+            disabled={!libraryFiltersActive}
+            className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Clear Library Filter
+          </button>
+
+          {libraryFiltersActive && (
+            <p className="text-xs font-semibold text-slate-500">
+              A library search, status, or scope filter is currently active.
+            </p>
+          )}
+        </div>
+
+        {activeCategories.length === 0 ? (
+          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
+            No active Graymills Categories were returned by the
+            Knowledge Library.
+          </div>
+        ) : (
+          <div className="mt-5 grid gap-4 xl:grid-cols-2">
+            {knowledgeCoverageRows.map((row) => (
+              <div
+                key={row.category.id}
+                className={`rounded-2xl border p-4 ${
+                  row.isReady
+                    ? "border-emerald-200 bg-emerald-50/50"
+                    : "border-amber-300 bg-amber-50"
+                }`}
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-lg font-bold text-slate-950">
+                      {row.category.category_name}
+                    </p>
+
+                    <p className="mt-1 font-mono text-xs text-slate-500">
+                      {row.category.category_key}
+                    </p>
+                  </div>
+
+                  <span
+                    className={`w-fit rounded-full px-3 py-1 text-xs font-bold ring-1 ${
+                      row.isReady
+                        ? "bg-emerald-100 text-emerald-800 ring-emerald-200"
+                        : "bg-amber-100 text-amber-900 ring-amber-300"
+                    }`}
+                  >
+                    {row.isReady
+                      ? "Ready"
+                      : "Needs Attention"}
+                  </span>
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  <div className="rounded-xl border border-slate-200 bg-white p-3">
+                    <p className="text-xs font-semibold text-slate-500">
+                      Approved
+                    </p>
+                    <p className="mt-1 text-lg font-bold text-emerald-800">
+                      {row.approvedCount}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 bg-white p-3">
+                    <p className="text-xs font-semibold text-slate-500">
+                      Draft Review
+                    </p>
+                    <p className="mt-1 text-lg font-bold text-amber-800">
+                      {row.draftReviewCount}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 bg-white p-3">
+                    <p className="text-xs font-semibold text-slate-500">
+                      Revoked Drafts
+                    </p>
+                    <p className="mt-1 text-lg font-bold text-orange-800">
+                      {row.revokedCount}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 bg-white p-3">
+                    <p className="text-xs font-semibold text-slate-500">
+                      Archived
+                    </p>
+                    <p className="mt-1 text-lg font-bold text-slate-700">
+                      {row.archivedCount}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 bg-white p-3">
+                    <p className="text-xs font-semibold text-slate-500">
+                      Extraction Issues
+                    </p>
+                    <p
+                      className={`mt-1 text-lg font-bold ${
+                        row.extractionIssueCount > 0
+                          ? "text-red-700"
+                          : "text-slate-700"
+                      }`}
+                    >
+                      {row.extractionIssueCount}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 bg-white p-3">
+                    <p className="text-xs font-semibold text-slate-500">
+                      Shared All
+                    </p>
+                    <p className="mt-1 text-lg font-bold text-blue-800">
+                      {sharedApprovedDocumentCount}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Latest Category Approval
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-slate-800">
+                    {formatKnowledgeDate(
+                      row.latestApprovalAt
+                    )}
+                  </p>
+                </div>
+
+                {!row.isReady && (
+                  <div className="mt-3 rounded-xl border border-amber-200 bg-white p-3 text-xs leading-5 text-amber-900">
+                    {row.approvedCount === 0
+                      ? "No active approved category-specific document is currently available to AI."
+                      : "Category coverage exists, but an extraction issue needs Admin review."}
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    filterLibraryToCategory(
+                      row.category
+                    )
+                  }
+                  className="mt-4 rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-800 shadow-sm hover:bg-blue-50"
+                >
+                  Filter Library to Category
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {(message || errorMessage) && (

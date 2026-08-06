@@ -186,10 +186,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.23.28 - AI Knowledge Traceability";
+  "Version 3.23.29 - AI Knowledge Coverage";
 
 const REVISION_NOTE =
-  "Adds an auditable snapshot of the approved Graymills knowledge documents and category routing used for each AI prospect analysis.";
+  "Adds an Admin knowledge-readiness dashboard showing category-specific approved coverage, shared knowledge, review backlog, revoked drafts, archived documents, extraction issues, and latest approval dates.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean
