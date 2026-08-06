@@ -186,10 +186,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.23.26D - Controlled Knowledge Library";
+  "Version 3.23.27 - Job Shop Approved Knowledge";
 
 const REVISION_NOTE =
-  "Adds an Admin-controlled Graymills knowledge library with private document uploads, category-scoped routing, draft review, explicit AI approval, archive and restore, and lifecycle history.";
+  "Adds source-backed Job Shop Fab Pain–Claim–Gain knowledge and verifies that AI retrieval is isolated to the Job Shop Fab category.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean

@@ -1,0 +1,311 @@
+GRAYMILLS JOB SHOP FAB
+APPROVED PAIN–CLAIM–GAIN KNOWLEDGE
+
+Version: 2026-08-06
+Graymills Category Key: job_shop_fab
+Graymills Category: Job Shop Fab
+AI Product Area: Job Shop / Contract Manufacturing
+
+SOURCE BASIS
+
+This controlled knowledge was prepared from:
+Graymills_Pain_Claim_Gain_Framework.md
+
+It is limited to the statements, positioning, proof examples,
+persona guidance, and guardrails supported by that framework.
+
+PURPOSE
+
+Use this knowledge to develop customer-facing messaging for
+Graymills' sheet-metal contract-manufacturing offer.
+
+Apply the framework separately according to:
+
+- Target company type
+- Buyer persona
+- Operating problem
+- Available proof
+
+Do not begin with fabrication equipment or a generic list of
+capabilities. Begin with the business or operational consequence
+the buyer cares about.
+
+TARGET COMPANY PROFILE
+
+Primary targets include project-based manufacturers and system
+integrators where project releases, engineering changes, or uneven
+demand can create temporary fabrication constraints.
+
+PRIMARY CONTACT POSITIONS
+
+Relevant contacts may include:
+
+- Operations leaders
+- Manufacturing leaders
+- Engineering leaders
+- Project and program leaders
+- Presidents
+- Owners
+- Chief operating officers
+- General managers
+
+PAIN
+
+Project demand does not always arrive evenly.
+
+When several projects release at once, internal cutting and bending
+can become a bottleneck just as engineering changes are still
+occurring.
+
+Potential consequences include:
+
+- Delayed assembly
+- Delayed testing
+- Delayed installation
+- Risk to customer commitments
+- Loss of control over released revisions
+- Obsolete-file risk
+- Rework
+- Additional supplier questions
+- Fabricated parts becoming a project critical-path constraint
+
+Approved central pain statement:
+
+When several projects release at once, internal fabrication capacity
+can fall behind just as designs are still changing. That puts
+assembly, testing, installation, and customer commitments at risk.
+
+CLAIM
+
+Graymills helps project-based manufacturers add or absorb selected
+fabrication capacity while maintaining control of released designs
+and protecting downstream schedules.
+
+Approved claim statement:
+
+Graymills helps project-based manufacturers absorb cut-and-bend
+demand while maintaining control of released designs and protecting
+downstream schedules.
+
+The claim must describe the customer improvement. It must not merely
+list Graymills equipment, software, or capabilities.
+
+GAIN / PROOF
+
+Current process-based proof supported by the source includes:
+
+- Graymills is an established industrial-equipment manufacturer,
+  not only a fabrication job shop.
+
+- Graymills understands how fabricated parts affect welding,
+  assembly, serviceability, and completion of finished equipment.
+
+- SolidWorks PDM supports controlled drawings, revisions, and
+  released files.
+
+- Work can begin with a defined cut-and-bend package rather than
+  requiring a broad outsourcing commitment.
+
+- Graymills is local to its target market, supporting practical
+  communication and logistics.
+
+- A relationship may later expand into welding, powder coating,
+  and assembly when appropriate and separately confirmed.
+
+Approved Gain / Proof statement:
+
+Graymills supports the claimed outcome through SolidWorks PDM
+revision control, practical industrial-equipment manufacturing
+experience, defined fabrication packages, and a local production
+relationship designed for close technical coordination.
+
+LOCKED OPERATIONS AND ENGINEERING POSITIONING
+
+Pain:
+
+When several projects release at once, internal fabrication capacity
+can fall behind just as designs are still changing. That puts
+assembly, testing, installation, and customer commitments at risk.
+
+Claim:
+
+Graymills helps project-based manufacturers absorb cut-and-bend
+demand while maintaining control of released designs and protecting
+downstream schedules.
+
+Gain / Proof:
+
+Graymills supports that outcome through SolidWorks PDM revision
+control, practical industrial-equipment manufacturing experience,
+defined fabrication packages, and a local production relationship
+designed for close technical coordination.
+
+Approved full message:
+
+When several projects release at once, internal fabrication capacity
+can fall behind just as designs are still changing. Graymills helps
+project-based manufacturers absorb cut-and-bend demand while
+maintaining control of released designs and protecting downstream
+schedules. SolidWorks PDM revision control, industrial-equipment
+manufacturing experience, and close local coordination provide a
+disciplined basis for keeping fabricated parts from becoming the
+project's critical path.
+
+CAMPAIGN THEME
+
+When Project Demand Spikes, Keep Fabrication Off the Critical Path
+
+This theme connects two supported ideas:
+
+1. Project peaks can overload internal cutting and bending.
+2. A relatively small fabricated package can delay a much larger
+   project.
+
+APPROVED LOW-FRICTION CALL TO ACTION
+
+Would it make sense to review one upcoming fabrication package that
+could put pressure on your internal schedule?
+
+PERSONA ADAPTATION
+
+Executive and C-suite:
+
+Focus on growth, fixed-cost exposure, capital allocation, temporary
+capacity requirements, utilization risk, and scaling without
+overbuilding.
+
+Approved claim direction:
+
+Add scalable fabrication capacity without building permanent
+capacity around peak demand.
+
+Do not state a specific avoided capital amount unless a separately
+approved source supports that number.
+
+Operations and Manufacturing:
+
+Focus on bottlenecks, overtime, downstream delays, schedule
+instability, overflow, and production flow.
+
+Approved claim direction:
+
+Add project capacity while protecting assembly, testing, and
+installation schedules.
+
+Engineering:
+
+Focus on revision control, released files, manufacturability,
+supplier questions, rework, and assembly fit.
+
+Approved claim direction:
+
+Move released designs into fabrication without losing revision
+discipline or creating more engineering work.
+
+Project and Program Leadership:
+
+Focus on critical-path risk, milestones, testing, installation,
+customer acceptance, and schedule accountability.
+
+Approved claim direction:
+
+Keep fabricated parts from becoming the reason the project slips.
+
+Practitioners:
+
+Focus on correct files, clear communication, fewer questions,
+less rework, reliable dates, easier repeat orders, and reduced
+internal disruption.
+
+Approved claim direction:
+
+Get cut-and-bent parts produced from the correct released files,
+with clear communication and fewer schedule disruptions.
+
+MESSAGING RULES
+
+1. Lead with the customer's operating problem, not Graymills'
+   equipment.
+
+2. State the customer outcome before listing capabilities.
+
+3. Use SolidWorks PDM as proof of revision discipline, not as the
+   claim itself.
+
+4. Keep claims narrow, credible, and defensible.
+
+5. Do not invent delivery, quality, productivity, savings, capacity,
+   or financial results.
+
+6. Use process-based proof until quantified customer evidence is
+   available.
+
+7. Match the message to the persona's level of responsibility.
+
+8. Connect daily friction to operational consequences and business
+   consequences.
+
+9. Use one low-friction next step.
+
+10. Keep initial outreach concise.
+
+CLAIM BOUNDARIES
+
+Do not claim or imply that Graymills has documented results for any
+of the following unless a separate approved source is available:
+
+- On-time delivery performance
+- Quote turnaround time
+- Revision-error rate
+- First-pass acceptance rate
+- Engineering response time
+- Repeat-order performance
+- Measured overtime reduction
+- Measured backlog reduction
+- Measured assembly-readiness improvement
+- A specific amount of available fabrication capacity
+- A specific avoided capital investment
+- Guaranteed schedule improvement
+- Guaranteed quality improvement
+- Guaranteed productivity improvement
+
+These are evidence areas to develop, not current proof.
+
+Do not present welding, powder coating, or assembly as automatically
+included in every project. The source supports only that a
+relationship may later expand into those services where separately
+confirmed.
+
+AI APPLICATION RULES
+
+When analyzing a company in the Job Shop Fab category:
+
+- Use external company research and CRM evidence to determine
+  whether project peaks, released-design control, internal
+  fabrication constraints, or downstream schedule risk are
+  relevant.
+
+- Present those conditions as hypotheses until supported by company
+  evidence.
+
+- Do not state that the prospect has a bottleneck, overtime issue,
+  revision problem, or late-project problem without evidence.
+
+- Use the Pain–Claim–Gain sequence:
+  Pain, then Claim, then Gain / Proof.
+
+- Keep all recommendations within the assigned Job Shop Fab
+  category.
+
+- Prefer one defined fabrication package as a low-risk discovery
+  starting point.
+
+- Ask for discovery where evidence is missing rather than inventing
+  operational conditions or results.
+
+FINAL PRINCIPLE
+
+The analysis and messaging should always answer:
+
+What is going wrong, what gets better, and why should the buyer
+believe Graymills?
