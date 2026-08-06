@@ -86,6 +86,181 @@ const documentSelect = `
   restored_by_name
 `;
 
+const traceableKnowledgeAnalysisSelect = `
+  id,
+  company_id,
+  prospect_id,
+  ai_generated_at,
+  analysis_graymills_category_key,
+  analysis_graymills_category_name,
+  analysis_knowledge_documents,
+  analysis_knowledge_document_count,
+  analysis_knowledge_captured_at
+`;
+
+type TraceableKnowledgeAnalysis = {
+  id: string;
+  company_id: string | null;
+  prospect_id: string | null;
+  ai_generated_at: string | null;
+  analysis_graymills_category_key: string | null;
+  analysis_graymills_category_name: string | null;
+  analysis_knowledge_documents: unknown;
+  analysis_knowledge_document_count: number | null;
+  analysis_knowledge_captured_at: string | null;
+};
+
+function isKnowledgeRecord(
+  value: unknown
+): value is Record<string, any> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value)
+  );
+}
+
+function getKnowledgeSnapshotDocuments(
+  value: unknown
+) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(isKnowledgeRecord);
+}
+
+async function loadAllTraceableKnowledgeAnalyses(
+  supabase: ReturnType<typeof getSupabaseAdmin>
+) {
+  const pageSize = 1000;
+  const rows: TraceableKnowledgeAnalysis[] = [];
+  let from = 0;
+
+  while (true) {
+    const { data, error } =
+      await supabase
+        .from("prospect_intelligence")
+        .select(traceableKnowledgeAnalysisSelect)
+        .not(
+          "analysis_knowledge_captured_at",
+          "is",
+          null
+        )
+        .order(
+          "analysis_knowledge_captured_at",
+          { ascending: false }
+        )
+        .range(
+          from,
+          from + pageSize - 1
+        );
+
+    if (error) {
+      throw error;
+    }
+
+    const page =
+      (data ?? []) as TraceableKnowledgeAnalysis[];
+
+    rows.push(...page);
+
+    if (page.length < pageSize) {
+      break;
+    }
+
+    from += pageSize;
+  }
+
+  return rows;
+}
+
+async function loadKnowledgeAuditCompanyNames(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  companyIds: string[]
+) {
+  const uniqueCompanyIds =
+    Array.from(
+      new Set(
+        companyIds.filter(Boolean)
+      )
+    );
+
+  const companyNameById =
+    new Map<string, string>();
+
+  const chunkSize = 100;
+
+  for (
+    let index = 0;
+    index < uniqueCompanyIds.length;
+    index += chunkSize
+  ) {
+    const chunk =
+      uniqueCompanyIds.slice(
+        index,
+        index + chunkSize
+      );
+
+    const { data, error } =
+      await supabase
+        .from("companies")
+        .select("id, company_name")
+        .in("id", chunk);
+
+    if (error) {
+      throw error;
+    }
+
+    for (const company of data ?? []) {
+      companyNameById.set(
+        String(company.id),
+        cleanText(company.company_name) ||
+          "Unnamed company"
+      );
+    }
+  }
+
+  return companyNameById;
+}
+
+function getCurrentKnowledgeLifecycleState(
+  document: Record<string, any> | null,
+  usageCount: number
+) {
+  if (!document) {
+    return "historical_only";
+  }
+
+  if (
+    document.status === "archived" ||
+    document.archived_at
+  ) {
+    return "archived";
+  }
+
+  if (
+    document.status === "active" &&
+    document.approved_for_ai
+  ) {
+    return "active_approved";
+  }
+
+  if (
+    usageCount > 0 &&
+    document.status === "draft" &&
+    !document.approved_for_ai
+  ) {
+    return "approval_revoked";
+  }
+
+  if (document.status === "draft") {
+    return "draft";
+  }
+
+  return "inactive";
+}
+
 function getSupabaseAdmin() {
   if (!supabaseUrl || !serviceRoleKey) {
     throw new Error("Missing Supabase server environment variables.");
@@ -261,7 +436,7 @@ async function addDocumentEvents(
 async function addSignedUrl(
   supabase: ReturnType<typeof getSupabaseAdmin>,
   document: Record<string, any>
-) {
+): Promise<Record<string, any>> {
   if (!document.storage_path) {
     return {
       ...document,
@@ -303,6 +478,8 @@ export async function GET(request: Request) {
       categoriesResult,
       documentsResult,
       eventsResult,
+      traceableAnalyses,
+      legacyAnalysisCountResult,
     ] = await Promise.all([
       supabase
         .from("graymills_category_definitions")
@@ -325,6 +502,24 @@ export async function GET(request: Request) {
         )
         .order("created_at", { ascending: false })
         .limit(1000),
+
+      loadAllTraceableKnowledgeAnalyses(
+        supabase
+      ),
+
+      supabase
+        .from("prospect_intelligence")
+        .select(
+          "id",
+          {
+            count: "exact",
+            head: true,
+          }
+        )
+        .is(
+          "analysis_knowledge_captured_at",
+          null
+        ),
     ]);
 
     if (categoriesResult.error) {
@@ -339,6 +534,10 @@ export async function GET(request: Request) {
       throw eventsResult.error;
     }
 
+    if (legacyAnalysisCountResult.error) {
+      throw legacyAnalysisCountResult.error;
+    }
+
     const eventsByDocument = new Map<string, any[]>();
 
     for (const event of eventsResult.data ?? []) {
@@ -350,7 +549,7 @@ export async function GET(request: Request) {
       eventsByDocument.set(documentId, currentEvents);
     }
 
-    const documents = await Promise.all(
+    const documents: Array<Record<string, any>> = await Promise.all(
       (documentsResult.data ?? []).map(
         async (document: Record<string, any>) => {
           const documentWithUrl =
@@ -366,9 +565,416 @@ export async function GET(request: Request) {
       )
     );
 
+    const companyNameById =
+      await loadKnowledgeAuditCompanyNames(
+        supabase,
+        traceableAnalyses
+          .map((analysis) =>
+            cleanText(
+              analysis.company_id
+            )
+          )
+          .filter(
+            (companyId): companyId is string =>
+              Boolean(companyId)
+          )
+      );
+
+    const currentDocumentById =
+      new Map<string, Record<string, any>>();
+
+    for (const document of documents) {
+      currentDocumentById.set(
+        String(document.id),
+        document
+      );
+    }
+
+    type UsageAccumulator = {
+      documentId: string;
+      titleSnapshot: string;
+      productAreaSnapshot: string | null;
+      versionLabelSnapshot: string | null;
+      sourceFileNameSnapshot: string | null;
+      fileSha256Snapshot: string | null;
+      usageCount: number;
+      lastUsedAt: string | null;
+      categoryNames: Set<string>;
+      categoryKeys: Set<string>;
+    };
+
+    const usageByDocument =
+      new Map<string, UsageAccumulator>();
+
+    let totalDocumentUsages = 0;
+
+    for (const analysis of traceableAnalyses) {
+      const categoryName =
+        cleanText(
+          analysis.analysis_graymills_category_name
+        ) ||
+        "Not recorded";
+
+      const categoryKey =
+        cleanText(
+          analysis.analysis_graymills_category_key
+        );
+
+      const usedAt =
+        cleanText(
+          analysis.analysis_knowledge_captured_at
+        ) ||
+        cleanText(
+          analysis.ai_generated_at
+        );
+
+      const snapshotDocuments =
+        getKnowledgeSnapshotDocuments(
+          analysis.analysis_knowledge_documents
+        );
+
+      for (const snapshot of snapshotDocuments) {
+        const documentId =
+          cleanText(snapshot.documentId) ||
+          cleanText(snapshot.id);
+
+        if (!documentId) {
+          continue;
+        }
+
+        totalDocumentUsages += 1;
+
+        const existing =
+          usageByDocument.get(documentId) ?? {
+            documentId,
+            titleSnapshot:
+              cleanText(snapshot.title) ||
+              "Historical knowledge document",
+            productAreaSnapshot:
+              cleanText(snapshot.productArea) ||
+              cleanText(snapshot.product_area),
+            versionLabelSnapshot:
+              cleanText(snapshot.versionLabel) ||
+              cleanText(snapshot.version_label),
+            sourceFileNameSnapshot:
+              cleanText(snapshot.sourceFileName) ||
+              cleanText(snapshot.source_file_name),
+            fileSha256Snapshot:
+              cleanText(snapshot.fileSha256) ||
+              cleanText(snapshot.file_sha256),
+            usageCount: 0,
+            lastUsedAt: null,
+            categoryNames:
+              new Set<string>(),
+            categoryKeys:
+              new Set<string>(),
+          };
+
+        existing.usageCount += 1;
+
+        if (
+          usedAt &&
+          (
+            !existing.lastUsedAt ||
+            new Date(usedAt).getTime() >
+              new Date(
+                existing.lastUsedAt
+              ).getTime()
+          )
+        ) {
+          existing.lastUsedAt =
+            usedAt;
+        }
+
+        existing.categoryNames.add(
+          categoryName
+        );
+
+        if (categoryKey) {
+          existing.categoryKeys.add(
+            categoryKey
+          );
+        }
+
+        usageByDocument.set(
+          documentId,
+          existing
+        );
+      }
+    }
+
+    const usageAuditDocuments:
+      Array<Record<string, unknown>> = [];
+
+    for (const document of documents) {
+      const documentId =
+        String(document.id);
+
+      const historicalUsage =
+        usageByDocument.get(documentId);
+
+      const usageCount =
+        historicalUsage?.usageCount ?? 0;
+
+      usageAuditDocuments.push({
+        documentId,
+        title:
+          cleanText(document.title) ||
+          historicalUsage?.titleSnapshot ||
+          "Untitled knowledge document",
+        titleSnapshot:
+          historicalUsage?.titleSnapshot ??
+          null,
+        productArea:
+          cleanText(document.product_area) ||
+          historicalUsage?.productAreaSnapshot ||
+          null,
+        versionLabel:
+          cleanText(document.version_label) ||
+          historicalUsage?.versionLabelSnapshot ||
+          null,
+        sourceFileName:
+          cleanText(
+            document.source_file_name
+          ) ||
+          historicalUsage
+            ?.sourceFileNameSnapshot ||
+          null,
+        fileSha256:
+          cleanText(document.file_sha256) ||
+          historicalUsage?.fileSha256Snapshot ||
+          null,
+        usageCount,
+        lastUsedAt:
+          historicalUsage?.lastUsedAt ??
+          null,
+        categoryNames:
+          historicalUsage
+            ? Array.from(
+                historicalUsage.categoryNames
+              ).sort()
+            : [],
+        categoryKeys:
+          historicalUsage
+            ? Array.from(
+                historicalUsage.categoryKeys
+              ).sort()
+            : [],
+        currentStatus:
+          document.status,
+        currentApprovedForAi:
+          Boolean(
+            document.approved_for_ai
+          ),
+        currentArchivedAt:
+          document.archived_at ?? null,
+        currentLifecycleState:
+          getCurrentKnowledgeLifecycleState(
+            document,
+            usageCount
+          ),
+        historicalOnly: false,
+      });
+
+      usageByDocument.delete(
+        documentId
+      );
+    }
+
+    for (
+      const historicalUsage
+      of usageByDocument.values()
+    ) {
+      usageAuditDocuments.push({
+        documentId:
+          historicalUsage.documentId,
+        title:
+          historicalUsage.titleSnapshot,
+        titleSnapshot:
+          historicalUsage.titleSnapshot,
+        productArea:
+          historicalUsage
+            .productAreaSnapshot,
+        versionLabel:
+          historicalUsage
+            .versionLabelSnapshot,
+        sourceFileName:
+          historicalUsage
+            .sourceFileNameSnapshot,
+        fileSha256:
+          historicalUsage
+            .fileSha256Snapshot,
+        usageCount:
+          historicalUsage.usageCount,
+        lastUsedAt:
+          historicalUsage.lastUsedAt,
+        categoryNames:
+          Array.from(
+            historicalUsage.categoryNames
+          ).sort(),
+        categoryKeys:
+          Array.from(
+            historicalUsage.categoryKeys
+          ).sort(),
+        currentStatus: null,
+        currentApprovedForAi: false,
+        currentArchivedAt: null,
+        currentLifecycleState:
+          "historical_only",
+        historicalOnly: true,
+      });
+    }
+
+    usageAuditDocuments.sort(
+      (left, right) => {
+        const usageDifference =
+          Number(right.usageCount || 0) -
+          Number(left.usageCount || 0);
+
+        if (usageDifference !== 0) {
+          return usageDifference;
+        }
+
+        return String(
+          left.title || ""
+        ).localeCompare(
+          String(
+            right.title || ""
+          )
+        );
+      }
+    );
+
+    const neverUsedApprovedDocumentCount =
+      usageAuditDocuments.filter(
+        (document) =>
+          document.currentLifecycleState ===
+            "active_approved" &&
+          Number(
+            document.usageCount || 0
+          ) === 0
+      ).length;
+
+    const historicalInactiveUsedDocumentCount =
+      usageAuditDocuments.filter(
+        (document) =>
+          Number(
+            document.usageCount || 0
+          ) > 0 &&
+          [
+            "approval_revoked",
+            "archived",
+            "historical_only",
+          ].includes(
+            String(
+              document.currentLifecycleState ||
+                ""
+            )
+          )
+      ).length;
+
+    const recentAnalyses =
+      traceableAnalyses
+        .slice(0, 25)
+        .map((analysis) => {
+          const companyId =
+            cleanText(
+              analysis.company_id
+            );
+
+          const knowledgeDocuments =
+            getKnowledgeSnapshotDocuments(
+              analysis
+                .analysis_knowledge_documents
+            ).map((document) => ({
+              documentId:
+                cleanText(
+                  document.documentId
+                ) ||
+                cleanText(document.id),
+              title:
+                cleanText(document.title) ||
+                "Knowledge document",
+              productArea:
+                cleanText(
+                  document.productArea
+                ) ||
+                cleanText(
+                  document.product_area
+                ),
+              versionLabel:
+                cleanText(
+                  document.versionLabel
+                ) ||
+                cleanText(
+                  document.version_label
+                ),
+              fileSha256:
+                cleanText(
+                  document.fileSha256
+                ) ||
+                cleanText(
+                  document.file_sha256
+                ),
+            }));
+
+          return {
+            analysisId:
+              String(analysis.id),
+            companyId,
+            companyName:
+              companyId
+                ? companyNameById.get(
+                    companyId
+                  ) ||
+                  "Company name unavailable"
+                : "Company unavailable",
+            prospectId:
+              cleanText(
+                analysis.prospect_id
+              ),
+            categoryKey:
+              cleanText(
+                analysis
+                  .analysis_graymills_category_key
+              ),
+            categoryName:
+              cleanText(
+                analysis
+                  .analysis_graymills_category_name
+              ) ||
+              "Not recorded",
+            aiGeneratedAt:
+              analysis.ai_generated_at,
+            knowledgeCapturedAt:
+              analysis
+                .analysis_knowledge_captured_at,
+            knowledgeDocumentCount:
+              Number(
+                analysis
+                  .analysis_knowledge_document_count ??
+                  knowledgeDocuments.length
+              ),
+            knowledgeDocuments,
+          };
+        });
+
     return NextResponse.json({
       categories: categoriesResult.data ?? [],
       documents,
+      usageAudit: {
+        traceableAnalysisCount:
+          traceableAnalyses.length,
+        legacyAnalysisCount:
+          legacyAnalysisCountResult.count ??
+          0,
+        totalDocumentUsages,
+        neverUsedApprovedDocumentCount,
+        historicalInactiveUsedDocumentCount,
+        documents:
+          usageAuditDocuments,
+        recentAnalyses,
+      },
       access: {
         role: verifiedAdmin.context.crmRole,
         userId: verifiedAdmin.context.crmUserId,

@@ -186,10 +186,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.23.29 - AI Knowledge Coverage";
+  "Version 3.23.30 - AI Knowledge Usage Audit";
 
 const REVISION_NOTE =
-  "Adds an Admin knowledge-readiness dashboard showing category-specific approved coverage, shared knowledge, review backlog, revoked drafts, archived documents, extraction issues, and latest approval dates.";
+  "Adds an Admin audit showing which approved Graymills knowledge documents have actually been used by AI analyses, including last use, category usage, never-used approved knowledge, inactive historical usage, and recent traceable analyses.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean

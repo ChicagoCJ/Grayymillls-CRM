@@ -90,6 +90,57 @@ type KnowledgeDocument = {
   events: KnowledgeDocumentEvent[];
 };
 
+type KnowledgeUsageAuditDocument = {
+  documentId: string;
+  title: string;
+  titleSnapshot: string | null;
+  productArea: string | null;
+  versionLabel: string | null;
+  sourceFileName: string | null;
+  fileSha256: string | null;
+  usageCount: number;
+  lastUsedAt: string | null;
+  categoryNames: string[];
+  categoryKeys: string[];
+  currentStatus: string | null;
+  currentApprovedForAi: boolean;
+  currentArchivedAt: string | null;
+  currentLifecycleState: string;
+  historicalOnly: boolean;
+};
+
+type KnowledgeUsageAuditSnapshotDocument = {
+  documentId: string | null;
+  title: string;
+  productArea: string | null;
+  versionLabel: string | null;
+  fileSha256: string | null;
+};
+
+type KnowledgeUsageAuditAnalysis = {
+  analysisId: string;
+  companyId: string | null;
+  companyName: string;
+  prospectId: string | null;
+  categoryKey: string | null;
+  categoryName: string;
+  aiGeneratedAt: string | null;
+  knowledgeCapturedAt: string | null;
+  knowledgeDocumentCount: number;
+  knowledgeDocuments:
+    KnowledgeUsageAuditSnapshotDocument[];
+};
+
+type KnowledgeUsageAudit = {
+  traceableAnalysisCount: number;
+  legacyAnalysisCount: number;
+  totalDocumentUsages: number;
+  neverUsedApprovedDocumentCount: number;
+  historicalInactiveUsedDocumentCount: number;
+  documents: KnowledgeUsageAuditDocument[];
+  recentAnalyses: KnowledgeUsageAuditAnalysis[];
+};
+
 type KnowledgeForm = {
   title: string;
   documentType: string;
@@ -262,6 +313,11 @@ export default function AdminKnowledgeLibrarySection({
   const [categories, setCategories] =
     useState<KnowledgeCategory[]>([]);
 
+  const [usageAudit, setUsageAudit] =
+    useState<KnowledgeUsageAudit | null>(
+      null
+    );
+
   const [form, setForm] =
     useState<KnowledgeForm>(
       createEmptyKnowledgeForm()
@@ -360,6 +416,16 @@ export default function AdminKnowledgeLibrarySection({
           ? data.categories
           : []
       );
+
+      setUsageAudit(
+        data.usageAudit &&
+        typeof data.usageAudit === "object"
+          ? (
+              data.usageAudit as
+                KnowledgeUsageAudit
+            )
+          : null
+      );
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -450,6 +516,20 @@ export default function AdminKnowledgeLibrarySection({
       searchText,
       statusFilter,
     ]);
+
+  const usageAuditDocuments =
+    Array.isArray(
+      usageAudit?.documents
+    )
+      ? usageAudit.documents
+      : [];
+
+  const recentKnowledgeAnalyses =
+    Array.isArray(
+      usageAudit?.recentAnalyses
+    )
+      ? usageAudit.recentAnalyses
+      : [];
 
   const activeDocumentCount =
     documents.filter(
@@ -1290,6 +1370,337 @@ export default function AdminKnowledgeLibrarySection({
               </div>
             ))}
           </div>
+        )}
+      </div>
+
+      <div className="border-b border-slate-200 bg-slate-50 p-5">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-violet-700">
+            AI Knowledge Usage Audit
+          </p>
+
+          <h3 className="mt-1 text-lg font-bold text-slate-950">
+            What the AI Has Actually Used
+          </h3>
+
+          <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
+            This report is calculated from the immutable Knowledge
+            Used snapshots saved with Version 3.23.28 and later AI
+            analyses. Historical usage remains visible even after a
+            knowledge document is revoked or archived.
+          </p>
+        </div>
+
+        {!usageAudit ? (
+          <div className="mt-5 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+            Knowledge usage audit data is not available.
+            Refresh the library to try again.
+          </div>
+        ) : (
+          <>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+              <div className="rounded-xl border border-violet-200 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-violet-700">
+                  Traceable Analyses
+                </p>
+                <p className="mt-1 text-2xl font-bold text-violet-900">
+                  {usageAudit.traceableAnalysisCount}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-blue-200 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
+                  Document Uses
+                </p>
+                <p className="mt-1 text-2xl font-bold text-blue-900">
+                  {usageAudit.totalDocumentUsages}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-amber-200 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
+                  Approved Never Used
+                </p>
+                <p className="mt-1 text-2xl font-bold text-amber-900">
+                  {usageAudit.neverUsedApprovedDocumentCount}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-rose-200 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">
+                  Inactive But Used
+                </p>
+                <p className="mt-1 text-2xl font-bold text-rose-900">
+                  {usageAudit.historicalInactiveUsedDocumentCount}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-slate-300 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                  Legacy Analyses
+                </p>
+                <p className="mt-1 text-2xl font-bold text-slate-800">
+                  {usageAudit.legacyAnalysisCount}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h4 className="font-bold text-slate-950">
+                    Knowledge Document Usage
+                  </h4>
+
+                  <p className="mt-1 text-sm text-slate-600">
+                    Current and historical documents ranked by
+                    recorded AI usage.
+                  </p>
+                </div>
+
+                <p className="text-xs font-semibold text-slate-500">
+                  {usageAuditDocuments.length} audited documents
+                </p>
+              </div>
+
+              {usageAuditDocuments.length === 0 ? (
+                <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                  No knowledge-document usage has been recorded yet.
+                </div>
+              ) : (
+                <div className="mt-4 grid gap-3">
+                  {usageAuditDocuments.map(
+                    (auditDocument) => {
+                      const lifecycleState =
+                        String(
+                          auditDocument.currentLifecycleState ||
+                            "inactive"
+                        );
+
+                      const lifecycleLabel =
+                        lifecycleState
+                          .replace(/_/g, " ")
+                          .replace(
+                            /\b\w/g,
+                            (character) =>
+                              character.toUpperCase()
+                          );
+
+                      const lifecycleClass =
+                        lifecycleState ===
+                          "active_approved"
+                          ? "bg-emerald-100 text-emerald-800 ring-emerald-200"
+                          : lifecycleState ===
+                              "archived"
+                            ? "bg-slate-200 text-slate-700 ring-slate-300"
+                            : lifecycleState ===
+                                "approval_revoked"
+                              ? "bg-amber-100 text-amber-900 ring-amber-300"
+                              : lifecycleState ===
+                                  "historical_only"
+                                ? "bg-rose-100 text-rose-800 ring-rose-200"
+                                : "bg-slate-100 text-slate-700 ring-slate-200";
+
+                      return (
+                        <div
+                          key={
+                            auditDocument.documentId
+                          }
+                          className="rounded-2xl border border-slate-200 bg-white p-4"
+                        >
+                          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span
+                                  className={
+                                    "rounded-full px-2.5 py-1 text-xs font-bold ring-1 " +
+                                    lifecycleClass
+                                  }
+                                >
+                                  {lifecycleLabel}
+                                </span>
+
+                                {auditDocument.currentLifecycleState ===
+                                  "active_approved" &&
+                                  auditDocument.usageCount ===
+                                    0 && (
+                                    <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-900 ring-1 ring-amber-300">
+                                      Never Used
+                                    </span>
+                                  )}
+                              </div>
+
+                              <h5 className="mt-3 break-words text-base font-bold text-slate-950">
+                                {auditDocument.title}
+                              </h5>
+
+                              <p className="mt-1 text-sm text-slate-600">
+                                {auditDocument.productArea ||
+                                  "Product area not recorded"}
+                              </p>
+                            </div>
+
+                            <div className="grid min-w-[260px] grid-cols-2 gap-2">
+                              <div className="rounded-xl bg-violet-50 p-3">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-violet-700">
+                                  Uses
+                                </p>
+                                <p className="mt-1 text-xl font-bold text-violet-900">
+                                  {auditDocument.usageCount}
+                                </p>
+                              </div>
+
+                              <div className="rounded-xl bg-slate-50 p-3">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                  Last Used
+                                </p>
+                                <p className="mt-1 text-xs font-semibold leading-5 text-slate-800">
+                                  {formatKnowledgeDate(
+                                    auditDocument.lastUsedAt
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="mt-3 grid gap-3 text-xs text-slate-600 md:grid-cols-3">
+                            <div className="rounded-lg bg-slate-50 p-3">
+                              <p className="font-bold text-slate-700">
+                                Categories Used In
+                              </p>
+                              <p className="mt-1 break-words">
+                                {auditDocument.categoryNames
+                                  .length > 0
+                                  ? auditDocument.categoryNames.join(
+                                      " | "
+                                    )
+                                  : "No recorded usage"}
+                              </p>
+                            </div>
+
+                            <div className="rounded-lg bg-slate-50 p-3">
+                              <p className="font-bold text-slate-700">
+                                Version
+                              </p>
+                              <p className="mt-1 break-words">
+                                {auditDocument.versionLabel ||
+                                  "Not recorded"}
+                              </p>
+                            </div>
+
+                            <div className="rounded-lg bg-slate-50 p-3">
+                              <p className="font-bold text-slate-700">
+                                Source File
+                              </p>
+                              <p className="mt-1 break-all">
+                                {auditDocument.sourceFileName ||
+                                  "Manual / not recorded"}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6">
+              <h4 className="font-bold text-slate-950">
+                Recent Traceable Analyses
+              </h4>
+
+              <p className="mt-1 text-sm text-slate-600">
+                The newest AI analyses with their preserved
+                knowledge-document snapshots.
+              </p>
+
+              {recentKnowledgeAnalyses.length === 0 ? (
+                <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                  No traceable analyses have been recorded yet.
+                </div>
+              ) : (
+                <div className="mt-4 grid gap-3">
+                  {recentKnowledgeAnalyses.map(
+                    (analysis) => (
+                      <details
+                        key={analysis.analysisId}
+                        className="rounded-xl border border-slate-200 bg-white p-4"
+                      >
+                        <summary className="cursor-pointer">
+                          <div className="inline-flex max-w-full flex-wrap items-center gap-2">
+                            <span className="font-bold text-slate-900">
+                              {analysis.companyName}
+                            </span>
+
+                            <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-800 ring-1 ring-blue-200">
+                              {analysis.categoryName}
+                            </span>
+
+                            <span className="text-xs text-slate-500">
+                              {formatKnowledgeDate(
+                                analysis.knowledgeCapturedAt
+                              )}
+                            </span>
+
+                            <span className="text-xs font-semibold text-violet-700">
+                              {analysis.knowledgeDocumentCount}{" "}
+                              document
+                              {analysis.knowledgeDocumentCount ===
+                              1
+                                ? ""
+                                : "s"}
+                            </span>
+                          </div>
+                        </summary>
+
+                        {analysis.knowledgeDocuments.length ===
+                        0 ? (
+                          <p className="mt-3 text-sm text-slate-600">
+                            No approved knowledge documents were
+                            supplied to this analysis.
+                          </p>
+                        ) : (
+                          <div className="mt-3 grid gap-2">
+                            {analysis.knowledgeDocuments.map(
+                              (
+                                snapshotDocument,
+                                index
+                              ) => (
+                                <div
+                                  key={
+                                    snapshotDocument.documentId ||
+                                    `${analysis.analysisId}-${index}`
+                                  }
+                                  className="rounded-lg bg-slate-50 p-3"
+                                >
+                                  <p className="text-sm font-bold text-slate-900">
+                                    {snapshotDocument.title}
+                                  </p>
+
+                                  <p className="mt-1 text-xs text-slate-600">
+                                    {[
+                                      snapshotDocument.productArea,
+                                      snapshotDocument.versionLabel
+                                        ? `Version ${snapshotDocument.versionLabel}`
+                                        : "",
+                                    ]
+                                      .filter(Boolean)
+                                      .join(" | ")}
+                                  </p>
+                                </div>
+                              )
+                            )}
+                          </div>
+                        )}
+                      </details>
+                    )
+                  )}
+                </div>
+              )}
+            </div>
+          </>
         )}
       </div>
 
