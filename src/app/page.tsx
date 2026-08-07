@@ -186,10 +186,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.23.30 - AI Knowledge Usage Audit";
+  "Version 3.23.31 - Pre-Analysis Knowledge Readiness";
 
 const REVISION_NOTE =
-  "Adds an Admin audit showing which approved Graymills knowledge documents have actually been used by AI analyses, including last use, category usage, never-used approved knowledge, inactive historical usage, and recent traceable analyses.";
+  "Checks category-scoped approved Graymills knowledge before Analyze Prospect runs, warns when category coverage or extraction readiness is weak, and requires explicit confirmation before spending an AI call.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean
@@ -2130,35 +2130,163 @@ async function loadCompanyOwnerFilterData() {
 async function handleAnalyzeProspect() {
   if (!selectedCompanyDetail?.company?.id) return;
 
-  const companyId = String(selectedCompanyDetail.company.id);
+  const companyId = String(
+    selectedCompanyDetail.company.id
+  );
 
   setIsAnalyzingProspect(true);
   setErrorMessage("");
   setImportMessage("");
 
   try {
-    const response = await fetch("/api/analyze-prospect", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...apiPermissionHeaders(),
-      },
-      body: JSON.stringify({
-        companyId,
-      }),
-    });
+    const readinessResponse =
+      await fetch(
+        "/api/analyze-prospect",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+            ...apiPermissionHeaders(),
+          },
+          body: JSON.stringify({
+            companyId,
+            readinessOnly: true,
+          }),
+        }
+      );
 
-    const data = await response.json();
+    const readinessData =
+      await readinessResponse.json();
 
-    if (!response.ok) {
-      throw new Error(data.error || "Failed to analyze prospect.");
+    if (!readinessResponse.ok) {
+      throw new Error(
+        readinessData.error ||
+          "Could not check AI knowledge readiness."
+      );
     }
 
-    setImportMessage("Prospect analysis completed and saved.");
+    const readiness =
+      readinessData.readiness &&
+      typeof readinessData.readiness ===
+        "object"
+        ? readinessData.readiness
+        : null;
+
+    if (!readiness) {
+      throw new Error(
+        "The AI knowledge readiness check returned no readiness result."
+      );
+    }
+
+    const hasKnowledgeWarning =
+      readiness.status === "warning";
+
+    if (hasKnowledgeWarning) {
+      const warningLines = [
+        readiness.message ||
+          "Knowledge Warning: category knowledge needs review.",
+        "",
+        `Category: ${
+          readiness.categoryName ||
+          "Not recorded"
+        }`,
+        `Approved category-specific documents: ${
+          readiness.approvedCategorySpecificDocumentCount ??
+          0
+        }`,
+        `Shared All documents: ${
+          readiness.sharedApprovedDocumentCount ??
+          0
+        }`,
+        `Extraction issues: ${
+          readiness.extractionIssueCount ??
+          0
+        }`,
+        "",
+        "You may continue, but the analysis will have weaker or potentially incomplete Graymills grounding.",
+        "",
+        "Continue with AI analysis?",
+      ];
+
+      const confirmed =
+        window.confirm(
+          warningLines.join("\n")
+        );
+
+      if (!confirmed) {
+        setImportMessage(
+          "AI analysis canceled. No AI call was made."
+        );
+        return;
+      }
+
+      setImportMessage(
+        "Knowledge Warning acknowledged. Starting AI analysis."
+      );
+    } else {
+      setImportMessage(
+        readiness.message ||
+          "Knowledge Ready. Starting AI analysis."
+      );
+    }
+
+    const response =
+      await fetch(
+        "/api/analyze-prospect",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+            ...apiPermissionHeaders(),
+          },
+          body: JSON.stringify({
+            companyId,
+            bypassKnowledgeReadinessWarning:
+              hasKnowledgeWarning,
+          }),
+        }
+      );
+
+    const data =
+      await response.json();
+
+    if (!response.ok) {
+      if (
+        response.status === 409 &&
+        data.code ===
+          "KNOWLEDGE_READINESS_WARNING"
+      ) {
+        throw new Error(
+          data.readiness?.message ||
+            data.error ||
+            "Knowledge readiness changed before AI analysis. Review the warning and try again."
+        );
+      }
+
+      throw new Error(
+        data.error ||
+          "Failed to analyze prospect."
+      );
+    }
+
+    setImportMessage(
+      hasKnowledgeWarning
+        ? "Prospect analysis completed and saved after Knowledge Warning confirmation."
+        : "Prospect analysis completed and saved. Knowledge Ready check passed."
+    );
+
     await loadCrmSummary();
-    await loadCompanyDetail(companyId);
+    await loadCompanyDetail(
+      companyId
+    );
   } catch (error) {
-    setErrorMessage(error instanceof Error ? error.message : "Failed to analyze prospect.");
+    setErrorMessage(
+      error instanceof Error
+        ? error.message
+        : "Failed to analyze prospect."
+    );
   } finally {
     setIsAnalyzingProspect(false);
   }

@@ -9,6 +9,8 @@ const openAiApiKey = process.env.OPENAI_API_KEY;
 
 type AnalyzePayload = {
   companyId: string;
+  readinessOnly?: boolean;
+  bypassKnowledgeReadinessWarning?: boolean;
 };
 
 type ProspectAnalysis = {
@@ -719,7 +721,6 @@ export async function POST(request: Request) {
     }
 
     const supabase = getSupabaseAdmin();
-    const openai = getOpenAIClient();
 
     const { data: company, error: companyError } = await supabase
       .from("companies")
@@ -896,6 +897,172 @@ export async function POST(request: Request) {
       "All",
       knowledgeProductArea,
     ];
+
+    const {
+      data: knowledgeReadinessRows,
+      error: knowledgeReadinessError,
+    } = await supabase
+      .from("graymills_knowledge_documents")
+      .select(
+        `
+          id,
+          title,
+          product_area,
+          approved_for_ai,
+          status,
+          archived_at,
+          extraction_status,
+          extraction_error
+        `
+      )
+      .in(
+        "product_area",
+        knowledgeProductAreas
+      )
+      .is("archived_at", null)
+      .limit(250);
+
+    if (knowledgeReadinessError) {
+      throw knowledgeReadinessError;
+    }
+
+    const categorySpecificReadinessDocuments =
+      (knowledgeReadinessRows ?? []).filter(
+        (document: any) =>
+          String(
+            document.product_area || ""
+          ) === knowledgeProductArea
+      );
+
+    const approvedCategorySpecificDocuments =
+      categorySpecificReadinessDocuments.filter(
+        (document: any) =>
+          document.status === "active" &&
+          document.approved_for_ai === true &&
+          !document.archived_at
+      );
+
+    const categoryExtractionIssueDocuments =
+      categorySpecificReadinessDocuments.filter(
+        (document: any) =>
+          document.status !== "archived" &&
+          !document.archived_at &&
+          (
+            document.extraction_status ===
+              "failed" ||
+            String(
+              document.extraction_error || ""
+            ).trim().length > 0
+          )
+      );
+
+    const sharedApprovedDocuments =
+      (knowledgeReadinessRows ?? []).filter(
+        (document: any) =>
+          String(
+            document.product_area || ""
+          ) === "All" &&
+          document.status === "active" &&
+          document.approved_for_ai === true &&
+          !document.archived_at
+      );
+
+    const knowledgeReadinessIsReady =
+      approvedCategorySpecificDocuments.length > 0 &&
+      categoryExtractionIssueDocuments.length === 0;
+
+    const knowledgeReadinessReasons:
+      string[] = [];
+
+    if (
+      approvedCategorySpecificDocuments.length === 0
+    ) {
+      knowledgeReadinessReasons.push(
+        `${categoryName} has no active approved category-specific knowledge document.`
+      );
+    }
+
+    if (
+      categoryExtractionIssueDocuments.length > 0
+    ) {
+      knowledgeReadinessReasons.push(
+        `${categoryName} has ${categoryExtractionIssueDocuments.length} knowledge document${
+          categoryExtractionIssueDocuments.length === 1
+            ? ""
+            : "s"
+        } with an extraction problem that needs Admin review.`
+      );
+    }
+
+    const knowledgeReadinessMessage =
+      knowledgeReadinessIsReady
+        ? (
+            `Knowledge Ready: ${categoryName} has ` +
+            `${approvedCategorySpecificDocuments.length} active approved ` +
+            `category-specific knowledge document${
+              approvedCategorySpecificDocuments.length === 1
+                ? ""
+                : "s"
+            }.`
+          )
+        : (
+            "Knowledge Warning: " +
+            knowledgeReadinessReasons.join(" ")
+          );
+
+    const knowledgeReadiness = {
+      status:
+        knowledgeReadinessIsReady
+          ? "ready"
+          : "warning",
+      categoryId:
+        String(
+          classificationRow.graymills_category_id
+        ),
+      categoryKey,
+      categoryName,
+      categorySpecificProductArea:
+        knowledgeProductArea,
+      approvedCategorySpecificDocumentCount:
+        approvedCategorySpecificDocuments.length,
+      sharedApprovedDocumentCount:
+        sharedApprovedDocuments.length,
+      extractionIssueCount:
+        categoryExtractionIssueDocuments.length,
+      reasons:
+        knowledgeReadinessReasons,
+      message:
+        knowledgeReadinessMessage,
+    };
+
+    if (payload.readinessOnly === true) {
+      return NextResponse.json({
+        readiness:
+          knowledgeReadiness,
+        aiCallStarted: false,
+      });
+    }
+
+    if (
+      !knowledgeReadinessIsReady &&
+      payload.bypassKnowledgeReadinessWarning !==
+        true
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Knowledge readiness warning requires explicit confirmation before AI analysis.",
+          code:
+            "KNOWLEDGE_READINESS_WARNING",
+          readiness:
+            knowledgeReadiness,
+          aiCallStarted: false,
+        },
+        {
+          status: 409,
+        }
+      );
+    }
 
     const currentClassification = {
       classificationId: String(classificationRow.id),
@@ -1216,6 +1383,8 @@ export async function POST(request: Request) {
       .limit(25);
 
     if (promptContextError) throw promptContextError;
+
+    const openai = getOpenAIClient();
 
     const researchPerformedAt =
       new Date().toISOString();
