@@ -205,10 +205,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.24.1 - AI Actions Where Sales Work Happens";
+  "Version 3.24.2 - Company Detail Section Navigation";
 
 const REVISION_NOTE =
-  "Places AI drafting actions directly beside Activity, Opportunity, and Discovery workflows, while keeping salesperson review required before any CRM record is saved.";
+  "Adds compact sticky Company Detail navigation for Snapshot, Coverage, Opportunities, Activity, Contacts, Projects / Tags, and AI Analysis.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean
@@ -18478,60 +18478,139 @@ function CompanyDetailSection({
             </p>
           )}
 
-          <div aria-label="Company Detail section status and navigation" className="mt-5 flex flex-nowrap gap-2 overflow-x-auto border-t border-slate-300 pb-1 pt-4 md:flex-wrap md:overflow-visible md:pb-0">
-            <a href="#company-detail-snapshot" className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">
-              Snapshot
-            </a>
-            <a href="#company-detail-sales-coverage" className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">
-              Coverage
-            </a>
-            <a
-              href="#company-detail-funnel"
-              className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
-            >
-              <span>Funnel</span>
-              <span
-                title="Funnel items"
-                className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-black text-violet-800"
-              >
-                {companyFunnelItemCount}
-              </span>
-            </a>
-            <a
-              href="#company-detail-activity"
-              className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
-            >
-              <span>Activity</span>
-              <span
-                title="Open activities"
-                className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-black text-emerald-800"
-              >
-                {companyOpenActivities.length} open
-              </span>
-              <span
-                title="Overdue activities"
-                className={`rounded-full px-2 py-0.5 text-[11px] font-black ${
-                  companyOverdueActivities.length > 0
-                    ? "bg-red-100 text-red-800"
-                    : "bg-slate-100 text-slate-600"
-                }`}
-              >
-                {companyOverdueActivities.length} overdue
-              </span>
-            </a>
-            <a
-              href="#company-detail-contacts"
-              className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
-            >
-              <span>Contacts</span>
-              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-black text-blue-800">
-                {detail.contacts.length}
-              </span>
-            </a>
-          </div>
+
         </div>
       </div>
 
+      <nav
+        aria-label="Company Detail section navigation"
+        className="sticky top-16 z-30 flex max-w-full self-start flex-nowrap items-center gap-2 overflow-x-auto rounded-xl border border-slate-300 bg-white/95 p-2 shadow-md backdrop-blur md:flex-wrap md:overflow-visible"
+      >
+        <span className="shrink-0 px-1 text-[11px] font-black uppercase tracking-wide text-slate-500">
+          Sections
+        </span>
+
+        <button
+          type="button"
+          onClick={() =>
+            scrollToCompanyDetailSection(
+              "company-detail-snapshot"
+            )
+          }
+          className="shrink-0 whitespace-nowrap rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+        >
+          Snapshot
+        </button>
+
+        <button
+          type="button"
+          onClick={() =>
+            scrollToCompanyDetailSection(
+              "company-detail-sales-coverage"
+            )
+          }
+          className="shrink-0 whitespace-nowrap rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+        >
+          Coverage
+        </button>
+
+        <button
+          type="button"
+          onClick={() =>
+            scrollToCompanyDetailSection(
+              "company-detail-funnel"
+            )
+          }
+          className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+        >
+          <span>Opportunities</span>
+
+          <span
+            title="Opportunity count"
+            className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-black text-violet-800"
+          >
+            {companyFunnelItemCount}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() =>
+            scrollToCompanyDetailSection(
+              "company-detail-activity"
+            )
+          }
+          className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+        >
+          <span>Activity</span>
+
+          <span
+            title="Open activities"
+            className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-black text-emerald-800"
+          >
+            {companyOpenActivities.length} open
+          </span>
+
+          {companyOverdueActivities.length > 0 && (
+            <span
+              title="Overdue activities"
+              className="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-black text-red-800"
+            >
+              {companyOverdueActivities.length} overdue
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() =>
+            scrollToCompanyDetailSection(
+              "company-detail-contacts"
+            )
+          }
+          className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+        >
+          <span>Contacts</span>
+
+          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-black text-blue-800">
+            {detail.contacts.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() =>
+            scrollToCompanyDetailSection(
+              "company-detail-projects-tags"
+            )
+          }
+          className="shrink-0 whitespace-nowrap rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+        >
+          Projects / Tags
+        </button>
+
+        <button
+          type="button"
+          onClick={() =>
+            scrollToCompanyDetailSection(
+              "company-detail-ai-analysis"
+            )
+          }
+          className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+        >
+          <span>AI Analysis</span>
+
+          <span
+            className={
+              hasAiAnalysis
+                ? "rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-black text-green-800"
+                : "rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-black text-slate-600"
+            }
+          >
+            {hasAiAnalysis ? "Ready" : "None"}
+          </span>
+        </button>
+      </nav>
       {/* Version 3.23.5 company editor outside sticky header */}
       {canManageCompanyRecord &&
         !showCompanyEditor &&
@@ -19205,7 +19284,7 @@ function CompanyDetailSection({
         </div>
       )}
 
-      <div id="company-detail-snapshot" className="scroll-mt-24 md:scroll-mt-[26rem]"></div>
+      <div id="company-detail-snapshot" className="scroll-mt-36"></div>
       <div className="grid gap-6 lg:grid-cols-3">
         <DetailCard title="Company Snapshot">
           <DetailRow label="Website" value={company.website} />
@@ -19661,7 +19740,7 @@ function CompanyDetailSection({
 
       <div
         id="company-detail-sales-coverage"
-        className="scroll-mt-24 md:scroll-mt-[26rem]"
+        className="scroll-mt-36"
       >
         <CompanySalesAssignmentPanel
           companyId={String(detail.company.id)}
@@ -19670,7 +19749,7 @@ function CompanyDetailSection({
         />
       </div>
 
-      <div id="company-detail-funnel" className="scroll-mt-24 md:scroll-mt-[26rem]"></div>
+      <div id="company-detail-funnel" className="scroll-mt-36"></div>
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <button
           type="button"
@@ -19700,7 +19779,7 @@ function CompanyDetailSection({
 
 
       <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
-        <div id="company-detail-activity" className="scroll-mt-24 md:scroll-mt-[26rem]"></div>
+        <div id="company-detail-activity" className="scroll-mt-36"></div>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-xl font-bold">Add Activity / Follow-Up</h3>
 
@@ -20701,7 +20780,7 @@ function CompanyDetailSection({
 
       <div
         id="company-detail-contacts"
-        className="scroll-mt-24 md:scroll-mt-[26rem] max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm"
+        className="scroll-mt-36 max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm"
       >
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -21099,6 +21178,11 @@ function CompanyDetailSection({
         )}
       </div>
 
+      <div
+        id="company-detail-projects-tags"
+        className="scroll-mt-36"
+      ></div>
+
       <CompanyProjectListManager
         companyId={String(detail.company.id)}
         canManageProjectsLists={canManageProjectsLists}
@@ -21108,6 +21192,11 @@ function CompanyDetailSection({
         companyId={String(detail.company.id)}
         apiPermissionHeaders={apiPermissionHeaders}
       />
+
+      <div
+        id="company-detail-ai-analysis"
+        className="scroll-mt-36"
+      ></div>
 
       {hasAiAnalysis ? (
         <>
