@@ -90,6 +90,25 @@ type ActivityForm = {
   relatedContactIds: string[];
 };
 
+type AiOpportunityDraftRequest = {
+  requestId: number;
+  opportunityName: string;
+  opportunityType:
+    | "Parts washer"
+    | "Pump / fluid handling"
+    | "Inking system"
+    | "OEM / custom"
+    | "Cleaning fluid"
+    | "Other";
+  productLine: string;
+  likelyProductPath: string;
+  primaryUseCase: string;
+  nextStep: string;
+  customerNeed: string;
+  businessCase: string;
+  primaryContactId: string;
+};
+
 function createEmptyActivityForm(): ActivityForm {
   return {
     activityType: "note",
@@ -186,10 +205,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.23.31 - Pre-Analysis Knowledge Readiness";
+  "Version 3.24.1 - AI Actions Where Sales Work Happens";
 
 const REVISION_NOTE =
-  "Checks category-scoped approved Graymills knowledge before Analyze Prospect runs, warns when category coverage or extraction readiness is weak, and requires explicit confirmation before spending an AI call.";
+  "Places AI drafting actions directly beside Activity, Opportunity, and Discovery workflows, while keeping salesperson review required before any CRM record is saved.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean
@@ -15837,6 +15856,22 @@ function CompanyDetailSection({
   graymillsSubIndustryDefinitions?: CompanySubIndustryDefinition[];
   apiPermissionHeaders?: any;
 }) {
+  const [aiSalesWorkMessage, setAiSalesWorkMessage] =
+    useState("");
+
+  const [
+    aiOpportunityDraftRequest,
+    setAiOpportunityDraftRequest,
+  ] =
+    useState<AiOpportunityDraftRequest | null>(
+      null
+    );
+
+  useEffect(() => {
+    setAiSalesWorkMessage("");
+    setAiOpportunityDraftRequest(null);
+  }, [detail?.company?.id]);
+
   const [companyActivityHistoryFilter, setCompanyActivityHistoryFilter] = useState<
     "All" | "Open" | "Overdue" | "Due Today" | "Completed"
   >("All");
@@ -17360,6 +17395,425 @@ function CompanyDetailSection({
       </section>
     );
   }
+  function aiSalesWorkText(
+    value: unknown,
+    fallback = "Requires salesperson review."
+  ) {
+    const cleaned =
+      typeof value === "string"
+        ? value.trim()
+        : "";
+
+    return cleaned || fallback;
+  }
+
+  function aiOpportunityTypeFromProductLine(
+    value: unknown
+  ): AiOpportunityDraftRequest["opportunityType"] {
+    const normalized =
+      String(value || "")
+        .trim()
+        .toLowerCase();
+
+    if (
+      normalized.includes("parts washer") ||
+      normalized.includes("parts washers")
+    ) {
+      return "Parts washer";
+    }
+
+    if (
+      normalized.includes("pump") ||
+      normalized.includes("fluid")
+    ) {
+      return "Pump / fluid handling";
+    }
+
+    if (
+      normalized.includes("graphic") ||
+      normalized.includes("ink")
+    ) {
+      return "Inking system";
+    }
+
+    if (
+      normalized.includes("job shop") ||
+      normalized.includes("contract manufacturing") ||
+      normalized.includes("fabrication") ||
+      normalized.includes("fab")
+    ) {
+      return "OEM / custom";
+    }
+
+    return "Other";
+  }
+
+  function buildAiDiscoveryPlanText() {
+    const companyName =
+      aiSalesWorkText(
+        detail?.company?.company_name,
+        "Company"
+      );
+
+    const questions =
+      discoveryQuestions.length > 0
+        ? discoveryQuestions
+            .map(
+              (question, index) =>
+                `${index + 1}. ${aiSalesWorkText(
+                  question,
+                  ""
+                )}`
+            )
+            .filter(
+              (line) =>
+                !line.endsWith(". ")
+            )
+            .join("\n")
+        : "No discovery questions were generated.";
+
+    return [
+      `AI DISCOVERY PLAN - ${companyName}`,
+      "",
+      "Review this AI-generated draft before using it with the customer.",
+      "",
+      "GRAYMILLS PRODUCT LINE",
+      aiSalesWorkText(
+        intelligence?.product_line
+      ),
+      "",
+      "LIKELY PRODUCT PATH",
+      aiSalesWorkText(
+        intelligence?.likely_product_path
+      ),
+      "",
+      "PRIMARY USE CASE",
+      aiSalesWorkText(
+        intelligence?.primary_use_case
+      ),
+      "",
+      "PAIN / CUSTOMER NEED",
+      aiSalesWorkText(
+        intelligence?.likely_pain_points
+      ),
+      "",
+      "CLAIM / SALES ANGLE",
+      aiSalesWorkText(
+        intelligence?.suggested_sales_angle
+      ),
+      "",
+      "GAIN / REASON TO BELIEVE",
+      aiSalesWorkText(
+        intelligence?.reason_to_believe
+      ),
+      "",
+      "NEXT BEST ACTION",
+      aiSalesWorkText(
+        intelligence?.next_best_action
+      ),
+      "",
+      "FIRST CALL OPENER",
+      aiSalesWorkText(
+        intelligence?.first_call_opener
+      ),
+      "",
+      "DISCOVERY QUESTIONS",
+      questions,
+    ].join("\n");
+  }
+
+  function scrollToCompanyDetailSection(
+    sectionId: string
+  ) {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      document
+        .getElementById(sectionId)
+        ?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+    });
+  }
+
+  function draftAiFollowUpActivity() {
+    if (!hasAiAnalysis) {
+      setAiSalesWorkMessage(
+        "Run Analyze Prospect before drafting AI sales work."
+      );
+      return;
+    }
+
+    if (!canManageCompanyActivities) {
+      setAiSalesWorkMessage(
+        "Activity management is unavailable for this company under the current role or assignment."
+      );
+      return;
+    }
+
+    if (
+      hasUnsavedNewCompanyActivityDraft() &&
+      typeof window !== "undefined" &&
+      !window.confirm(
+        "Replace the current unsaved Activity draft with the AI follow-up draft?"
+      )
+    ) {
+      return;
+    }
+
+    const companyName =
+      aiSalesWorkText(
+        detail?.company?.company_name,
+        "Company"
+      );
+
+    const primaryContact =
+      (detail?.contacts ?? []).find(
+        (contact: any) =>
+          Boolean(contact?.is_primary)
+      );
+
+    const questionBlock =
+      discoveryQuestions.length > 0
+        ? discoveryQuestions
+            .map(
+              (question, index) =>
+                `${index + 1}. ${aiSalesWorkText(
+                  question,
+                  ""
+                )}`
+            )
+            .filter(
+              (line) =>
+                !line.endsWith(". ")
+            )
+            .join("\n")
+        : "No discovery questions were generated.";
+
+    const notes = [
+      "AI-guided follow-up draft. Review and edit before saving.",
+      "",
+      "NEXT BEST ACTION",
+      aiSalesWorkText(
+        intelligence?.next_best_action
+      ),
+      "",
+      "FIRST CALL OPENER",
+      aiSalesWorkText(
+        intelligence?.first_call_opener
+      ),
+      "",
+      "SUGGESTED SALES ANGLE",
+      aiSalesWorkText(
+        intelligence?.suggested_sales_angle
+      ),
+      "",
+      "DISCOVERY QUESTIONS",
+      questionBlock,
+    ].join("\n");
+
+    setActivityForm({
+      activityType: "task",
+      subject:
+        `AI discovery follow-up - ${companyName}`,
+      notes,
+      dueDate:
+        companyActivityDateOffset(2),
+      primaryContactId:
+        primaryContact?.id
+          ? String(primaryContact.id)
+          : "",
+      relatedContactIds: [],
+    });
+
+    setAiSalesWorkMessage(
+      "AI follow-up drafted in the existing Activity form. Review it before selecting Save Activity."
+    );
+
+    scrollToCompanyDetailSection(
+      "company-detail-activity"
+    );
+  }
+
+  function draftAiOpportunity() {
+    if (!hasAiAnalysis) {
+      setAiSalesWorkMessage(
+        "Run Analyze Prospect before drafting AI sales work."
+      );
+      return;
+    }
+
+    const companyName =
+      aiSalesWorkText(
+        detail?.company?.company_name,
+        "Company"
+      );
+
+    const productLine =
+      aiSalesWorkText(
+        intelligence?.product_line,
+        ""
+      );
+
+    const likelyProductPath =
+      aiSalesWorkText(
+        intelligence?.likely_product_path,
+        "Sales Opportunity"
+      );
+
+    const primaryContact =
+      (detail?.contacts ?? []).find(
+        (contact: any) =>
+          Boolean(contact?.is_primary)
+      );
+
+    const customerNeed = [
+      aiSalesWorkText(
+        intelligence?.likely_pain_points,
+        ""
+      ),
+      aiSalesWorkText(
+        intelligence?.likely_priorities,
+        ""
+      ),
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
+    const businessCase = [
+      aiSalesWorkText(
+        intelligence?.suggested_sales_angle,
+        ""
+      ),
+      aiSalesWorkText(
+        intelligence?.reason_to_believe,
+        ""
+      ),
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
+    setAiOpportunityDraftRequest({
+      requestId: Date.now(),
+      opportunityName:
+        `${companyName} - ${likelyProductPath}`,
+      opportunityType:
+        aiOpportunityTypeFromProductLine(
+          productLine
+        ),
+      productLine,
+      likelyProductPath,
+      primaryUseCase:
+        aiSalesWorkText(
+          intelligence?.primary_use_case,
+          ""
+        ),
+      nextStep:
+        aiSalesWorkText(
+          intelligence?.next_best_action,
+          ""
+        ),
+      customerNeed,
+      businessCase,
+      primaryContactId:
+        primaryContact?.id
+          ? String(primaryContact.id)
+          : "",
+    });
+
+    setAiSalesWorkMessage(
+      "Opening the existing Opportunity form with AI guidance. Review every field before creating the Opportunity."
+    );
+
+    scrollToCompanyDetailSection(
+      "company-detail-funnel"
+    );
+  }
+
+  async function copyAiDiscoveryPlan() {
+    if (!hasAiAnalysis) {
+      setAiSalesWorkMessage(
+        "Run Analyze Prospect before copying a Discovery Plan."
+      );
+      return;
+    }
+
+    if (
+      typeof window === "undefined" ||
+      typeof document === "undefined"
+    ) {
+      return;
+    }
+
+    const discoveryPlan =
+      buildAiDiscoveryPlanText();
+
+    try {
+      let copied = false;
+
+      try {
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(
+            discoveryPlan
+          );
+
+          copied = true;
+        }
+      } catch {
+        copied = false;
+      }
+
+      if (!copied) {
+        const temporaryTextArea =
+          document.createElement(
+            "textarea"
+          );
+
+        temporaryTextArea.value =
+          discoveryPlan;
+
+        temporaryTextArea.setAttribute(
+          "readonly",
+          ""
+        );
+
+        temporaryTextArea.style.position =
+          "fixed";
+
+        temporaryTextArea.style.opacity =
+          "0";
+
+        document.body.appendChild(
+          temporaryTextArea
+        );
+
+        temporaryTextArea.select();
+
+        copied =
+          document.execCommand("copy");
+
+        temporaryTextArea.remove();
+      }
+
+      if (!copied) {
+        throw new Error(
+          "Clipboard access was not available."
+        );
+      }
+
+      setAiSalesWorkMessage(
+        "AI Discovery Plan copied. Review it before using or sharing it."
+      );
+    } catch {
+      setAiSalesWorkMessage(
+        "Could not copy the AI Discovery Plan. Browser clipboard access may be blocked."
+      );
+    }
+  }
+
   function companyActivityDateOffset(days: number) {
     return getLocalDateInputValueOffset(days);
   }
@@ -19217,10 +19671,25 @@ function CompanyDetailSection({
       </div>
 
       <div id="company-detail-funnel" className="scroll-mt-24 md:scroll-mt-[26rem]"></div>
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={draftAiOpportunity}
+          disabled={!hasAiAnalysis}
+          className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+        >
+          AI Draft Opportunity
+        </button>
+
+        <p className="text-sm text-slate-600">
+          Prefills the existing Opportunity form. Nothing is created until you review the draft and select Create Opportunity.
+        </p>
+      </div>
       <CompanyOpportunityPanel
         canMoveOpportunityStages={canMoveOpportunityStages}
         apiPermissionHeaders={apiPermissionHeaders}
         onOpportunityCountChange={setCompanyFunnelItemCount}
+        aiDraftRequest={aiOpportunityDraftRequest}
         companyId={String(detail.company.id)}
         companyName={displayValue(detail.company.company_name)}
         contacts={detail.contacts}
@@ -19232,7 +19701,18 @@ function CompanyDetailSection({
 
       <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
         <div id="company-detail-activity" className="scroll-mt-24 md:scroll-mt-[26rem]"></div>
-        <h3 className="text-xl font-bold">Add Activity / Follow-Up</h3>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-xl font-bold">Add Activity / Follow-Up</h3>
+
+          <button
+            type="button"
+            onClick={draftAiFollowUpActivity}
+            disabled={!hasAiAnalysis || !canManageCompanyActivities}
+            className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+          >
+            AI Draft Follow-Up
+          </button>
+        </div>
         <p className="mt-2 text-sm text-slate-600">
           Save notes, calls, emails, meetings, tasks, and quote follow-ups directly to this company record.
         </p>
@@ -19363,7 +19843,7 @@ function CompanyDetailSection({
               {detail.contacts.map((contact: any) => (
                 <option key={String(contact.id)} value={String(contact.id)}>
                   {displayValue(contact.full_name || contact.email)}
-                  {contact.is_primary ? " â€” Company Primary" : ""}
+                  {contact.is_primary ? " - Company Primary" : ""}
                 </option>
               ))}
             </select>
@@ -19403,7 +19883,7 @@ function CompanyDetailSection({
                       />
                       <span>
                         {displayValue(contact.full_name || contact.email)}
-                        {isPrimarySelection ? " â€” Primary Contact" : ""}
+                        {isPrimarySelection ? " - Primary Contact" : ""}
                       </span>
                     </label>
                   );
@@ -21292,7 +21772,21 @@ function CompanyDetailSection({
             </DetailCard>
           </div>
           <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
-            <h3 className="text-xl font-bold">Discovery Questions</h3>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h3 className="text-xl font-bold">Discovery Questions</h3>
+
+              <button
+                type="button"
+                onClick={() => {
+                  void copyAiDiscoveryPlan();
+                }}
+                disabled={!hasAiAnalysis}
+                className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+              >
+                Copy Discovery Plan
+              </button>
+            </div>
+
             {discoveryQuestions.length === 0 ? (
               <p className="mt-3 text-sm text-slate-600">No discovery questions generated.</p>
             ) : (
@@ -21302,6 +21796,13 @@ function CompanyDetailSection({
                 ))}
               </ol>
             )}
+
+            {aiSalesWorkMessage &&
+              aiSalesWorkMessage.toLowerCase().includes("discovery plan") && (
+                <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-900">
+                  {aiSalesWorkMessage}
+                </div>
+              )}
           </div>
 
           <div className="grid gap-6 lg:grid-cols-2">
@@ -21335,6 +21836,7 @@ function CompanyDetailSection({
               secondaryKeys={["response", "answer", "recommended_response", "notes"]}
             />
           </div>
+
 
           <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
             <h3 className="text-xl font-bold">Copyable Sales Block</h3>
@@ -22404,7 +22906,7 @@ function OpportunityActivitiesPanel({
                 {contacts.map((contact: any) => (
                   <option key={String(contact.id)} value={String(contact.id)}>
                     {displayValue(contact.full_name || contact.email)}
-                    {contact.is_primary ? " â€” Company Primary" : ""}
+                    {contact.is_primary ? " - Company Primary" : ""}
                   </option>
                 ))}
               </select>
@@ -22445,7 +22947,7 @@ function OpportunityActivitiesPanel({
                         />
                         <span>
                           {displayValue(contact.full_name || contact.email)}
-                          {isPrimarySelection ? " â€” Primary Contact" : ""}
+                          {isPrimarySelection ? " - Primary Contact" : ""}
                         </span>
                       </label>
                     );
@@ -22594,6 +23096,7 @@ function CompanyOpportunityPanel({
   canMoveOpportunityStages = true,
   apiPermissionHeaders = () => ({}),
   onOpportunityCountChange,
+  aiDraftRequest,
 }: {
   companyId: string;
   companyName: string;
@@ -22603,6 +23106,7 @@ function CompanyOpportunityPanel({
   canMoveOpportunityStages?: boolean;
   apiPermissionHeaders?: () => Record<string, string>;
   onOpportunityCountChange?: (count: number) => void;
+  aiDraftRequest?: AiOpportunityDraftRequest | null;
 }) {
   const [stages, setStages] = useState<SalesFunnelStage[]>([]);
   const [opportunities, setOpportunities] = useState<SalesOpportunity[]>([]);
@@ -22662,6 +23166,118 @@ function CompanyOpportunityPanel({
     businessCase: "",
     owner: "",
   });
+
+  const lastAiDraftRequestIdRef =
+    useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!aiDraftRequest) {
+      return;
+    }
+
+    if (
+      lastAiDraftRequestIdRef.current ===
+      aiDraftRequest.requestId
+    ) {
+      return;
+    }
+
+    lastAiDraftRequestIdRef.current =
+      aiDraftRequest.requestId;
+
+    const hasExistingDraft =
+      Boolean(
+        form.opportunityName.trim() ||
+        form.primaryContactId ||
+        form.relatedContactIds.length > 0 ||
+        form.prospectId ||
+        form.stageId ||
+        form.productLine.trim() ||
+        form.likelyProductPath.trim() ||
+        form.primaryUseCase.trim() ||
+        form.estimatedValue ||
+        form.probability ||
+        form.expectedCloseDate ||
+        form.nextStep.trim() ||
+        form.nextStepDueDate ||
+        form.customerNeed.trim() ||
+        form.businessCase.trim() ||
+        form.owner.trim()
+      );
+
+    if (
+      hasExistingDraft &&
+      typeof window !== "undefined" &&
+      !window.confirm(
+        "Replace the current unsaved Opportunity draft with the latest AI guidance?"
+      )
+    ) {
+      setOpportunityMessage(
+        "Existing Opportunity draft preserved. AI draft was not applied."
+      );
+
+      return;
+    }
+
+    setEditingOpportunityId("");
+    setOpportunityError("");
+
+    setForm({
+      opportunityName:
+        aiDraftRequest.opportunityName,
+      opportunityType:
+        aiDraftRequest.opportunityType,
+      primaryContactId:
+        aiDraftRequest.primaryContactId,
+      relatedContactIds: [],
+      prospectId:
+        String(primaryProspect?.id ?? ""),
+      stageId:
+        defaultStage?.id || "",
+      productLine:
+        aiDraftRequest.productLine,
+      likelyProductPath:
+        aiDraftRequest.likelyProductPath,
+      primaryUseCase:
+        aiDraftRequest.primaryUseCase,
+      estimatedValue: "",
+      probability:
+        typeof defaultStage?.default_probability ===
+        "number"
+          ? String(
+              defaultStage.default_probability
+            )
+          : "",
+      expectedCloseDate: "",
+      nextStep:
+        aiDraftRequest.nextStep,
+      nextStepDueDate: "",
+      customerNeed:
+        aiDraftRequest.customerNeed,
+      businessCase:
+        aiDraftRequest.businessCase,
+      owner: "",
+    });
+
+    setShowCreateForm(true);
+
+    setOpportunityMessage(
+      "AI opportunity draft loaded. Review the Type, Stage, contacts, value, dates, customer need, business case, and next step before selecting Create Opportunity."
+    );
+
+    if (typeof window !== "undefined") {
+      window.requestAnimationFrame(() => {
+        document
+          .getElementById(
+            "company-detail-funnel"
+          )
+          ?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+      });
+    }
+  }, [aiDraftRequest?.requestId]);
 
   async function loadOpportunityData() {
     setIsLoading(true);
@@ -23086,7 +23702,7 @@ function CompanyOpportunityPanel({
                 {contacts.map((contact: any) => (
                   <option key={String(contact.id)} value={String(contact.id)}>
                     {displayValue(contact.full_name || contact.email)}
-                    {contact.is_primary ? " â€” Company Primary" : ""}
+                    {contact.is_primary ? " - Company Primary" : ""}
                   </option>
                 ))}
               </select>
@@ -23125,7 +23741,7 @@ function CompanyOpportunityPanel({
                         />
                         <span>
                           {displayValue(contact.full_name || contact.email)}
-                          {isPrimarySelection ? " â€” Primary Contact" : ""}
+                          {isPrimarySelection ? " - Primary Contact" : ""}
                         </span>
                       </label>
                     );
@@ -23423,7 +24039,7 @@ function CompanyOpportunityPanel({
                               {contacts.map((contact: any) => (
                                 <option key={String(contact.id)} value={String(contact.id)}>
                                   {displayValue(contact.full_name || contact.email)}
-                                  {contact.is_primary ? " â€” Company Primary" : ""}
+                                  {contact.is_primary ? " - Company Primary" : ""}
                                 </option>
                               ))}
                             </select>
@@ -23464,7 +24080,7 @@ function CompanyOpportunityPanel({
                                       />
                                       <span>
                                         {displayValue(contact.full_name || contact.email)}
-                                        {isPrimarySelection ? " â€” Primary Contact" : ""}
+                                        {isPrimarySelection ? " - Primary Contact" : ""}
                                       </span>
                                     </label>
                                   );
