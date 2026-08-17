@@ -205,10 +205,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.24.2 - Company Detail Section Navigation";
+  "Version 3.25 - Salesperson AI Workflow Polish";
 
 const REVISION_NOTE =
-  "Adds compact sticky Company Detail navigation for Snapshot, Coverage, Opportunities, Activity, Contacts, Projects / Tags, and AI Analysis.";
+  "Polishes salesperson-reviewed AI Activity and Opportunity drafts with clearer draft status, smarter replacement protection, and safer useful defaults without automatically saving CRM records.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean
@@ -16077,6 +16077,12 @@ function CompanyDetailSection({
     );
   }
 
+  function isAiGuidedActivityDraft() {
+    return activityForm.notes.startsWith(
+      "AI-guided follow-up draft. Review and edit before saving."
+    );
+  }
+
   function hasUnsavedCompanyActivityEdit() {
     const selectedActivity = (
       detail?.activities ?? []
@@ -17556,6 +17562,7 @@ function CompanyDetailSection({
 
     if (
       hasUnsavedNewCompanyActivityDraft() &&
+      !isAiGuidedActivityDraft() &&
       typeof window !== "undefined" &&
       !window.confirm(
         "Replace the current unsaved Activity draft with the AI follow-up draft?"
@@ -20065,8 +20072,16 @@ function CompanyDetailSection({
         </div>
 
         {hasUnsavedNewCompanyActivityDraft() && (
-          <p className="mt-4 w-fit rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
-            Unsaved activity draft
+          <p
+            className={
+              isAiGuidedActivityDraft()
+                ? "mt-4 w-fit rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-800"
+                : "mt-4 w-fit rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800"
+            }
+          >
+            {isAiGuidedActivityDraft()
+              ? "AI Draft - review before Save Activity"
+              : "Unsaved activity draft"}
           </p>
         )}
 
@@ -23274,20 +23289,87 @@ function CompanyOpportunityPanel({
     lastAiDraftRequestIdRef.current =
       aiDraftRequest.requestId;
 
+    const defaultOpportunityName =
+      `${companyName} - ${displayValue(
+        primaryProspect?.likely_product_path ||
+          "Sales Opportunity"
+      )}`;
+
+    const defaultProspectId =
+      String(primaryProspect?.id ?? "");
+
+    const defaultStageId =
+      defaultStage?.id || "";
+
+    const defaultProductLine =
+      String(primaryProspect?.product_line ?? "");
+
+    const defaultLikelyProductPath =
+      String(
+        primaryProspect?.likely_product_path ?? ""
+      );
+
+    const defaultPrimaryUseCase =
+      String(primaryProspect?.primary_use_case ?? "");
+
+    const defaultProbability =
+      typeof defaultStage?.default_probability ===
+      "number"
+        ? String(defaultStage.default_probability)
+        : "";
+
+    const defaultNextStep =
+      String(primaryProspect?.next_best_action ?? "");
+
+    const currentFormIsAiDraft =
+      opportunityMessage.startsWith(
+        "AI Draft loaded - not saved."
+      );
+
     const hasExistingDraft =
       Boolean(
-        form.opportunityName.trim() ||
+        (
+          form.opportunityName.trim() &&
+          form.opportunityName.trim() !==
+            defaultOpportunityName.trim()
+        ) ||
+        form.opportunityType !== "Parts washer" ||
         form.primaryContactId ||
         form.relatedContactIds.length > 0 ||
-        form.prospectId ||
-        form.stageId ||
-        form.productLine.trim() ||
-        form.likelyProductPath.trim() ||
-        form.primaryUseCase.trim() ||
+        (
+          form.prospectId &&
+          form.prospectId !== defaultProspectId
+        ) ||
+        (
+          form.stageId &&
+          form.stageId !== defaultStageId
+        ) ||
+        (
+          form.productLine.trim() &&
+          form.productLine.trim() !==
+            defaultProductLine.trim()
+        ) ||
+        (
+          form.likelyProductPath.trim() &&
+          form.likelyProductPath.trim() !==
+            defaultLikelyProductPath.trim()
+        ) ||
+        (
+          form.primaryUseCase.trim() &&
+          form.primaryUseCase.trim() !==
+            defaultPrimaryUseCase.trim()
+        ) ||
         form.estimatedValue ||
-        form.probability ||
+        (
+          form.probability &&
+          form.probability !== defaultProbability
+        ) ||
         form.expectedCloseDate ||
-        form.nextStep.trim() ||
+        (
+          form.nextStep.trim() &&
+          form.nextStep.trim() !==
+            defaultNextStep.trim()
+        ) ||
         form.nextStepDueDate ||
         form.customerNeed.trim() ||
         form.businessCase.trim() ||
@@ -23296,6 +23378,7 @@ function CompanyOpportunityPanel({
 
     if (
       hasExistingDraft &&
+      !currentFormIsAiDraft &&
       typeof window !== "undefined" &&
       !window.confirm(
         "Replace the current unsaved Opportunity draft with the latest AI guidance?"
@@ -23340,7 +23423,8 @@ function CompanyOpportunityPanel({
       expectedCloseDate: "",
       nextStep:
         aiDraftRequest.nextStep,
-      nextStepDueDate: "",
+      nextStepDueDate:
+        getLocalDateInputValueOffset(2),
       customerNeed:
         aiDraftRequest.customerNeed,
       businessCase:
@@ -23351,7 +23435,7 @@ function CompanyOpportunityPanel({
     setShowCreateForm(true);
 
     setOpportunityMessage(
-      "AI opportunity draft loaded. Review the Type, Stage, contacts, value, dates, customer need, business case, and next step before selecting Create Opportunity."
+      "AI Draft loaded - not saved. Review Type, Stage, contacts, value, dates, customer need, business case, and next step before selecting Create Opportunity."
     );
 
     if (typeof window !== "undefined") {
@@ -23698,7 +23782,15 @@ function CompanyOpportunityPanel({
       {(opportunityMessage || opportunityError) && (
         <div className="mt-4 grid gap-2">
           {opportunityMessage && (
-            <div className="rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+            <div
+              className={
+                opportunityMessage.startsWith(
+                  "AI Draft loaded - not saved."
+                )
+                  ? "rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm font-semibold text-blue-800"
+                  : "rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-800"
+              }
+            >
               {opportunityMessage}
             </div>
           )}
@@ -23712,7 +23804,19 @@ function CompanyOpportunityPanel({
 
       {showCreateForm && (
         <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-5">
-          <h4 className="text-lg font-bold">New Opportunity</h4>
+          <div className="flex flex-wrap items-center gap-2">
+            <h4 className="text-lg font-bold">
+              New Opportunity
+            </h4>
+
+            {opportunityMessage.startsWith(
+              "AI Draft loaded - not saved."
+            ) && (
+              <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-800">
+                AI Draft - not saved
+              </span>
+            )}
+          </div>
 
           <div className="mt-4 grid gap-4 lg:grid-cols-4">
             <div className="lg:col-span-2">
