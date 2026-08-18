@@ -3,9 +3,10 @@
 
 import { getBrowserSupabaseClient, hasBrowserSupabaseConfig } from "../lib/supabase-browser";
 import AdminKnowledgeLibrarySection from "./components/AdminKnowledgeLibrarySection";
+import ErpReconciliationSection from "./components/ErpReconciliationSection";
 import { ChangeEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
-type TabKey = "dashboard" | "companies" | "contacts" | "funnel" | "import" | "help" | "releaseNotes" | "admin" | "companyDetail";
+type TabKey = "dashboard" | "companies" | "contacts" | "funnel" | "import" | "erpReconciliation" | "help" | "releaseNotes" | "admin" | "companyDetail";
 
 type ImportResultsReport = {
   companiesCreated: string[];
@@ -205,10 +206,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.25 - Salesperson AI Workflow Polish";
+  "Version 3.26 - ERP-to-CRM Reconciliation";
 
 const REVISION_NOTE =
-  "Polishes salesperson-reviewed AI Activity and Opportunity drafts with clearer draft status, smarter replacement protection, and safer useful defaults without automatically saving CRM records.";
+  "Adds secure ERP XLSX reconciliation with customer-level matching, CRM activity and opportunity context, preserved source workbooks, and human review before any future CRM updates.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean
@@ -2497,6 +2498,7 @@ async function handleAnalyzeProspect() {
     { key: "contacts", label: "Contacts" },
     { key: "funnel", label: "Funnel" },
     { key: "import", label: "Import ZoomInfo" },
+    { key: "erpReconciliation", label: "ERP Reconciliation" },
     { key: "admin", label: "Admin" },
     { key: "help", label: "Help" },
     { key: "releaseNotes", label: "Release Notes" },
@@ -3459,6 +3461,16 @@ async function handleAnalyzeProspect() {
             apiPermissionHeaders={apiPermissionHeaders}
             canMoveOpportunityStages={currentPermissions.canMoveOpportunityStages}
             canManageProjectsLists={currentPermissions.canManageAdminSettings}
+          />
+        )}
+
+        {activeTab === "erpReconciliation" && (
+          <ErpReconciliationSection
+            canAccess={
+              currentUserRole === "admin" ||
+              currentUserRole === "sales_manager"
+            }
+            onOpenCompany={(companyId) => {               void loadCompanyDetail(                 companyId               );             }}
           />
         )}
 
