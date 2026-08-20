@@ -114,6 +114,25 @@ type OutreachContactResponse = {
   error?: string;
 };
 
+type EnrollmentRequestResponse = {
+  status?: string;
+  mode?: string;
+  batchId?: string | null;
+  recordedEnrollmentCount?: number;
+  requestedCount?: number;
+  eligibleCount?: number;
+  blockedCount?: number;
+  alreadyRecordedCount?: number;
+  newEnrollmentCount?: number;
+  blocked?: {
+    contactId: string;
+    reason: string;
+  }[];
+  alreadyRecordedContactIds?: string[];
+  message?: string;
+  error?: string;
+};
+
 async function getBearerHeaders() {
   if (
     !hasBrowserSupabaseConfig()
@@ -399,6 +418,62 @@ export default function OutreachMailshakeSection({
     useState<string[]>(
       []
     );
+
+  const [
+    selectedCampaignId,
+    setSelectedCampaignId,
+  ] =
+    useState("");
+
+  const [
+    selectionUsedSelectAll,
+    setSelectionUsedSelectAll,
+  ] =
+    useState(false);
+
+  const [
+    enrollmentReview,
+    setEnrollmentReview,
+  ] =
+    useState<
+      EnrollmentRequestResponse | null
+    >(null);
+
+  const [
+    enrollmentReviewFingerprint,
+    setEnrollmentReviewFingerprint,
+  ] =
+    useState("");
+
+  const [
+    recordedEnrollmentFingerprint,
+    setRecordedEnrollmentFingerprint,
+  ] =
+    useState("");
+
+  const [
+    isReviewingEnrollment,
+    setIsReviewingEnrollment,
+  ] =
+    useState(false);
+
+  const [
+    isRecordingEnrollment,
+    setIsRecordingEnrollment,
+  ] =
+    useState(false);
+
+  const [
+    enrollmentError,
+    setEnrollmentError,
+  ] =
+    useState("");
+
+  const [
+    enrollmentMessage,
+    setEnrollmentMessage,
+  ] =
+    useState("");
 
   const [
     contactPage,
@@ -700,9 +775,7 @@ export default function OutreachMailshakeSection({
         data
       );
 
-      setSelectedContactIds(
-        []
-      );
+      clearSelection();
 
       setContactPage(1);
 
@@ -717,7 +790,7 @@ export default function OutreachMailshakeSection({
     } catch (error) {
       setContacts([]);
       setContactResponse(null);
-      setSelectedContactIds([]);
+      clearSelection();
       setContactsLoaded(true);
 
       setContactError(
@@ -942,6 +1015,92 @@ export default function OutreachMailshakeSection({
         )
     ).length;
 
+  const selectedCampaign =
+    useMemo(
+      () =>
+        campaigns.find(
+          (campaign) =>
+            campaign.providerCampaignId ===
+            selectedCampaignId
+        ) ??
+        null,
+      [
+        campaigns,
+        selectedCampaignId,
+      ]
+    );
+
+  const enrollmentFilterSnapshot =
+    useMemo(
+      () => ({
+        search:
+          contactSearch,
+
+        companyId:
+          companyFilter,
+
+        state:
+          stateFilter,
+
+        managementLevel:
+          managementFilter,
+
+        functionOrDepartment:
+          functionFilter,
+
+        marketTagId:
+          marketFilter,
+
+        sectorTagId:
+          sectorFilter,
+
+        categoryTagId:
+          categoryFilter,
+
+        projectOrListId:
+          projectFilter,
+
+        eligibility:
+          eligibilityFilter,
+
+        selectAllFilteredUsed:
+          selectionUsedSelectAll,
+      }),
+      [
+        contactSearch,
+        companyFilter,
+        stateFilter,
+        managementFilter,
+        functionFilter,
+        marketFilter,
+        sectorFilter,
+        categoryFilter,
+        projectFilter,
+        eligibilityFilter,
+        selectionUsedSelectAll,
+      ]
+    );
+
+  const enrollmentSelectionFingerprint =
+    useMemo(
+      () =>
+        JSON.stringify({
+          campaignId:
+            selectedCampaignId,
+
+          selectedContactIds:
+            [...selectedContactIds].sort(),
+
+          filterSnapshot:
+            enrollmentFilterSnapshot,
+        }),
+      [
+        selectedCampaignId,
+        selectedContactIds,
+        enrollmentFilterSnapshot,
+      ]
+    );
+
   const pageCount =
     Math.max(
       1,
@@ -997,6 +1156,10 @@ export default function OutreachMailshakeSection({
   }
 
   function selectAllFiltered() {
+    setSelectionUsedSelectAll(
+      true
+    );
+
     setSelectedContactIds(
       (previous) =>
         Array.from(
@@ -1016,6 +1179,30 @@ export default function OutreachMailshakeSection({
     setSelectedContactIds(
       []
     );
+
+    setSelectionUsedSelectAll(
+      false
+    );
+
+    setEnrollmentReview(
+      null
+    );
+
+    setEnrollmentReviewFingerprint(
+      ""
+    );
+
+    setRecordedEnrollmentFingerprint(
+      ""
+    );
+
+    setEnrollmentError(
+      ""
+    );
+
+    setEnrollmentMessage(
+      ""
+    );
   }
 
   function clearFilters() {
@@ -1029,6 +1216,269 @@ export default function OutreachMailshakeSection({
     setCategoryFilter("All");
     setProjectFilter("All");
     setEligibilityFilter("All");
+  }
+
+  function selectedCampaignStatus() {
+    if (
+      !selectedCampaign
+    ) {
+      return "";
+    }
+
+    if (
+      selectedCampaign.isArchived
+    ) {
+      return "archived";
+    }
+
+    if (
+      selectedCampaign.isPaused
+    ) {
+      return "paused";
+    }
+
+    return "active";
+  }
+
+  async function submitEnrollmentAction(
+    action:
+      | "review"
+      | "record"
+  ) {
+    if (
+      !selectedCampaign
+    ) {
+      setEnrollmentError(
+        "Choose a Mailshake campaign first."
+      );
+
+      return;
+    }
+
+    if (
+      selectedContactIds.length ===
+      0
+    ) {
+      setEnrollmentError(
+        "Select at least one eligible CRM contact first."
+      );
+
+      return;
+    }
+
+    if (
+      selectedCampaign.isArchived
+    ) {
+      setEnrollmentError(
+        "Archived Mailshake campaigns cannot receive new CRM enrollment instructions."
+      );
+
+      return;
+    }
+
+    if (
+      action === "review"
+    ) {
+      setIsReviewingEnrollment(
+        true
+      );
+    } else {
+      setIsRecordingEnrollment(
+        true
+      );
+    }
+
+    setEnrollmentError(
+      ""
+    );
+
+    setEnrollmentMessage(
+      ""
+    );
+
+    try {
+      const response =
+        await fetch(
+          "/api/outreach-mailshake/enrollment-requests",
+          {
+            method:
+              "POST",
+
+            headers: {
+              ...(await getBearerHeaders()),
+
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify({
+                action,
+
+                providerCampaignId:
+                  selectedCampaign.providerCampaignId,
+
+                campaignName:
+                  selectedCampaign.title,
+
+                campaignStatus:
+                  selectedCampaignStatus(),
+
+                selectionMode:
+                  selectionUsedSelectAll
+                    ? "select_all_filtered"
+                    : "individual",
+
+                filterSnapshot:
+                  enrollmentFilterSnapshot,
+
+                contactIds:
+                  selectedContactIds,
+              }),
+
+            cache:
+              "no-store",
+          }
+        );
+
+      const rawText =
+        await response.text();
+
+      let data:
+        EnrollmentRequestResponse;
+
+      try {
+        data =
+          rawText
+            ? JSON.parse(
+                rawText
+              )
+            : {};
+      } catch {
+        throw new Error(
+          `CRM enrollment endpoint returned an unreadable response with HTTP status ${response.status}.`
+        );
+      }
+
+      if (
+        !response.ok
+      ) {
+        throw new Error(
+          data.error ||
+            "Could not review or record the CRM outreach enrollment."
+        );
+      }
+
+      setEnrollmentReview(
+        data
+      );
+
+      setEnrollmentReviewFingerprint(
+        enrollmentSelectionFingerprint
+      );
+
+      if (
+        action === "review"
+      ) {
+        setRecordedEnrollmentFingerprint(
+          ""
+        );
+      } else if (
+        data.status ===
+          "recorded_in_crm"
+      ) {
+        setRecordedEnrollmentFingerprint(
+          enrollmentSelectionFingerprint
+        );
+      }
+
+      setEnrollmentMessage(
+        data.message ||
+          (
+            action === "review"
+              ? "CRM enrollment review completed."
+              : "CRM enrollment instruction recorded."
+          )
+      );
+    } catch (error) {
+      setEnrollmentReview(
+        null
+      );
+
+      setEnrollmentReviewFingerprint(
+        ""
+      );
+
+      setEnrollmentError(
+        error instanceof Error
+          ? error.message
+          : "Could not review or record the CRM outreach enrollment."
+      );
+    } finally {
+      if (
+        action === "review"
+      ) {
+        setIsReviewingEnrollment(
+          false
+        );
+      } else {
+        setIsRecordingEnrollment(
+          false
+        );
+      }
+    }
+  }
+
+  async function reviewEnrollment() {
+    await submitEnrollmentAction(
+      "review"
+    );
+  }
+
+  async function recordEnrollmentInCrm() {
+    if (
+      enrollmentReviewFingerprint !==
+      enrollmentSelectionFingerprint
+    ) {
+      setEnrollmentError(
+        "The campaign, contact selection, or filters changed after the last server review. Review the selection again before recording it."
+      );
+
+      return;
+    }
+
+    const newCount =
+      Number(
+        enrollmentReview?.newEnrollmentCount ??
+        0
+      );
+
+    if (
+      newCount <= 0
+    ) {
+      setEnrollmentError(
+        "The server review found no new CRM enrollment records to create."
+      );
+
+      return;
+    }
+
+    const campaignName =
+      selectedCampaign?.title ||
+      "the selected campaign";
+
+    const confirmed =
+      window.confirm(
+        `Record ${newCount} CRM outreach enrollment${newCount === 1 ? "" : "s"} for "${campaignName}"? This records the instruction in CRM only. Nothing will be submitted to Mailshake and no email will be sent.`
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    await submitEnrollmentAction(
+      "record"
+    );
   }
 
   if (!canAccess) {
@@ -1065,11 +1515,11 @@ export default function OutreachMailshakeSection({
 
           <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
             <p className="font-bold">
-              Enrollment is still review-only
+              CRM enrollment recording enabled
             </p>
 
             <p className="mt-1 text-xs leading-5">
-              Sent and reply event synchronization is active. The contact selection tools below do not add recipients to Mailshake and cannot send email.
+              The CRM can now review and record an outreach enrollment instruction. This revision still has no Mailshake recipient submission action, so recording an enrollment cannot send email.
             </p>
           </div>
         </div>
@@ -1792,19 +2242,326 @@ export default function OutreachMailshakeSection({
                 </div>
               )}
 
-              <div className="mt-5 rounded-xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-950">
-                <p className="font-bold">
-                  Review-only checkpoint
+              <div className="mt-5 rounded-2xl border border-violet-300 bg-violet-50 p-5 text-sm text-violet-950">
+                <p className="text-xs font-black uppercase tracking-wide text-violet-700">
+                  CRM Enrollment Review
                 </p>
 
-                <p className="mt-1 text-xs leading-5">
-                  {selectedContactIds.length} CRM contact
-                  {selectedContactIds.length ===
-                  1
-                    ? ""
-                    : "s"}{" "}
-                  selected. There is intentionally no Add to Mailshake button in this revision.
+                <h4 className="mt-1 text-lg font-bold text-violet-950">
+                  Review the CRM instruction before recording it
+                </h4>
+
+                <p className="mt-2 max-w-4xl text-xs leading-5 text-violet-900">
+                  This workflow records the salesperson or manager's enrollment decision in CRM first. Nothing on this panel adds a recipient to Mailshake or sends email.
                 </p>
+
+                <div className="mt-5 grid gap-4 lg:grid-cols-2">
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-wide text-violet-800">
+                      Existing Mailshake Campaign
+                    </label>
+
+                    <select
+                      value={
+                        selectedCampaignId
+                      }
+                      onChange={(
+                        event
+                      ) => {
+                        setSelectedCampaignId(
+                          event.target.value
+                        );
+
+                        setEnrollmentReview(
+                          null
+                        );
+
+                        setEnrollmentReviewFingerprint(
+                          ""
+                        );
+
+                        setRecordedEnrollmentFingerprint(
+                          ""
+                        );
+
+                        setEnrollmentMessage(
+                          ""
+                        );
+
+                        setEnrollmentError(
+                          ""
+                        );
+                      }}
+                      disabled={
+                        campaigns.filter(
+                          (campaign) =>
+                            !campaign.isArchived &&
+                            Boolean(
+                              campaign.providerCampaignId
+                            )
+                        ).length ===
+                        0
+                      }
+                      className="mt-2 w-full rounded-xl border border-violet-300 bg-white px-4 py-3 text-sm shadow-sm disabled:cursor-not-allowed disabled:bg-slate-100"
+                    >
+                      <option value="">
+                        Choose a Mailshake campaign
+                      </option>
+
+                      {campaigns
+                        .filter(
+                          (campaign) =>
+                            !campaign.isArchived &&
+                            Boolean(
+                              campaign.providerCampaignId
+                            )
+                        )
+                        .map(
+                          (
+                            campaign
+                          ) => (
+                            <option
+                              key={
+                                campaign.providerCampaignId
+                              }
+                              value={
+                                campaign.providerCampaignId
+                              }
+                            >
+                              {campaign.title} —{" "}
+                              {campaign.isPaused
+                                ? "Paused"
+                                : "Active"}
+                            </option>
+                          )
+                        )}
+                    </select>
+
+                    {!hasLoaded && (
+                      <p className="mt-2 text-xs text-violet-800">
+                        Load Mailshake campaigns above before choosing the execution campaign.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="rounded-xl border border-violet-200 bg-white p-4">
+                    <p className="text-xs font-bold uppercase text-violet-700">
+                      Current CRM Selection
+                    </p>
+
+                    <p className="mt-1 text-2xl font-black text-violet-950">
+                      {selectedContactIds.length}
+                    </p>
+
+                    <p className="mt-1 text-xs text-violet-800">
+                      {selectionUsedSelectAll
+                        ? "Selection includes Select All Filtered."
+                        : "Selection was made individually."}
+                    </p>
+                  </div>
+                </div>
+
+                {selectedCampaign && (
+                  <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-4 text-xs text-blue-950">
+                    <p className="font-bold">
+                      Selected campaign: {selectedCampaign.title}
+                    </p>
+
+                    <p className="mt-1">
+                      Mailshake Campaign ID: {selectedCampaign.providerCampaignId}
+                    </p>
+
+                    <p className="mt-1">
+                      Current provider status:{" "}
+                      {selectedCampaign.isPaused
+                        ? "Paused"
+                        : "Active"}
+                    </p>
+
+                    {selectedCampaign.isPaused ? (
+                      <p className="mt-2 font-semibold">
+                        Recording the CRM enrollment does not unpause this campaign.
+                      </p>
+                    ) : (
+                      <p className="mt-2 font-semibold">
+                        This campaign is active. This revision still records CRM intent only; provider submission will require a separate later confirmation.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <div className="mt-5 flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void reviewEnrollment()
+                    }
+                    disabled={
+                      isReviewingEnrollment ||
+                      isRecordingEnrollment ||
+                      !selectedCampaign ||
+                      selectedContactIds.length ===
+                        0
+                    }
+                    className="rounded-xl bg-blue-700 px-5 py-3 text-sm font-bold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                  >
+                    {isReviewingEnrollment
+                      ? "Reviewing CRM Selection..."
+                      : "Review Selection on Server"}
+                  </button>
+                </div>
+
+                {enrollmentError && (
+                  <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-800">
+                    {enrollmentError}
+                  </div>
+                )}
+
+                {enrollmentMessage && (
+                  <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-900">
+                    {enrollmentMessage}
+                  </div>
+                )}
+
+                {enrollmentReview && (
+                  <div className="mt-5 rounded-2xl border border-violet-200 bg-white p-5">
+                    <h5 className="font-bold text-slate-950">
+                      Server-Validated Enrollment Review
+                    </h5>
+
+                    {enrollmentReviewFingerprint !==
+                      enrollmentSelectionFingerprint && (
+                      <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-900">
+                        The selection or filters changed after this review. Run Review Selection on Server again before recording.
+                      </div>
+                    )}
+
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                      <div className="rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200">
+                        <p className="text-xs font-bold uppercase text-slate-500">
+                          Requested
+                        </p>
+                        <p className="mt-1 text-xl font-black text-slate-950">
+                          {enrollmentReview.requestedCount ?? 0}
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl bg-emerald-50 p-3 ring-1 ring-emerald-200">
+                        <p className="text-xs font-bold uppercase text-emerald-700">
+                          Eligible Now
+                        </p>
+                        <p className="mt-1 text-xl font-black text-emerald-950">
+                          {enrollmentReview.eligibleCount ?? 0}
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl bg-amber-50 p-3 ring-1 ring-amber-200">
+                        <p className="text-xs font-bold uppercase text-amber-700">
+                          Blocked Now
+                        </p>
+                        <p className="mt-1 text-xl font-black text-amber-950">
+                          {enrollmentReview.blockedCount ?? 0}
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl bg-blue-50 p-3 ring-1 ring-blue-200">
+                        <p className="text-xs font-bold uppercase text-blue-700">
+                          Already in CRM
+                        </p>
+                        <p className="mt-1 text-xl font-black text-blue-950">
+                          {enrollmentReview.alreadyRecordedCount ?? 0}
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl bg-violet-100 p-3 ring-1 ring-violet-300">
+                        <p className="text-xs font-bold uppercase text-violet-700">
+                          New CRM Records
+                        </p>
+                        <p className="mt-1 text-xl font-black text-violet-950">
+                          {enrollmentReview.newEnrollmentCount ?? 0}
+                        </p>
+                      </div>
+                    </div>
+
+                    {(enrollmentReview.blocked?.length ?? 0) > 0 && (
+                      <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                        <p className="text-xs font-bold uppercase text-amber-800">
+                          Server-Blocked Contacts
+                        </p>
+
+                        <div className="mt-2 grid gap-2">
+                          {(enrollmentReview.blocked ?? [])
+                            .slice(0, 8)
+                            .map(
+                              (
+                                blocked,
+                                index
+                              ) => (
+                                <p
+                                  key={`${blocked.contactId}-${index}`}
+                                  className="text-xs leading-5 text-amber-900"
+                                >
+                                  {blocked.reason}
+                                </p>
+                              )
+                            )}
+
+                          {(enrollmentReview.blocked?.length ?? 0) >
+                            8 && (
+                            <p className="text-xs font-semibold text-amber-900">
+                              Plus{" "}
+                              {(enrollmentReview.blocked?.length ?? 0) -
+                                8}{" "}
+                              additional blocked contact(s).
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="mt-5 border-t border-violet-200 pt-5">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void recordEnrollmentInCrm()
+                        }
+                        disabled={
+                          isReviewingEnrollment ||
+                          isRecordingEnrollment ||
+                          enrollmentReviewFingerprint !==
+                            enrollmentSelectionFingerprint ||
+                          recordedEnrollmentFingerprint ===
+                            enrollmentSelectionFingerprint ||
+                          Number(
+                            enrollmentReview.newEnrollmentCount ??
+                              0
+                          ) <= 0
+                        }
+                        className="rounded-xl bg-violet-700 px-5 py-3 text-sm font-bold text-white hover:bg-violet-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                      >
+                        {isRecordingEnrollment
+                          ? "Recording in CRM..."
+                          : recordedEnrollmentFingerprint ===
+                              enrollmentSelectionFingerprint
+                            ? "Recorded in CRM"
+                            : `Record ${Number(
+                                enrollmentReview.newEnrollmentCount ??
+                                  0
+                              )} in CRM — Not Mailshake`}
+                      </button>
+
+                      <p className="mt-3 text-xs font-semibold leading-5 text-violet-900">
+                        This button creates CRM enrollment records only. There is still no API call here that adds recipients to Mailshake.
+                      </p>
+
+                      {enrollmentReview.batchId && (
+                        <p className="mt-2 break-all text-xs text-slate-500">
+                          CRM enrollment batch: {enrollmentReview.batchId}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </>
           )}
