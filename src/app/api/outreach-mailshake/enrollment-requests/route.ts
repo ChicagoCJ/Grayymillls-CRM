@@ -16,9 +16,13 @@ const PAGE_SIZE = 500;
 const MAX_PAGES = 50;
 const MAX_SELECTED_CONTACTS = 10000;
 
+const MAILSHAKE_API_BASE =
+  "https://api.mailshake.com/2017-04-01";
+
 type EnrollmentAction =
   | "review"
-  | "record";
+  | "record"
+  | "provider_review";
 
 type SelectionMode =
   | "individual"
@@ -42,6 +46,24 @@ type ContactRow = {
 
 type ExistingEnrollmentRow = {
   contact_id?: string | null;
+};
+
+type ExistingEnrollmentDetailRow = {
+  id?: string | null;
+  batch_id?: string | null;
+  contact_id?: string | null;
+  normalized_email?: string | null;
+  status?: string | null;
+  provider_recipient_id?: string | null;
+  submitted_at?: string | null;
+};
+
+type MailshakeCampaignProvider = {
+  object?: string;
+  id?: number | string;
+  title?: string;
+  isArchived?: boolean;
+  isPaused?: boolean;
 };
 
 type PreparedContact = {
@@ -72,6 +94,159 @@ function normalizeEmail(
   return cleanText(
     value
   ).toLowerCase();
+}
+
+function getMailshakeApiKey() {
+  const apiKey =
+    cleanText(
+      process.env.MAILSHAKE_API_KEY
+    );
+
+  if (!apiKey) {
+    throw new Error(
+      "MAILSHAKE_API_KEY is not configured on the CRM server."
+    );
+  }
+
+  return apiKey;
+}
+
+function mailshakeAuthorizationHeader() {
+  const apiKey =
+    getMailshakeApiKey();
+
+  const token =
+    Buffer.from(
+      `${apiKey}:`,
+      "utf8"
+    ).toString(
+      "base64"
+    );
+
+  return `Basic ${token}`;
+}
+
+async function readMailshakeCampaign(
+  providerCampaignId: string
+) {
+  const body =
+    new URLSearchParams();
+
+  body.set(
+    "campaignID",
+    providerCampaignId
+  );
+
+  const response =
+    await fetch(
+      `${MAILSHAKE_API_BASE}/campaigns/get`,
+      {
+        method:
+          "POST",
+
+        headers: {
+          Authorization:
+            mailshakeAuthorizationHeader(),
+
+          Accept:
+            "application/json",
+
+          "Content-Type":
+            "application/x-www-form-urlencoded",
+        },
+
+        body:
+          body.toString(),
+
+        cache:
+          "no-store",
+      }
+    );
+
+  const rawText =
+    await response.text();
+
+  let data:
+    MailshakeCampaignProvider &
+    Record<
+      string,
+      unknown
+    >;
+
+  try {
+    data =
+      rawText
+        ? (
+            JSON.parse(
+              rawText
+            ) as
+              MailshakeCampaignProvider &
+              Record<
+                string,
+                unknown
+              >
+          )
+        : {};
+  } catch {
+    throw new Error(
+      `Mailshake returned an unreadable campaign response with HTTP status ${response.status}.`
+    );
+  }
+
+  if (!response.ok) {
+    const providerMessage =
+      cleanText(
+        data.message
+      ) ||
+      cleanText(
+        data.error
+      );
+
+    throw new Error(
+      providerMessage
+        ? `Mailshake API error: ${providerMessage}`
+        : `Mailshake campaign lookup failed with HTTP status ${response.status}.`
+    );
+  }
+
+  const returnedId =
+    cleanText(
+      data.id
+    );
+
+  if (!returnedId) {
+    throw new Error(
+      "Mailshake did not return a campaign ID."
+    );
+  }
+
+  if (
+    returnedId !==
+    providerCampaignId
+  ) {
+    throw new Error(
+      "Mailshake returned a different campaign than the CRM requested."
+    );
+  }
+
+  return {
+    providerCampaignId:
+      returnedId,
+
+    title:
+      cleanText(
+        data.title
+      ) ||
+      "Untitled campaign",
+
+    isArchived:
+      data.isArchived ===
+      true,
+
+    isPaused:
+      data.isPaused ===
+      true,
+  };
 }
 
 function getSupabaseAdmin() {
@@ -815,13 +990,16 @@ export async function POST(
         : payload.action ===
             "review"
           ? "review"
-          : null;
+          : payload.action ===
+              "provider_review"
+            ? "provider_review"
+            : null;
 
     if (!action) {
       return NextResponse.json(
         {
           error:
-            'action must be "review" or "record".',
+            'action must be "review", "record", or "provider_review".',
         },
         {
           status: 400,
@@ -905,7 +1083,9 @@ export async function POST(
 
     if (
       campaignStatus ===
-      "archived"
+      "archived" &&
+      action !==
+        "provider_review"
     ) {
       return NextResponse.json(
         {
@@ -1034,6 +1214,350 @@ export async function POST(
           review.existingEnrollmentIds
         ),
     };
+
+    if (
+      action ===
+      "provider_review"
+    ) {
+      const outreachCampaignId =
+        cleanText(
+          review.existingCampaign?.id
+        );
+
+      if (!outreachCampaignId) {
+        return NextResponse.json(
+          {
+            error:
+              "No CRM outreach campaign enrollment record exists for this Mailshake campaign. Record the CRM enrollment instruction first.",
+          },
+          {
+            status:
+              409,
+          }
+        );
+      }
+
+      const eligibleContactIds =
+        review.eligible.map(
+          (contact) =>
+            contact.contactId
+        );
+
+      const existingEnrollmentRows:
+        ExistingEnrollmentDetailRow[] =
+          [];
+
+      for (
+        const chunk of
+        splitIntoChunks(
+          eligibleContactIds
+        )
+      ) {
+        const {
+          data,
+          error,
+        } =
+          await supabase
+            .from(
+              "outreach_enrollments"
+            )
+            .select(
+              `
+              id,
+              batch_id,
+              contact_id,
+              normalized_email,
+              status,
+              provider_recipient_id,
+              submitted_at
+              `
+            )
+            .eq(
+              "outreach_campaign_id",
+              outreachCampaignId
+            )
+            .in(
+              "contact_id",
+              chunk
+            );
+
+        if (error) {
+          throw error;
+        }
+
+        if (
+          Array.isArray(
+            data
+          )
+        ) {
+          existingEnrollmentRows.push(
+            ...(
+              data as
+                ExistingEnrollmentDetailRow[]
+            )
+          );
+        }
+      }
+
+      const currentContactById =
+        new Map<
+          string,
+          PreparedContact
+        >(
+          review.eligible.map(
+            (contact) =>
+              [
+                contact.contactId,
+                contact,
+              ] as const
+          )
+        );
+
+      const enrollmentByContactId =
+        new Map<
+          string,
+          ExistingEnrollmentDetailRow
+        >();
+
+      existingEnrollmentRows.forEach(
+        (row) => {
+          const contactId =
+            cleanText(
+              row.contact_id
+            );
+
+          if (contactId) {
+            enrollmentByContactId.set(
+              contactId,
+              row
+            );
+          }
+        }
+      );
+
+      const readyContactIds:
+        string[] = [];
+
+      const emailChangedContactIds:
+        string[] = [];
+
+      const nonRequestedContactIds:
+        string[] = [];
+
+      existingEnrollmentRows.forEach(
+        (row) => {
+          const contactId =
+            cleanText(
+              row.contact_id
+            );
+
+          const currentContact =
+            currentContactById.get(
+              contactId
+            );
+
+          if (!currentContact) {
+            return;
+          }
+
+          const recordedEmail =
+            normalizeEmail(
+              row.normalized_email
+            );
+
+          if (
+            recordedEmail !==
+            currentContact.normalizedEmail
+          ) {
+            emailChangedContactIds.push(
+              contactId
+            );
+
+            return;
+          }
+
+          const enrollmentStatus =
+            cleanText(
+              row.status
+            ).toLowerCase();
+
+          const alreadyHasProviderRecipient =
+            Boolean(
+              cleanText(
+                row.provider_recipient_id
+              )
+            );
+
+          const alreadySubmitted =
+            Boolean(
+              cleanText(
+                row.submitted_at
+              )
+            );
+
+          if (
+            enrollmentStatus !==
+              "requested" ||
+            alreadyHasProviderRecipient ||
+            alreadySubmitted
+          ) {
+            nonRequestedContactIds.push(
+              contactId
+            );
+
+            return;
+          }
+
+          readyContactIds.push(
+            contactId
+          );
+        }
+      );
+
+      const missingCrmEnrollmentContactIds =
+        review.eligible
+          .filter(
+            (contact) =>
+              !enrollmentByContactId.has(
+                contact.contactId
+              )
+          )
+          .map(
+            (contact) =>
+              contact.contactId
+          );
+
+      const batchIds =
+        Array.from(
+          new Set(
+            existingEnrollmentRows
+              .map(
+                (row) =>
+                  cleanText(
+                    row.batch_id
+                  )
+              )
+              .filter(
+                Boolean
+              )
+          )
+        );
+
+      /*
+       * Fresh provider read.
+       *
+       * Do not trust the campaign status that came from
+       * the browser or its session cache.
+       */
+      const providerCampaign =
+        await readMailshakeCampaign(
+          providerCampaignId
+        );
+
+      const providerIsArchived =
+        providerCampaign.isArchived ===
+        true;
+
+      const providerIsPaused =
+        providerCampaign.isPaused ===
+        true;
+
+      const providerCampaignState =
+        providerIsArchived
+          ? "archived"
+          : providerIsPaused
+            ? "paused"
+            : "not_paused";
+
+      /*
+       * Initial rollout policy:
+       * future submission is only allowed to a campaign
+       * Mailshake currently reports as paused.
+       *
+       * This revision does not submit anything.
+       */
+      const providerExecutionAllowed =
+        !providerIsArchived &&
+        providerIsPaused &&
+        readyContactIds.length >
+          0;
+
+      let providerMessage:
+        string;
+
+      if (providerIsArchived) {
+        providerMessage =
+          "Provider execution review complete. Mailshake currently reports this campaign as archived, so future CRM submission is blocked. No CRM or Mailshake records were changed.";
+      } else if (
+        !providerIsPaused
+      ) {
+        providerMessage =
+          "Provider execution review complete. Mailshake currently reports this campaign as not paused. Under the initial safety policy, future CRM submission is blocked until the campaign is paused. No CRM or Mailshake records were changed.";
+      } else if (
+        readyContactIds.length >
+        0
+      ) {
+        providerMessage =
+          `Provider execution review complete. Mailshake currently reports this campaign as paused. ${readyContactIds.length} recorded CRM enrollment${readyContactIds.length === 1 ? "" : "s"} ${readyContactIds.length === 1 ? "is" : "are"} currently eligible for a future provider submission. This review did not submit recipients or send email.`;
+      } else {
+        providerMessage =
+          "Provider execution review complete. Mailshake currently reports this campaign as paused, but none of the selected CRM enrollments are currently ready for provider submission. No CRM or Mailshake records were changed.";
+      }
+
+      return NextResponse.json({
+        status:
+          "provider_execution_reviewed",
+
+        mode:
+          "provider-review-only",
+
+        ...baseResponse,
+
+        providerReview: {
+          readOnly:
+            true,
+
+          providerCampaignId:
+            providerCampaign.providerCampaignId,
+
+          providerCampaignTitle:
+            providerCampaign.title,
+
+          providerCampaignState,
+
+          isArchived:
+            providerIsArchived,
+
+          isPaused:
+            providerIsPaused,
+
+          recordedEnrollmentCount:
+            existingEnrollmentRows.length,
+
+          readyToSubmitCount:
+            readyContactIds.length,
+
+          blockedNowCount:
+            review.blocked.length,
+
+          missingCrmEnrollmentCount:
+            missingCrmEnrollmentContactIds.length,
+
+          emailChangedCount:
+            emailChangedContactIds.length,
+
+          nonRequestedCount:
+            nonRequestedContactIds.length,
+
+          batchIds,
+
+          providerExecutionAllowed,
+        },
+
+        message:
+          providerMessage,
+      });
+    }
 
     if (
       action === "review"

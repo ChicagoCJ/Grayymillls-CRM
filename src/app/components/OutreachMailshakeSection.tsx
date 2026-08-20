@@ -129,6 +129,25 @@ type EnrollmentRequestResponse = {
     reason: string;
   }[];
   alreadyRecordedContactIds?: string[];
+  providerReview?: {
+    readOnly?: boolean;
+    providerCampaignId?: string;
+    providerCampaignTitle?: string;
+    providerCampaignState?:
+      | "paused"
+      | "not_paused"
+      | "archived";
+    isArchived?: boolean;
+    isPaused?: boolean;
+    recordedEnrollmentCount?: number;
+    readyToSubmitCount?: number;
+    blockedNowCount?: number;
+    missingCrmEnrollmentCount?: number;
+    emailChangedCount?: number;
+    nonRequestedCount?: number;
+    batchIds?: string[];
+    providerExecutionAllowed?: boolean;
+  };
   message?: string;
   error?: string;
 };
@@ -193,7 +212,7 @@ function campaignStatus(
   }
 
   return {
-    label: "Active",
+    label: "Not Paused",
     classes:
       "bg-emerald-100 text-emerald-800 ring-emerald-200",
   };
@@ -472,6 +491,38 @@ export default function OutreachMailshakeSection({
   const [
     enrollmentMessage,
     setEnrollmentMessage,
+  ] =
+    useState("");
+
+  const [
+    providerExecutionReview,
+    setProviderExecutionReview,
+  ] =
+    useState<
+      EnrollmentRequestResponse | null
+    >(null);
+
+  const [
+    providerExecutionReviewFingerprint,
+    setProviderExecutionReviewFingerprint,
+  ] =
+    useState("");
+
+  const [
+    isReviewingProviderExecution,
+    setIsReviewingProviderExecution,
+  ] =
+    useState(false);
+
+  const [
+    providerExecutionError,
+    setProviderExecutionError,
+  ] =
+    useState("");
+
+  const [
+    providerExecutionMessage,
+    setProviderExecutionMessage,
   ] =
     useState("");
 
@@ -1203,6 +1254,22 @@ export default function OutreachMailshakeSection({
     setEnrollmentMessage(
       ""
     );
+
+    setProviderExecutionReview(
+      null
+    );
+
+    setProviderExecutionReviewFingerprint(
+      ""
+    );
+
+    setProviderExecutionError(
+      ""
+    );
+
+    setProviderExecutionMessage(
+      ""
+    );
   }
 
   function clearFilters() {
@@ -1293,6 +1360,22 @@ export default function OutreachMailshakeSection({
     );
 
     setEnrollmentMessage(
+      ""
+    );
+
+    setProviderExecutionReview(
+      null
+    );
+
+    setProviderExecutionReviewFingerprint(
+      ""
+    );
+
+    setProviderExecutionError(
+      ""
+    );
+
+    setProviderExecutionMessage(
       ""
     );
 
@@ -1481,6 +1564,162 @@ export default function OutreachMailshakeSection({
     );
   }
 
+  async function reviewProviderExecution() {
+    if (
+      !selectedCampaign
+    ) {
+      setProviderExecutionError(
+        "Choose a Mailshake campaign first."
+      );
+
+      return;
+    }
+
+    if (
+      selectedContactIds.length ===
+      0
+    ) {
+      setProviderExecutionError(
+        "Select at least one CRM contact first."
+      );
+
+      return;
+    }
+
+    if (
+      enrollmentReviewFingerprint !==
+      enrollmentSelectionFingerprint
+    ) {
+      setProviderExecutionError(
+        "The campaign, contact selection, or filters changed after the last CRM server review. Review the CRM selection again first."
+      );
+
+      return;
+    }
+
+    setIsReviewingProviderExecution(
+      true
+    );
+
+    setProviderExecutionError(
+      ""
+    );
+
+    setProviderExecutionMessage(
+      ""
+    );
+
+    setProviderExecutionReview(
+      null
+    );
+
+    try {
+      const response =
+        await fetch(
+          "/api/outreach-mailshake/enrollment-requests",
+          {
+            method:
+              "POST",
+
+            headers: {
+              ...(await getBearerHeaders()),
+
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify({
+                action:
+                  "provider_review",
+
+                providerCampaignId:
+                  selectedCampaign.providerCampaignId,
+
+                campaignName:
+                  selectedCampaign.title,
+
+                campaignStatus:
+                  selectedCampaignStatus(),
+
+                selectionMode:
+                  selectionUsedSelectAll
+                    ? "select_all_filtered"
+                    : "individual",
+
+                filterSnapshot:
+                  enrollmentFilterSnapshot,
+
+                contactIds:
+                  selectedContactIds,
+              }),
+
+            cache:
+              "no-store",
+          }
+        );
+
+      const rawText =
+        await response.text();
+
+      let data:
+        EnrollmentRequestResponse;
+
+      try {
+        data =
+          rawText
+            ? JSON.parse(
+                rawText
+              )
+            : {};
+      } catch {
+        throw new Error(
+          `CRM provider review endpoint returned an unreadable response with HTTP status ${response.status}.`
+        );
+      }
+
+      if (
+        !response.ok
+      ) {
+        throw new Error(
+          data.error ||
+            "Could not review the recorded CRM enrollment for Mailshake execution."
+        );
+      }
+
+      setProviderExecutionReview(
+        data
+      );
+
+      setProviderExecutionReviewFingerprint(
+        enrollmentSelectionFingerprint
+      );
+
+      setProviderExecutionMessage(
+        data.message ||
+          "Provider execution review completed."
+      );
+    } catch (error) {
+      setProviderExecutionReview(
+        null
+      );
+
+      setProviderExecutionReviewFingerprint(
+        ""
+      );
+
+      setProviderExecutionError(
+        error instanceof Error
+          ? error.message
+          : "Could not review the recorded CRM enrollment for Mailshake execution."
+      );
+    } finally {
+      setIsReviewingProviderExecution(
+        false
+      );
+    }
+  }
+
   if (!canAccess) {
     return (
       <section className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-900 shadow-sm">
@@ -1501,7 +1740,7 @@ export default function OutreachMailshakeSection({
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-wide text-blue-700">
-              Version 3.27 - Outreach Integration Foundation
+              Version 3.27E-11B - Provider Execution Review
             </p>
 
             <h2 className="mt-1 text-2xl font-bold text-slate-950">
@@ -1515,11 +1754,11 @@ export default function OutreachMailshakeSection({
 
           <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
             <p className="font-bold">
-              CRM enrollment recording enabled
+              Provider execution review enabled
             </p>
 
             <p className="mt-1 text-xs leading-5">
-              The CRM can now review and record an outreach enrollment instruction. This revision still has no Mailshake recipient submission action, so recording an enrollment cannot send email.
+              The CRM can now perform a fresh, read-only provider execution review after an enrollment is recorded. This revision still cannot add recipients to Mailshake or send email.
             </p>
           </div>
         </div>
@@ -2291,6 +2530,22 @@ export default function OutreachMailshakeSection({
                         setEnrollmentError(
                           ""
                         );
+
+                        setProviderExecutionReview(
+                          null
+                        );
+
+                        setProviderExecutionReviewFingerprint(
+                          ""
+                        );
+
+                        setProviderExecutionMessage(
+                          ""
+                        );
+
+                        setProviderExecutionError(
+                          ""
+                        );
                       }}
                       disabled={
                         campaigns.filter(
@@ -2331,7 +2586,7 @@ export default function OutreachMailshakeSection({
                               {campaign.title} —{" "}
                               {campaign.isPaused
                                 ? "Paused"
-                                : "Active"}
+                                : "Not Paused"}
                             </option>
                           )
                         )}
@@ -2375,7 +2630,7 @@ export default function OutreachMailshakeSection({
                       Current provider status:{" "}
                       {selectedCampaign.isPaused
                         ? "Paused"
-                        : "Active"}
+                        : "Not Paused"}
                     </p>
 
                     {selectedCampaign.isPaused ? (
@@ -2384,7 +2639,7 @@ export default function OutreachMailshakeSection({
                       </p>
                     ) : (
                       <p className="mt-2 font-semibold">
-                        This campaign is active. This revision still records CRM intent only; provider submission will require a separate later confirmation.
+                        This campaign is not paused. This revision still records CRM intent only; provider submission will require a separate later confirmation.
                       </p>
                     )}
                   </div>
@@ -2560,6 +2815,213 @@ export default function OutreachMailshakeSection({
                         </p>
                       )}
                     </div>
+                  </div>
+                )}
+
+                {enrollmentReview &&
+                  (
+                    Number(
+                      enrollmentReview.alreadyRecordedCount ??
+                        0
+                    ) +
+                    Number(
+                      enrollmentReview.recordedEnrollmentCount ??
+                        0
+                    )
+                  ) >
+                    0 && (
+                  <div className="mt-5 rounded-2xl border border-rose-300 bg-rose-50 p-5 text-sm text-rose-950">
+                    <p className="text-xs font-black uppercase tracking-wide text-rose-700">
+                      Provider Execution Review — Read Only
+                    </p>
+
+                    <h5 className="mt-1 text-lg font-bold text-rose-950">
+                      Re-check CRM and Mailshake before any future submission
+                    </h5>
+
+                    <p className="mt-2 max-w-4xl text-xs leading-5 text-rose-900">
+                      This performs a fresh server-side CRM eligibility check and reads the current campaign directly from Mailshake. It does not add recipients to Mailshake, change enrollment status, or send email.
+                    </p>
+
+                    <div className="mt-4">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void reviewProviderExecution()
+                        }
+                        disabled={
+                          isReviewingProviderExecution ||
+                          isReviewingEnrollment ||
+                          isRecordingEnrollment ||
+                          enrollmentReviewFingerprint !==
+                            enrollmentSelectionFingerprint
+                        }
+                        className="rounded-xl bg-rose-700 px-5 py-3 text-sm font-bold text-white hover:bg-rose-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                      >
+                        {isReviewingProviderExecution
+                          ? "Checking CRM and Mailshake..."
+                          : "Review Recorded Enrollment for Mailshake"}
+                      </button>
+                    </div>
+
+                    {providerExecutionReviewFingerprint &&
+                      providerExecutionReviewFingerprint !==
+                        enrollmentSelectionFingerprint && (
+                        <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs font-semibold text-amber-900">
+                          The campaign, contact selection, or filters changed after this provider review. Run the CRM server review again before relying on these results.
+                        </div>
+                      )}
+
+                    {providerExecutionError && (
+                      <div className="mt-4 rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-900">
+                        {providerExecutionError}
+                      </div>
+                    )}
+
+                    {providerExecutionMessage && (
+                      <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm font-semibold text-blue-950">
+                        {providerExecutionMessage}
+                      </div>
+                    )}
+
+                    {providerExecutionReview?.providerReview && (
+                      <div className="mt-5 rounded-xl border border-rose-200 bg-white p-5">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <p className="text-xs font-bold uppercase text-slate-500">
+                              Fresh Mailshake Campaign
+                            </p>
+
+                            <p className="mt-1 font-bold text-slate-950">
+                              {providerExecutionReview.providerReview.providerCampaignTitle ||
+                                "Campaign name not reported"}
+                            </p>
+
+                            <p className="mt-1 text-xs text-slate-600">
+                              Campaign ID:{" "}
+                              {providerExecutionReview.providerReview.providerCampaignId ||
+                                "Not reported"}
+                            </p>
+                          </div>
+
+                          <span
+                            className={`w-fit rounded-full px-3 py-1.5 text-xs font-bold ring-1 ${
+                              providerExecutionReview.providerReview
+                                .providerCampaignState ===
+                              "paused"
+                                ? "bg-amber-100 text-amber-900 ring-amber-200"
+                                : providerExecutionReview.providerReview
+                                      .providerCampaignState ===
+                                    "archived"
+                                  ? "bg-slate-200 text-slate-800 ring-slate-300"
+                                  : "bg-red-100 text-red-900 ring-red-200"
+                            }`}
+                          >
+                            {providerExecutionReview.providerReview
+                              .providerCampaignState ===
+                            "paused"
+                              ? "Paused"
+                              : providerExecutionReview.providerReview
+                                    .providerCampaignState ===
+                                  "archived"
+                                ? "Archived"
+                                : "Not Paused"}
+                          </span>
+                        </div>
+
+                        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                          <div className="rounded-xl bg-blue-50 p-3 ring-1 ring-blue-200">
+                            <p className="text-xs font-bold uppercase text-blue-700">
+                              Recorded in CRM
+                            </p>
+                            <p className="mt-1 text-xl font-black text-blue-950">
+                              {providerExecutionReview.providerReview
+                                .recordedEnrollmentCount ?? 0}
+                            </p>
+                          </div>
+
+                          <div className="rounded-xl bg-emerald-50 p-3 ring-1 ring-emerald-200">
+                            <p className="text-xs font-bold uppercase text-emerald-700">
+                              Ready / Requested
+                            </p>
+                            <p className="mt-1 text-xl font-black text-emerald-950">
+                              {providerExecutionReview.providerReview
+                                .readyToSubmitCount ?? 0}
+                            </p>
+                          </div>
+
+                          <div className="rounded-xl bg-amber-50 p-3 ring-1 ring-amber-200">
+                            <p className="text-xs font-bold uppercase text-amber-700">
+                              Blocked Now
+                            </p>
+                            <p className="mt-1 text-xl font-black text-amber-950">
+                              {providerExecutionReview.providerReview
+                                .blockedNowCount ?? 0}
+                            </p>
+                          </div>
+
+                          <div className="rounded-xl bg-orange-50 p-3 ring-1 ring-orange-200">
+                            <p className="text-xs font-bold uppercase text-orange-700">
+                              Email Changed
+                            </p>
+                            <p className="mt-1 text-xl font-black text-orange-950">
+                              {providerExecutionReview.providerReview
+                                .emailChangedCount ?? 0}
+                            </p>
+                          </div>
+
+                          <div className="rounded-xl bg-slate-100 p-3 ring-1 ring-slate-200">
+                            <p className="text-xs font-bold uppercase text-slate-600">
+                              Already Processed / Not Requested
+                            </p>
+                            <p className="mt-1 text-xl font-black text-slate-950">
+                              {providerExecutionReview.providerReview
+                                .nonRequestedCount ?? 0}
+                            </p>
+                          </div>
+                        </div>
+
+                        {(providerExecutionReview.providerReview
+                          .missingCrmEnrollmentCount ?? 0) >
+                          0 && (
+                          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-900">
+                            {
+                              providerExecutionReview.providerReview
+                                .missingCrmEnrollmentCount
+                            }{" "}
+                            currently eligible selected contact(s) do not have a CRM enrollment record for this campaign.
+                          </div>
+                        )}
+
+                        {providerExecutionReview.providerReview
+                          .providerExecutionAllowed ? (
+                          <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-900">
+                            Initial safety policy passed: Mailshake currently reports this campaign as paused and at least one recorded enrollment remains in requested status. A later revision may add an explicit submission action. This revision cannot submit anything.
+                          </div>
+                        ) : (
+                          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-900">
+                            Initial safety policy does not currently permit provider submission. No Mailshake write action is available in this revision.
+                          </div>
+                        )}
+
+                        {(providerExecutionReview.providerReview.batchIds
+                          ?.length ??
+                          0) > 0 && (
+                          <p className="mt-4 break-all text-xs text-slate-500">
+                            CRM enrollment batch
+                            {(providerExecutionReview.providerReview.batchIds
+                              ?.length ??
+                              0) === 1
+                              ? ""
+                              : "es"}
+                            :{" "}
+                            {providerExecutionReview.providerReview.batchIds?.join(
+                              ", "
+                            )}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
