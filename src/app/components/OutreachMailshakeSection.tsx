@@ -2407,7 +2407,7 @@ export default function OutreachMailshakeSection({
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-wide text-blue-700">
-              Version 3.27E-13A - Provider Operations History
+              Version 3.27E-13B2 - Preview-Only Recipient Allowlist
             </p>
 
             <h2 className="mt-1 text-2xl font-bold text-slate-950">
@@ -2421,11 +2421,11 @@ export default function OutreachMailshakeSection({
 
           <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
             <p className="font-bold">
-              Controlled Mailshake submission enabled
+              Controlled Mailshake submission testing
             </p>
 
             <p className="mt-1 text-xs leading-5">
-              The CRM can now submit exactly one recorded enrollment to Mailshake only after fresh CRM revalidation and two fresh checks confirming the Mailshake campaign is paused. Provider acceptance remains asynchronous and is not yet confirmation.
+              Provider submission remains limited to exactly one recorded enrollment, a paused Mailshake campaign, and an explicit server-side recipient allowlist. During this rollout stage the provider-write and reconciliation routes are enabled only on Vercel Preview deployments.
             </p>
           </div>
         </div>

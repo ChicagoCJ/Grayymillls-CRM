@@ -87,6 +87,77 @@ function normalizeEmail(
   ).toLowerCase();
 }
 
+function getPreviewTestRecipientEmails() {
+  /*
+   * Provider writes are deliberately disabled outside Vercel
+   * Preview deployments during this rollout stage.
+   *
+   * Production therefore fails closed even if an older provider
+   * test environment variable still exists there.
+   */
+  const vercelEnvironment =
+    cleanText(
+      process.env.VERCEL_ENV
+    ).toLowerCase();
+
+  if (
+    vercelEnvironment !==
+    "preview"
+  ) {
+    return {
+      enabled:
+        false,
+
+      emails:
+        [] as string[],
+
+      reason:
+        "Mailshake provider submission is currently enabled only on Vercel Preview deployments.",
+    };
+  }
+
+  const emails =
+    Array.from(
+      new Set(
+        cleanText(
+          process.env.MAILSHAKE_PREVIEW_TEST_EMAILS
+        )
+          .split(
+            /[,;\n\r]+/
+          )
+          .map(
+            normalizeEmail
+          )
+          .filter(Boolean)
+      )
+    );
+
+  if (
+    emails.length ===
+    0
+  ) {
+    return {
+      enabled:
+        false,
+
+      emails,
+
+      reason:
+        "Mailshake provider submission is disabled because MAILSHAKE_PREVIEW_TEST_EMAILS is not configured for Preview.",
+    };
+  }
+
+  return {
+    enabled:
+      true,
+
+    emails,
+
+    reason:
+      "",
+  };
+}
+
 function normalizedEmailList(
   value: unknown
 ) {
@@ -1010,16 +1081,19 @@ export async function POST(
       );
     }
 
-    const initialTestEmail =
-      normalizeEmail(
-        process.env.MAILSHAKE_INITIAL_TEST_EMAIL
-      );
+    const previewTestRecipientPolicy =
+      getPreviewTestRecipientEmails();
 
-    if (!initialTestEmail) {
+    if (
+      !previewTestRecipientPolicy.enabled
+    ) {
       return NextResponse.json(
         {
           error:
-            "Mailshake provider-status reconciliation is disabled because MAILSHAKE_INITIAL_TEST_EMAIL is not configured.",
+            previewTestRecipientPolicy.reason.replace(
+              "provider submission",
+              "provider-status reconciliation"
+            ),
         },
         {
           status:
@@ -1027,6 +1101,9 @@ export async function POST(
         }
       );
     }
+
+    const previewTestRecipientEmails =
+      previewTestRecipientPolicy.emails;
 
     const supabase =
       getSupabaseAdmin();
@@ -1098,13 +1175,14 @@ export async function POST(
       );
 
     if (
-      submittedEmail !==
-      initialTestEmail
+      !previewTestRecipientEmails.includes(
+        submittedEmail
+      )
     ) {
       return NextResponse.json(
         {
           error:
-            "Provider-status reconciliation stopped because this enrollment is not for the configured initial Mailshake test recipient.",
+            "Provider-status reconciliation stopped because this enrollment is not on the configured Mailshake Preview test-recipient allowlist.",
         },
         {
           status:
@@ -1782,7 +1860,7 @@ export async function POST(
     }
 
     /*
-     * Mailshake says processing is finished and the test email
+     * Mailshake says processing is finished and the allowlisted email
      * is not in any documented problem list.
      *
      * Do not mark CRM confirmed from that inference alone.
@@ -1923,7 +2001,7 @@ export async function POST(
     /*
      * Mailshake says there was a problem, but none of its
      * documented email problem arrays match our one submitted
-     * test recipient. Fail closed and preserve the submitted
+     * allowlisted recipient. Fail closed and preserve the submitted
      * mapping reservation.
      */
     const now =
@@ -1942,7 +2020,7 @@ export async function POST(
             "partial",
 
           provider_message:
-            "Mailshake finished with a problem, but CRM could not map the problem safely to the submitted test recipient. Manual reconciliation is required.",
+            "Mailshake finished with a problem, but CRM could not map the problem safely to the submitted allowlisted recipient. Manual reconciliation is required.",
 
           last_checked_at:
             now,

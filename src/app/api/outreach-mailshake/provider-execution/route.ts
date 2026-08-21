@@ -100,6 +100,77 @@ function normalizeEmail(
   ).toLowerCase();
 }
 
+function getPreviewTestRecipientEmails() {
+  /*
+   * Provider writes are deliberately disabled outside Vercel
+   * Preview deployments during this rollout stage.
+   *
+   * Production therefore fails closed even if an older provider
+   * test environment variable still exists there.
+   */
+  const vercelEnvironment =
+    cleanText(
+      process.env.VERCEL_ENV
+    ).toLowerCase();
+
+  if (
+    vercelEnvironment !==
+    "preview"
+  ) {
+    return {
+      enabled:
+        false,
+
+      emails:
+        [] as string[],
+
+      reason:
+        "Mailshake provider submission is currently enabled only on Vercel Preview deployments.",
+    };
+  }
+
+  const emails =
+    Array.from(
+      new Set(
+        cleanText(
+          process.env.MAILSHAKE_PREVIEW_TEST_EMAILS
+        )
+          .split(
+            /[,;\n\r]+/
+          )
+          .map(
+            normalizeEmail
+          )
+          .filter(Boolean)
+      )
+    );
+
+  if (
+    emails.length ===
+    0
+  ) {
+    return {
+      enabled:
+        false,
+
+      emails,
+
+      reason:
+        "Mailshake provider submission is disabled because MAILSHAKE_PREVIEW_TEST_EMAILS is not configured for Preview.",
+    };
+  }
+
+  return {
+    enabled:
+      true,
+
+    emails,
+
+    reason:
+      "",
+  };
+}
+
 function getSupabaseAdmin() {
   if (
     !supabaseUrl ||
@@ -904,16 +975,16 @@ export async function POST(
       ) as
         ProviderExecutionPayload;
 
-    const initialTestEmail =
-      normalizeEmail(
-        process.env.MAILSHAKE_INITIAL_TEST_EMAIL
-      );
+    const previewTestRecipientPolicy =
+      getPreviewTestRecipientEmails();
 
-    if (!initialTestEmail) {
+    if (
+      !previewTestRecipientPolicy.enabled
+    ) {
       return NextResponse.json(
         {
           error:
-            "Mailshake provider submission is disabled because MAILSHAKE_INITIAL_TEST_EMAIL is not configured.",
+            previewTestRecipientPolicy.reason,
         },
         {
           status:
@@ -921,6 +992,9 @@ export async function POST(
         }
       );
     }
+
+    const previewTestRecipientEmails =
+      previewTestRecipientPolicy.emails;
 
     const providerCampaignId =
       cleanText(
@@ -1227,20 +1301,21 @@ export async function POST(
     }
 
     /*
-     * Initial rollout recipient lock.
+     * Preview rollout recipient allowlist.
      *
      * Even if every other safety check passes, recipients/add
-     * may only be called for the one test inbox configured on
-     * the server.
+     * may only be called for an explicitly allowlisted Preview
+     * test inbox.
      */
     if (
-      currentEmail !==
-      initialTestEmail
+      !previewTestRecipientEmails.includes(
+        currentEmail
+      )
     ) {
       return NextResponse.json(
         {
           error:
-            "Provider execution stopped because this CRM contact is not the configured initial Mailshake test recipient.",
+            "Provider execution stopped because this CRM contact is not on the configured Mailshake Preview test-recipient allowlist.",
         },
         {
           status:
@@ -1451,10 +1526,13 @@ export async function POST(
 
           request_snapshot: {
             safetyPolicy:
-              "paused_only_single_recipient_test_email_locked",
+              "preview_only_paused_single_recipient_allowlist",
 
-            initialTestRecipientLock:
-              initialTestEmail,
+            previewAllowlistedRecipient:
+              currentEmail,
+
+            previewAllowlistSize:
+              previewTestRecipientEmails.length,
 
             providerCampaignTitle:
               providerCampaign.title,
