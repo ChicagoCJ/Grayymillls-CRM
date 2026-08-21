@@ -495,6 +495,184 @@ async function updateOperationChecking(
   }
 }
 
+async function refreshEnrollmentBatchStatus(
+  supabase:
+    ReturnType<
+      typeof getSupabaseAdmin
+    >,
+  batchId: string
+) {
+  if (!batchId) {
+    return;
+  }
+
+  const {
+    data,
+    error,
+  } =
+    await supabase
+      .from(
+        "outreach_enrollments"
+      )
+      .select(
+        "status"
+      )
+      .eq(
+        "batch_id",
+        batchId
+      );
+
+  if (error) {
+    throw error;
+  }
+
+  const statuses =
+    (data ?? [])
+      .map(
+        (row) =>
+          cleanText(
+            row.status
+          ).toLowerCase()
+      )
+      .filter(Boolean);
+
+  if (
+    statuses.length ===
+    0
+  ) {
+    return;
+  }
+
+  const terminalStatuses =
+    new Set([
+      "confirmed",
+      "already_present",
+      "unsubscribed",
+      "failed",
+      "cancelled",
+    ]);
+
+  const nonTerminalCount =
+    statuses.filter(
+      (status) =>
+        !terminalStatuses.has(
+          status
+        )
+    ).length;
+
+  const failedCount =
+    statuses.filter(
+      (status) =>
+        status ===
+        "failed"
+    ).length;
+
+  const cancelledCount =
+    statuses.filter(
+      (status) =>
+        status ===
+        "cancelled"
+    ).length;
+
+  let batchStatus:
+    "submitting" |
+    "completed" |
+    "partial" |
+    "failed" |
+    "cancelled";
+
+  if (
+    nonTerminalCount >
+    0
+  ) {
+    batchStatus =
+      "submitting";
+  } else if (
+    cancelledCount ===
+    statuses.length
+  ) {
+    batchStatus =
+      "cancelled";
+  } else if (
+    failedCount ===
+    statuses.length
+  ) {
+    batchStatus =
+      "failed";
+  } else if (
+    failedCount >
+      0 ||
+    cancelledCount >
+      0
+  ) {
+    batchStatus =
+      "partial";
+  } else {
+    batchStatus =
+      "completed";
+  }
+
+  const now =
+    new Date().toISOString();
+
+  const update:
+    Record<
+      string,
+      unknown
+    > = {
+      status:
+        batchStatus,
+
+      updated_at:
+        now,
+    };
+
+  if (
+    batchStatus !==
+    "submitting"
+  ) {
+    update.completed_at =
+      now;
+  }
+
+  if (
+    batchStatus ===
+    "failed"
+  ) {
+    update.error_message =
+      "All provider enrollment outcomes in this batch failed.";
+  } else if (
+    batchStatus ===
+    "partial"
+  ) {
+    update.error_message =
+      "Provider enrollment batch completed with one or more failed or cancelled outcomes.";
+  } else {
+    update.error_message =
+      null;
+  }
+
+  const {
+    error:
+      updateError,
+  } =
+    await supabase
+      .from(
+        "outreach_enrollment_batches"
+      )
+      .update(
+        update
+      )
+      .eq(
+        "id",
+        batchId
+      );
+
+  if (updateError) {
+    throw updateError;
+  }
+}
+
 async function markTerminalOutcome(
   supabase:
     ReturnType<
@@ -505,6 +683,8 @@ async function markTerminalOutcome(
       string;
     enrollmentId:
       string;
+    batchId?:
+      string | null;
     enrollmentStatus:
       "confirmed" |
       "already_present" |
@@ -752,6 +932,15 @@ async function markTerminalOutcome(
 
   if (operationError) {
     throw operationError;
+  }
+
+  if (
+    params.batchId
+  ) {
+    await refreshEnrollmentBatchStatus(
+      supabase,
+      params.batchId
+    );
   }
 
   return now;
@@ -1087,14 +1276,38 @@ export async function POST(
         operationStatus
       )
     ) {
+      const batchId =
+        cleanText(
+          enrollment.batch_id
+        );
+
+      if (batchId) {
+        await refreshEnrollmentBatchStatus(
+          supabase,
+          batchId
+        );
+      }
+
       return NextResponse.json(
         {
           mode:
             "provider-status",
 
+          status:
+            cleanText(
+              enrollment.status
+            ) ||
+            operationStatus,
+
           operationId,
 
           operationStatus,
+
+          providerCheckStatusId:
+            cleanText(
+              operation.provider_check_status_id
+            ) ||
+            null,
 
           enrollmentStatus:
             cleanText(
@@ -1111,7 +1324,7 @@ export async function POST(
             true,
 
           message:
-            "This provider operation has already been reconciled in CRM.",
+            "This provider operation has already been reconciled in CRM. The related CRM enrollment batch was also re-evaluated.",
         }
       );
     }
@@ -1275,6 +1488,9 @@ export async function POST(
           status:
             "processing",
 
+          operationStatus:
+            "checking",
+
           operationId,
 
           providerCheckStatusId:
@@ -1332,6 +1548,12 @@ export async function POST(
 
           enrollmentId,
 
+          batchId:
+            cleanText(
+              enrollment.batch_id
+            ) ||
+            null,
+
           enrollmentStatus:
             "unsubscribed",
 
@@ -1358,6 +1580,9 @@ export async function POST(
 
           status:
             "unsubscribed",
+
+          operationStatus:
+            "completed",
 
           operationId,
 
@@ -1419,6 +1644,12 @@ export async function POST(
 
           enrollmentId,
 
+          batchId:
+            cleanText(
+              enrollment.batch_id
+            ) ||
+            null,
+
           enrollmentStatus:
             "already_present",
 
@@ -1448,6 +1679,9 @@ export async function POST(
 
           status:
             "already_present",
+
+          operationStatus:
+            "completed",
 
           operationId,
 
@@ -1484,6 +1718,12 @@ export async function POST(
 
           enrollmentId,
 
+          batchId:
+            cleanText(
+              enrollment.batch_id
+            ) ||
+            null,
+
           enrollmentStatus:
             "failed",
 
@@ -1512,6 +1752,9 @@ export async function POST(
             "provider-status",
 
           status:
+            "failed",
+
+          operationStatus:
             "failed",
 
           operationId,
@@ -1566,6 +1809,12 @@ export async function POST(
 
           enrollmentId,
 
+          batchId:
+            cleanText(
+              enrollment.batch_id
+            ) ||
+            null,
+
           enrollmentStatus:
             "confirmed",
 
@@ -1595,6 +1844,9 @@ export async function POST(
 
           status:
             "confirmed",
+
+          operationStatus:
+            "completed",
 
           operationId,
 
@@ -1638,6 +1890,9 @@ export async function POST(
 
           status:
             "processing",
+
+          operationStatus:
+            "checking",
 
           operationId,
 
@@ -1714,6 +1969,9 @@ export async function POST(
 
         status:
           "reconciliation_required",
+
+        operationStatus:
+          "partial",
 
         operationId,
 
