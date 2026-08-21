@@ -2407,7 +2407,7 @@ export default function OutreachMailshakeSection({
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-wide text-blue-700">
-              Version 3.27E-13B2 - Preview-Only Recipient Allowlist
+              Version 3.27E-13B2A - Preview Allowlist + Mojibake Cleanup
             </p>
 
             <h2 className="mt-1 text-2xl font-bold text-slate-950">

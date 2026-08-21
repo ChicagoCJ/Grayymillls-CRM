@@ -3125,8 +3125,8 @@ async function handleAnalyzeProspect() {
                 </h2>
                 <p className="mt-1 text-sm leading-6 text-green-900">
                   Current user: <span className="font-semibold">{currentUserDisplayName}</span>
-                  {" "}Â· Role: <span className="font-semibold">{formatAppUserRole(currentUserRole)}</span>
-                  {" "}Â· Status: <span className="font-semibold">{signedInProductionUser.status || "Not detected"}</span>
+                  {" "}| Role: <span className="font-semibold">{formatAppUserRole(currentUserRole)}</span>
+                  {" "}| Status: <span className="font-semibold">{signedInProductionUser.status || "Not detected"}</span>
                 </p>
                 <p className="mt-1 text-xs leading-5 text-green-800">
                   {signedInProductionUser.message}
@@ -5305,7 +5305,7 @@ function AdminProjectsListsSection({
                       </div>
 
                       <p className="mt-2 text-sm text-slate-600">
-                        Owner: {ownerName} Â· Sort order:{" "}
+                        Owner: {ownerName} | Sort order:{" "}
                         {item.sort_order ?? 100}
                       </p>
 
@@ -9999,8 +9999,8 @@ const filteredOpportunities = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (Number.isNaN(closeDay.getTime())) return { label: formatDate(closeDate), className: "text-slate-600" };
-    if (closeDay.getTime() < today.getTime()) return { label: `Overdue Â· ${formatDate(closeDate)}`, className: "font-semibold text-red-700" };
-    if (closeDay.getTime() === today.getTime()) return { label: `Due today Â· ${formatDate(closeDate)}`, className: "font-semibold text-amber-700" };
+    if (closeDay.getTime() < today.getTime()) return { label: `Overdue | ${formatDate(closeDate)}`, className: "font-semibold text-red-700" };
+    if (closeDay.getTime() === today.getTime()) return { label: `Due today | ${formatDate(closeDate)}`, className: "font-semibold text-amber-700" };
     return { label: formatDate(closeDate), className: "text-slate-600" };
   }
 
@@ -10114,12 +10114,12 @@ const filteredOpportunities = useMemo(() => {
                             )}
                           </div>
                           <p className="mt-1 text-xs text-slate-600">
-                            {savedView.view_mode === "list" ? "List" : "Board"} Â·{" "}
+                            {savedView.view_mode === "list" ? "List" : "Board"} |{" "}
                             {savedView.card_density === "compact"
                               ? "Compact"
                               : "Comfortable"}{" "}
-                            Â· Status: {savedView.status_filter} Â· Stage:{" "}
-                            {savedView.stage_filter} Â· Type: {savedView.type_filter}
+                            | Status: {savedView.status_filter} | Stage:{" "}
+                            {savedView.stage_filter} | Type: {savedView.type_filter}
                           </p>
                           {savedView.search_term && (
                             <p className="mt-1 text-xs text-slate-600">
@@ -10816,7 +10816,7 @@ const filteredOpportunities = useMemo(() => {
                                 }`}>
                                   <span className="font-semibold">Next:</span>{" "}
                                   {opportunity.next_step || "Missing"}
-                                  {" Â· "}
+                                  {" | "}
                                   {opportunity.next_step_due_date ? formatDate(opportunity.next_step_due_date) : "No due date"}
                                 </p>
                               </div>
@@ -11548,7 +11548,7 @@ function ReleaseNotesSection() {
       changes: [
         "Save the current Funnel configuration under a reusable name.",
         "Apply, rename, update, set as default, clear default, or delete saved views.",
-        "Automatically restore the signed-in userâ€™s default Funnel view.",
+        "Automatically restore the signed-in user's default Funnel view.",
         "Protect all saved-view reads and writes with verified Supabase authentication and server-side ownership enforcement.",
       ],
       testNotes: [
@@ -12277,7 +12277,7 @@ function MySalesWorkspaceSection({
           </p>
           {workspace?.user?.displayName && (
             <p className="mt-2 text-xs font-semibold text-slate-500">
-              {workspace.user.displayName} Â· {formatTitleFromKey(workspace.user.role || "")}
+              {workspace.user.displayName} | {formatTitleFromKey(workspace.user.role || "")}
             </p>
           )}
         </div>
@@ -13310,8 +13310,8 @@ function ManagedIndustryDefinitionsPanel({
                       {definition.industry_name}
                     </p>
                     <p className="text-xs text-slate-500">
-                      {parentCategory?.category_name || "Legacy / Unassigned"} Â·
-                      {" "}Sort {definition.sort_order} Â· {definition.status}
+                      {parentCategory?.category_name || "Legacy / Unassigned"} |
+                      {" "}Sort {definition.sort_order} | {definition.status}
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -13380,7 +13380,7 @@ function ManagedIndustryDefinitionsPanel({
 
                   return (
                     <option key={definition.id} value={definition.id}>
-                      {parentCategory?.category_name || "Unassigned"} â€”{" "}
+                      {parentCategory?.category_name || "Unassigned"} -{" "}
                       {definition.industry_name}
                     </option>
                   );
@@ -13476,9 +13476,9 @@ function ManagedIndustryDefinitionsPanel({
                       {definition.sub_industry_name}
                     </p>
                     <p className="text-xs text-slate-500">
-                      {parentCategory?.category_name || "Unassigned"} â€”{" "}
-                      {parentIndustry?.industry_name || "Unassigned"} Â· Sort{" "}
-                      {definition.sort_order} Â· {definition.status}
+                      {parentCategory?.category_name || "Unassigned"} -{" "}
+                      {parentIndustry?.industry_name || "Unassigned"} | Sort{" "}
+                      {definition.sort_order} | {definition.status}
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -19456,7 +19456,7 @@ function CompanyDetailSection({
                     classification.subIndustryName,
                   ]
                     .filter(Boolean)
-                    .join(" â†’ ");
+                    .join(" -> ");
 
                   const hasArchivedValue =
                     classification.categoryStatus === "archived" ||
@@ -20219,7 +20219,7 @@ function CompanyDetailSection({
 
         <div className="mt-3 text-xs text-slate-500">
           Showing {filteredUnifiedTimeline.length} of {unifiedTimeline.length} timeline items
-          {" Â· "}
+          {" | "}
           {unifiedTimelineOpenCount} open
         </div>
 
@@ -21090,7 +21090,7 @@ function CompanyDetailSection({
                     })
                   }
                 />
-                Set as this companyâ€™s primary contact
+                Set as this company's primary contact
               </label>
             </div>
 
