@@ -183,6 +183,131 @@ type ProviderStatusResponse = {
   error?: string;
 };
 
+type ProviderHistoryRecipient = {
+  enrollmentId?: string | null;
+  batchId?: string | null;
+  batchStatus?: string | null;
+  campaignName?: string | null;
+  contactId?: string | null;
+  contactName?: string | null;
+  companyId?: string | null;
+  companyName?: string | null;
+  submittedEmail?: string | null;
+  enrollmentStatus?: string | null;
+  mappingStatus?: string | null;
+  providerRecipientId?: string | null;
+  providerStatus?: string | null;
+  providerMessage?: string | null;
+  requestedAt?: string | null;
+  submittedAt?: string | null;
+  confirmedAt?: string | null;
+  failedAt?: string | null;
+  failureReason?: string | null;
+};
+
+type ProviderHistoryOperation = {
+  id?: string;
+  provider?: string;
+  operationType?: string;
+  outreachCampaignId?: string | null;
+  providerCampaignId?: string;
+  campaignName?: string | null;
+  status?: string;
+  providerCheckStatusId?: string | null;
+  requestedByCrmUserId?: string | null;
+  requestedByDisplayName?: string | null;
+  requestedCount?: number;
+  submittedCount?: number;
+  confirmedCount?: number;
+  alreadyPresentCount?: number;
+  unsubscribedCount?: number;
+  failedCount?: number;
+  providerMessage?: string | null;
+  errorMessage?: string | null;
+  requestedAt?: string | null;
+  submittedAt?: string | null;
+  lastCheckedAt?: string | null;
+  completedAt?: string | null;
+  failedAt?: string | null;
+  recipients?: ProviderHistoryRecipient[];
+};
+
+type ProviderHistoryResponse = {
+  mode?: string;
+  readOnly?: boolean;
+  provider?: string;
+  count?: number;
+  operations?: ProviderHistoryOperation[];
+  message?: string;
+  error?: string;
+};
+
+function formatProviderHistoryTime(
+  value: string | null | undefined
+) {
+  if (!value) {
+    return "—";
+  }
+
+  const parsed =
+    new Date(
+      value
+    );
+
+  if (
+    Number.isNaN(
+      parsed.getTime()
+    )
+  ) {
+    return value;
+  }
+
+  return parsed.toLocaleString();
+}
+
+function providerHistoryStatusClasses(
+  value: string | null | undefined
+) {
+  const status =
+    String(
+      value || ""
+    ).toLowerCase();
+
+  if (
+    status === "completed" ||
+    status === "confirmed"
+  ) {
+    return "bg-emerald-100 text-emerald-800 ring-emerald-200";
+  }
+
+  if (
+    status === "submitted" ||
+    status === "submitting" ||
+    status === "checking" ||
+    status === "prepared"
+  ) {
+    return "bg-blue-100 text-blue-800 ring-blue-200";
+  }
+
+  if (
+    status === "failed" ||
+    status === "submission_unknown"
+  ) {
+    return "bg-red-100 text-red-800 ring-red-200";
+  }
+
+  if (
+    status === "partial" ||
+    status === "already_present" ||
+    status === "unsubscribed" ||
+    status === "cancelled"
+  ) {
+    return "bg-amber-100 text-amber-900 ring-amber-200";
+  }
+
+  return "bg-slate-100 text-slate-700 ring-slate-200";
+}
+
 async function getBearerHeaders() {
   if (
     !hasBrowserSupabaseConfig()
@@ -594,6 +719,38 @@ export default function OutreachMailshakeSection({
   const [
     isCheckingProviderStatus,
     setIsCheckingProviderStatus,
+  ] =
+    useState(false);
+
+  const [
+    providerHistory,
+    setProviderHistory,
+  ] =
+    useState<
+      ProviderHistoryOperation[]
+    >([]);
+
+  const [
+    providerHistoryMessage,
+    setProviderHistoryMessage,
+  ] =
+    useState("");
+
+  const [
+    providerHistoryError,
+    setProviderHistoryError,
+  ] =
+    useState("");
+
+  const [
+    isLoadingProviderHistory,
+    setIsLoadingProviderHistory,
+  ] =
+    useState(false);
+
+  const [
+    hasLoadedProviderHistory,
+    setHasLoadedProviderHistory,
   ] =
     useState(false);
 
@@ -2139,6 +2296,97 @@ export default function OutreachMailshakeSection({
     }
   }
 
+  async function loadProviderHistory() {
+    if (
+      isLoadingProviderHistory
+    ) {
+      return;
+    }
+
+    setIsLoadingProviderHistory(
+      true
+    );
+
+    setProviderHistoryError(
+      ""
+    );
+
+    setProviderHistoryMessage(
+      ""
+    );
+
+    try {
+      const response =
+        await fetch(
+          "/api/outreach-mailshake/provider-history?limit=25",
+          {
+            method:
+              "GET",
+
+            headers: {
+              ...(await getBearerHeaders()),
+            },
+
+            cache:
+              "no-store",
+          }
+        );
+
+      const rawText =
+        await response.text();
+
+      let data:
+        ProviderHistoryResponse;
+
+      try {
+        data =
+          rawText
+            ? JSON.parse(
+                rawText
+              )
+            : {};
+      } catch {
+        throw new Error(
+          `CRM provider-history endpoint returned an unreadable response with HTTP status ${response.status}.`
+        );
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            "Could not load CRM provider operation history."
+        );
+      }
+
+      setProviderHistory(
+        Array.isArray(
+          data.operations
+        )
+          ? data.operations
+          : []
+      );
+
+      setProviderHistoryMessage(
+        data.message ||
+          "CRM provider operation history loaded."
+      );
+
+      setHasLoadedProviderHistory(
+        true
+      );
+    } catch (error) {
+      setProviderHistoryError(
+        error instanceof Error
+          ? error.message
+          : "Could not load CRM provider operation history."
+      );
+    } finally {
+      setIsLoadingProviderHistory(
+        false
+      );
+    }
+  }
+
   if (!canAccess) {
     return (
       <section className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-900 shadow-sm">
@@ -2159,7 +2407,7 @@ export default function OutreachMailshakeSection({
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-wide text-blue-700">
-              Version 3.27E-12B1 - Mailshake Import Reconciliation Finalization
+              Version 3.27E-13A - Provider Operations History
             </p>
 
             <h2 className="mt-1 text-2xl font-bold text-slate-950">
@@ -2225,6 +2473,375 @@ export default function OutreachMailshakeSection({
         {successMessage && (
           <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">
             {successMessage}
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+              CRM Audit Trail
+            </p>
+
+            <h3 className="mt-1 text-xl font-bold text-slate-950">
+              Provider Operations History
+            </h3>
+
+            <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
+              Review recent Mailshake provider operations recorded by CRM. This reads CRM audit records only and does not submit recipients, change Mailshake campaigns, or send email.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() =>
+              void loadProviderHistory()
+            }
+            disabled={
+              isLoadingProviderHistory
+            }
+            className="rounded-xl bg-slate-800 px-5 py-3 text-sm font-bold text-white hover:bg-slate-900 disabled:cursor-wait disabled:bg-slate-400"
+          >
+            {isLoadingProviderHistory
+              ? "Loading Provider History..."
+              : hasLoadedProviderHistory
+                ? "Refresh Provider History"
+                : "Load Provider History"}
+          </button>
+        </div>
+
+        {providerHistoryError && (
+          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-900">
+            {providerHistoryError}
+          </div>
+        )}
+
+        {providerHistoryMessage &&
+          !providerHistoryError && (
+          <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-4 text-xs font-semibold text-blue-900">
+            {providerHistoryMessage}
+          </div>
+        )}
+
+        {hasLoadedProviderHistory &&
+          providerHistory.length ===
+            0 && (
+            <div className="mt-5 rounded-xl bg-slate-50 p-5 text-sm text-slate-600">
+              No Mailshake provider operations are recorded in CRM yet.
+            </div>
+          )}
+
+        {providerHistory.length >
+          0 && (
+          <div className="mt-5 grid gap-4">
+            {providerHistory.map(
+              (
+                operation,
+                operationIndex
+              ) => {
+                const recipients =
+                  operation.recipients ??
+                  [];
+
+                return (
+                  <article
+                    key={
+                      operation.id ||
+                      `provider-operation-${operationIndex}`
+                    }
+                    className="rounded-2xl border border-slate-200 bg-slate-50 p-5"
+                  >
+                    <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                          {operation.campaignName ||
+                            "Mailshake Campaign"}
+                        </p>
+
+                        <h4 className="mt-1 text-lg font-bold text-slate-950">
+                          Campaign ID{" "}
+                          {operation.providerCampaignId ||
+                            "—"}
+                        </h4>
+
+                        <p className="mt-1 break-all text-xs text-slate-500">
+                          CRM provider operation:{" "}
+                          {operation.id ||
+                            "—"}
+                        </p>
+                      </div>
+
+                      <span
+                        className={`w-fit rounded-full px-3 py-1 text-xs font-black ring-1 ${providerHistoryStatusClasses(
+                          operation.status
+                        )}`}
+                      >
+                        {operation.status ||
+                          "unknown"}
+                      </span>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+                      <div className="rounded-xl bg-white p-3 ring-1 ring-slate-200">
+                        <p className="text-xs font-semibold text-slate-500">
+                          Requested
+                        </p>
+                        <p className="mt-1 text-lg font-black text-slate-950">
+                          {operation.requestedCount ??
+                            0}
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl bg-white p-3 ring-1 ring-slate-200">
+                        <p className="text-xs font-semibold text-slate-500">
+                          Submitted
+                        </p>
+                        <p className="mt-1 text-lg font-black text-blue-800">
+                          {operation.submittedCount ??
+                            0}
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl bg-white p-3 ring-1 ring-slate-200">
+                        <p className="text-xs font-semibold text-slate-500">
+                          Confirmed
+                        </p>
+                        <p className="mt-1 text-lg font-black text-emerald-800">
+                          {operation.confirmedCount ??
+                            0}
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl bg-white p-3 ring-1 ring-slate-200">
+                        <p className="text-xs font-semibold text-slate-500">
+                          Already Present
+                        </p>
+                        <p className="mt-1 text-lg font-black text-amber-800">
+                          {operation.alreadyPresentCount ??
+                            0}
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl bg-white p-3 ring-1 ring-slate-200">
+                        <p className="text-xs font-semibold text-slate-500">
+                          Unsubscribed
+                        </p>
+                        <p className="mt-1 text-lg font-black text-amber-800">
+                          {operation.unsubscribedCount ??
+                            0}
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl bg-white p-3 ring-1 ring-slate-200">
+                        <p className="text-xs font-semibold text-slate-500">
+                          Failed
+                        </p>
+                        <p className="mt-1 text-lg font-black text-red-800">
+                          {operation.failedCount ??
+                            0}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid gap-2 text-xs text-slate-600 md:grid-cols-2">
+                      <p>
+                        <span className="font-bold text-slate-800">
+                          Requested by:
+                        </span>{" "}
+                        {operation.requestedByDisplayName ||
+                          "—"}
+                      </p>
+
+                      <p>
+                        <span className="font-bold text-slate-800">
+                          checkStatusID:
+                        </span>{" "}
+                        {operation.providerCheckStatusId ||
+                          "—"}
+                      </p>
+
+                      <p>
+                        <span className="font-bold text-slate-800">
+                          Requested:
+                        </span>{" "}
+                        {formatProviderHistoryTime(
+                          operation.requestedAt
+                        )}
+                      </p>
+
+                      <p>
+                        <span className="font-bold text-slate-800">
+                          Submitted:
+                        </span>{" "}
+                        {formatProviderHistoryTime(
+                          operation.submittedAt
+                        )}
+                      </p>
+
+                      <p>
+                        <span className="font-bold text-slate-800">
+                          Last checked:
+                        </span>{" "}
+                        {formatProviderHistoryTime(
+                          operation.lastCheckedAt
+                        )}
+                      </p>
+
+                      <p>
+                        <span className="font-bold text-slate-800">
+                          Completed:
+                        </span>{" "}
+                        {formatProviderHistoryTime(
+                          operation.completedAt
+                        )}
+                      </p>
+                    </div>
+
+                    {operation.providerMessage && (
+                      <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs leading-5 text-blue-950">
+                        {operation.providerMessage}
+                      </div>
+                    )}
+
+                    {operation.errorMessage && (
+                      <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold leading-5 text-red-900">
+                        {operation.errorMessage}
+                      </div>
+                    )}
+
+                    <div className="mt-4 grid gap-3">
+                      {recipients.length ===
+                        0 ? (
+                        <div className="rounded-xl bg-white p-4 text-xs text-slate-500 ring-1 ring-slate-200">
+                          No provider-operation enrollment mappings were found for this operation.
+                        </div>
+                      ) : (
+                        recipients.map(
+                          (
+                            recipient,
+                            recipientIndex
+                          ) => (
+                            <div
+                              key={
+                                recipient.enrollmentId ||
+                                `${operation.id}-recipient-${recipientIndex}`
+                              }
+                              className="rounded-xl bg-white p-4 ring-1 ring-slate-200"
+                            >
+                              <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                                <div>
+                                  <p className="font-bold text-slate-950">
+                                    {recipient.contactName ||
+                                      recipient.submittedEmail ||
+                                      "CRM recipient"}
+                                  </p>
+
+                                  <p className="mt-1 text-xs text-slate-600">
+                                    {recipient.companyName
+                                      ? `${recipient.companyName} · `
+                                      : ""}
+                                    {recipient.submittedEmail ||
+                                      "No email recorded"}
+                                  </p>
+                                </div>
+
+                                <div className="flex flex-wrap gap-2">
+                                  <span
+                                    className={`rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${providerHistoryStatusClasses(
+                                      recipient.enrollmentStatus
+                                    )}`}
+                                  >
+                                    CRM:{" "}
+                                    {recipient.enrollmentStatus ||
+                                      "unknown"}
+                                  </span>
+
+                                  <span
+                                    className={`rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${providerHistoryStatusClasses(
+                                      recipient.mappingStatus
+                                    )}`}
+                                  >
+                                    Provider:{" "}
+                                    {recipient.mappingStatus ||
+                                      "unknown"}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="mt-3 grid gap-2 text-xs text-slate-600 md:grid-cols-2 xl:grid-cols-3">
+                                <p className="break-all">
+                                  <span className="font-bold text-slate-800">
+                                    Enrollment:
+                                  </span>{" "}
+                                  {recipient.enrollmentId ||
+                                    "—"}
+                                </p>
+
+                                <p className="break-all">
+                                  <span className="font-bold text-slate-800">
+                                    Mailshake recipient ID:
+                                  </span>{" "}
+                                  {recipient.providerRecipientId ||
+                                    "—"}
+                                </p>
+
+                                <p>
+                                  <span className="font-bold text-slate-800">
+                                    Batch:
+                                  </span>{" "}
+                                  {recipient.batchStatus ||
+                                    "—"}
+                                </p>
+
+                                <p>
+                                  <span className="font-bold text-slate-800">
+                                    Submitted:
+                                  </span>{" "}
+                                  {formatProviderHistoryTime(
+                                    recipient.submittedAt
+                                  )}
+                                </p>
+
+                                <p>
+                                  <span className="font-bold text-slate-800">
+                                    Confirmed:
+                                  </span>{" "}
+                                  {formatProviderHistoryTime(
+                                    recipient.confirmedAt
+                                  )}
+                                </p>
+
+                                <p>
+                                  <span className="font-bold text-slate-800">
+                                    Failed:
+                                  </span>{" "}
+                                  {formatProviderHistoryTime(
+                                    recipient.failedAt
+                                  )}
+                                </p>
+                              </div>
+
+                              {recipient.providerMessage && (
+                                <p className="mt-3 text-xs leading-5 text-slate-700">
+                                  {recipient.providerMessage}
+                                </p>
+                              )}
+
+                              {recipient.failureReason && (
+                                <p className="mt-3 rounded-lg bg-red-50 p-3 text-xs font-semibold text-red-900 ring-1 ring-red-200">
+                                  {recipient.failureReason}
+                                </p>
+                              )}
+                            </div>
+                          )
+                        )
+                      )}
+                    </div>
+                  </article>
+                );
+              }
+            )}
           </div>
         )}
       </div>
