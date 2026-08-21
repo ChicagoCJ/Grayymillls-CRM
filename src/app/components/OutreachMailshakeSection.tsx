@@ -152,6 +152,24 @@ type EnrollmentRequestResponse = {
   error?: string;
 };
 
+type ProviderSubmissionResponse = {
+  status?: string;
+  mode?: string;
+  provider?: string;
+  providerCampaignId?: string;
+  providerCampaignTitle?: string;
+  providerCampaignState?: string;
+  operationId?: string;
+  enrollmentId?: string;
+  providerCheckStatusId?: string | null;
+  submittedCount?: number;
+  enrollmentStatus?: string;
+  providerRecipientId?: string | null;
+  warning?: string | null;
+  message?: string;
+  error?: string;
+};
+
 async function getBearerHeaders() {
   if (
     !hasBrowserSupabaseConfig()
@@ -525,6 +543,26 @@ export default function OutreachMailshakeSection({
     setProviderExecutionMessage,
   ] =
     useState("");
+
+  const [
+    providerSubmissionResult,
+    setProviderSubmissionResult,
+  ] =
+    useState<
+      ProviderSubmissionResponse | null
+    >(null);
+
+  const [
+    providerSubmissionError,
+    setProviderSubmissionError,
+  ] =
+    useState("");
+
+  const [
+    isSubmittingProvider,
+    setIsSubmittingProvider,
+  ] =
+    useState(false);
 
   const [
     contactPage,
@@ -1270,6 +1308,14 @@ export default function OutreachMailshakeSection({
     setProviderExecutionMessage(
       ""
     );
+
+    setProviderSubmissionResult(
+      null
+    );
+
+    setProviderSubmissionError(
+      ""
+    );
   }
 
   function clearFilters() {
@@ -1613,6 +1659,14 @@ export default function OutreachMailshakeSection({
       null
     );
 
+    setProviderSubmissionResult(
+      null
+    );
+
+    setProviderSubmissionError(
+      ""
+    );
+
     try {
       const response =
         await fetch(
@@ -1720,6 +1774,174 @@ export default function OutreachMailshakeSection({
     }
   }
 
+  async function submitRecordedEnrollmentToMailshake() {
+    const providerReview =
+      providerExecutionReview?.providerReview;
+
+    if (
+      !selectedCampaign ||
+      !providerReview
+    ) {
+      setProviderSubmissionError(
+        "Run the Provider Execution Review first."
+      );
+
+      return;
+    }
+
+    if (
+      providerExecutionReviewFingerprint !==
+      enrollmentSelectionFingerprint
+    ) {
+      setProviderSubmissionError(
+        "The campaign, contact selection, or filters changed after the provider review. Review again before submission."
+      );
+
+      return;
+    }
+
+    if (
+      providerReview.providerExecutionAllowed !==
+        true ||
+      providerReview.providerCampaignState !==
+        "paused"
+    ) {
+      setProviderSubmissionError(
+        "The latest provider review does not permit Mailshake submission."
+      );
+
+      return;
+    }
+
+    if (
+      selectedContactIds.length !==
+        1 ||
+      Number(
+        providerReview.readyToSubmitCount ??
+          0
+      ) !==
+        1
+    ) {
+      setProviderSubmissionError(
+        "The initial provider rollout permits exactly one ready CRM enrollment per submission."
+      );
+
+      return;
+    }
+
+    const campaignName =
+      providerReview.providerCampaignTitle ||
+      selectedCampaign.title ||
+      "the selected campaign";
+
+    const confirmed =
+      window.confirm(
+        `SUBMIT 1 RECORDED CRM ENROLLMENT TO MAILSHAKE?\n\nCampaign: ${campaignName}\n\nThis is a REAL Mailshake provider action. The server will re-check CRM eligibility and confirm that Mailshake still reports the campaign as PAUSED immediately before submission.\n\nIf Mailshake accepts the recipient, CRM will record the enrollment as submitted. It will NOT be treated as confirmed until the asynchronous Mailshake add-status result is checked.\n\nKEEP THE CAMPAIGN PAUSED until that verification is complete.\n\nContinue?`
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setIsSubmittingProvider(
+      true
+    );
+
+    setProviderSubmissionError(
+      ""
+    );
+
+    setProviderSubmissionResult(
+      null
+    );
+
+    try {
+      const response =
+        await fetch(
+          "/api/outreach-mailshake/provider-execution",
+          {
+            method:
+              "POST",
+
+            headers: {
+              ...(await getBearerHeaders()),
+
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify({
+                providerCampaignId:
+                  selectedCampaign.providerCampaignId,
+
+                contactId:
+                  selectedContactIds[0],
+
+                confirmationPhrase:
+                  "SUBMIT_ONE_TO_PAUSED_MAILSHAKE",
+              }),
+
+            cache:
+              "no-store",
+          }
+        );
+
+      const rawText =
+        await response.text();
+
+      let data:
+        ProviderSubmissionResponse;
+
+      try {
+        data =
+          rawText
+            ? JSON.parse(
+                rawText
+              )
+            : {};
+      } catch {
+        throw new Error(
+          `CRM provider submission endpoint returned an unreadable response with HTTP status ${response.status}.`
+        );
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            "The controlled Mailshake submission did not complete."
+        );
+      }
+
+      setProviderSubmissionResult(
+        data
+      );
+
+      /*
+       * The provider review is stale as soon as a provider
+       * operation is attempted. Require a fresh review before
+       * any possible later action.
+       */
+      setProviderExecutionReviewFingerprint(
+        ""
+      );
+    } catch (error) {
+      setProviderExecutionReviewFingerprint(
+        ""
+      );
+
+      setProviderSubmissionError(
+        error instanceof Error
+          ? error.message
+          : "The controlled Mailshake submission did not complete."
+      );
+    } finally {
+      setIsSubmittingProvider(
+        false
+      );
+    }
+  }
+
   if (!canAccess) {
     return (
       <section className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-900 shadow-sm">
@@ -1740,7 +1962,7 @@ export default function OutreachMailshakeSection({
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-wide text-blue-700">
-              Version 3.27E-11B - Provider Execution Review
+              Version 3.27E-11D - Controlled Mailshake Submission
             </p>
 
             <h2 className="mt-1 text-2xl font-bold text-slate-950">
@@ -1754,11 +1976,11 @@ export default function OutreachMailshakeSection({
 
           <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
             <p className="font-bold">
-              Provider execution review enabled
+              Controlled Mailshake submission enabled
             </p>
 
             <p className="mt-1 text-xs leading-5">
-              The CRM can now perform a fresh, read-only provider execution review after an enrollment is recorded. This revision still cannot add recipients to Mailshake or send email.
+              The CRM can now submit exactly one recorded enrollment to Mailshake only after fresh CRM revalidation and two fresh checks confirming the Mailshake campaign is paused. Provider acceptance remains asynchronous and is not yet confirmation.
             </p>
           </div>
         </div>
@@ -2832,7 +3054,7 @@ export default function OutreachMailshakeSection({
                     0 && (
                   <div className="mt-5 rounded-2xl border border-rose-300 bg-rose-50 p-5 text-sm text-rose-950">
                     <p className="text-xs font-black uppercase tracking-wide text-rose-700">
-                      Provider Execution Review — Read Only
+                      Provider Execution — Controlled
                     </p>
 
                     <h5 className="mt-1 text-lg font-bold text-rose-950">
@@ -2995,12 +3217,111 @@ export default function OutreachMailshakeSection({
 
                         {providerExecutionReview.providerReview
                           .providerExecutionAllowed ? (
-                          <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-900">
-                            Initial safety policy passed: Mailshake currently reports this campaign as paused and at least one recorded enrollment remains in requested status. A later revision may add an explicit submission action. This revision cannot submit anything.
+                          <div className="mt-4 grid gap-4">
+                            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-900">
+                              Initial safety policy passed: Mailshake currently reports this campaign as paused and at least one recorded enrollment remains in requested status.
+                            </div>
+
+                            <div className="rounded-xl border-2 border-red-300 bg-red-50 p-5">
+                              <p className="text-xs font-black uppercase tracking-wide text-red-700">
+                                Real Mailshake Action
+                              </p>
+
+                              <h6 className="mt-1 font-bold text-red-950">
+                                Submit one recorded enrollment to the paused campaign
+                              </h6>
+
+                              <p className="mt-2 text-xs leading-5 text-red-900">
+                                The initial rollout is limited to exactly one recipient. The server will revalidate CRM eligibility, check whether the recipient already exists in Mailshake, and check the campaign twice. The final provider check must still report Paused.
+                              </p>
+
+                              <p className="mt-2 text-xs font-bold leading-5 text-red-950">
+                                If Mailshake accepts the request, keep the campaign paused. Acceptance is asynchronous and does not mean the recipient is confirmed yet.
+                              </p>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  void submitRecordedEnrollmentToMailshake()
+                                }
+                                disabled={
+                                  isSubmittingProvider ||
+                                  providerExecutionReviewFingerprint !==
+                                    enrollmentSelectionFingerprint ||
+                                  providerSubmissionResult !==
+                                    null ||
+                                  selectedContactIds.length !==
+                                    1 ||
+                                  Number(
+                                    providerExecutionReview.providerReview
+                                      ?.readyToSubmitCount ??
+                                      0
+                                  ) !==
+                                    1
+                                }
+                                className="mt-4 rounded-xl bg-red-700 px-5 py-3 text-sm font-black text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                              >
+                                {isSubmittingProvider
+                                  ? "Submitting 1 to Mailshake..."
+                                  : "Submit 1 to PAUSED Mailshake Campaign"}
+                              </button>
+                            </div>
                           </div>
                         ) : (
                           <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-900">
-                            Initial safety policy does not currently permit provider submission. No Mailshake write action is available in this revision.
+                            Initial safety policy does not currently permit provider submission. Mailshake must report this campaign as paused.
+                          </div>
+                        )}
+
+                        {providerSubmissionError && (
+                          <div className="mt-4 rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-950">
+                            {providerSubmissionError}
+                          </div>
+                        )}
+
+                        {providerSubmissionResult && (
+                          <div
+                            className={`mt-4 rounded-xl border p-4 text-sm ${
+                              providerSubmissionResult.status ===
+                              "submitted"
+                                ? "border-blue-300 bg-blue-50 text-blue-950"
+                                : "border-amber-300 bg-amber-50 text-amber-950"
+                            }`}
+                          >
+                            <p className="font-black">
+                              {providerSubmissionResult.status ===
+                              "submitted"
+                                ? "Mailshake accepted the asynchronous request."
+                                : "Provider outcome requires reconciliation."}
+                            </p>
+
+                            <p className="mt-2 leading-6">
+                              {providerSubmissionResult.message}
+                            </p>
+
+                            {providerSubmissionResult.operationId && (
+                              <p className="mt-3 break-all text-xs">
+                                CRM provider operation:{" "}
+                                {providerSubmissionResult.operationId}
+                              </p>
+                            )}
+
+                            {providerSubmissionResult.providerCheckStatusId && (
+                              <p className="mt-1 break-all text-xs">
+                                Mailshake checkStatusID:{" "}
+                                {providerSubmissionResult.providerCheckStatusId}
+                              </p>
+                            )}
+
+                            {providerSubmissionResult.warning && (
+                              <p className="mt-3 font-bold text-amber-900">
+                                {providerSubmissionResult.warning}
+                              </p>
+                            )}
+
+                            <p className="mt-3 text-xs font-black uppercase tracking-wide">
+                              Do not unpause this campaign yet.
+                            </p>
                           </div>
                         )}
 
