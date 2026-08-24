@@ -207,10 +207,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.27 - Outreach Integration Foundation";
+  "Version 3.27E - Outreach Integration Foundation";
 
 const REVISION_NOTE =
-  "Adds secure ERP XLSX reconciliation with customer-level matching, CRM activity and opportunity context, preserved source workbooks, and human review before any future CRM updates.";
+  "Current revision 13C1: Production-safe Mailshake reconciliation split. Provider submission remains Preview-only; reconciliation remains available for existing CRM-tracked provider operations.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean
