@@ -2407,7 +2407,7 @@ export default function OutreachMailshakeSection({
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-wide text-blue-700">
-              Version 3.27E-13B2A - Preview Allowlist + Mojibake Cleanup
+              Version 3.27E-13C1 - Production-Safe Reconciliation Split
             </p>
 
             <h2 className="mt-1 text-2xl font-bold text-slate-950">
@@ -2425,7 +2425,7 @@ export default function OutreachMailshakeSection({
             </p>
 
             <p className="mt-1 text-xs leading-5">
-              Provider submission remains limited to exactly one recorded enrollment, a paused Mailshake campaign, and an explicit server-side recipient allowlist. During this rollout stage the provider-write and reconciliation routes are enabled only on Vercel Preview deployments.
+              Provider submission remains limited to exactly one recorded enrollment, a paused Mailshake campaign, and an explicit server-side recipient allowlist, and is enabled only on Vercel Preview deployments. Provider-status reconciliation remains available in Preview and Production for existing CRM-tracked provider operations.
             </p>
           </div>
         </div>

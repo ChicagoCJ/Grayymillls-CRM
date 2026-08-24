@@ -87,77 +87,6 @@ function normalizeEmail(
   ).toLowerCase();
 }
 
-function getPreviewTestRecipientEmails() {
-  /*
-   * Provider writes are deliberately disabled outside Vercel
-   * Preview deployments during this rollout stage.
-   *
-   * Production therefore fails closed even if an older provider
-   * test environment variable still exists there.
-   */
-  const vercelEnvironment =
-    cleanText(
-      process.env.VERCEL_ENV
-    ).toLowerCase();
-
-  if (
-    vercelEnvironment !==
-    "preview"
-  ) {
-    return {
-      enabled:
-        false,
-
-      emails:
-        [] as string[],
-
-      reason:
-        "Mailshake provider submission is currently enabled only on Vercel Preview deployments.",
-    };
-  }
-
-  const emails =
-    Array.from(
-      new Set(
-        cleanText(
-          process.env.MAILSHAKE_PREVIEW_TEST_EMAILS
-        )
-          .split(
-            /[,;\n\r]+/
-          )
-          .map(
-            normalizeEmail
-          )
-          .filter(Boolean)
-      )
-    );
-
-  if (
-    emails.length ===
-    0
-  ) {
-    return {
-      enabled:
-        false,
-
-      emails,
-
-      reason:
-        "Mailshake provider submission is disabled because MAILSHAKE_PREVIEW_TEST_EMAILS is not configured for Preview.",
-    };
-  }
-
-  return {
-    enabled:
-      true,
-
-    emails,
-
-    reason:
-      "",
-  };
-}
-
 function normalizedEmailList(
   value: unknown
 ) {
@@ -1081,30 +1010,11 @@ export async function POST(
       );
     }
 
-    const previewTestRecipientPolicy =
-      getPreviewTestRecipientEmails();
-
-    if (
-      !previewTestRecipientPolicy.enabled
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            previewTestRecipientPolicy.reason.replace(
-              "provider submission",
-              "provider-status reconciliation"
-            ),
-        },
-        {
-          status:
-            503,
-        }
-      );
-    }
-
-    const previewTestRecipientEmails =
-      previewTestRecipientPolicy.emails;
-
+    /*
+     * Reconciliation is deliberately available in both Vercel Preview
+     * and Production. This route reconciles an existing CRM-tracked
+     * provider operation; recipient creation remains in provider-execution.
+     */
     const supabase =
       getSupabaseAdmin();
 
@@ -1174,22 +1084,6 @@ export async function POST(
         enrollment.normalized_email
       );
 
-    if (
-      !previewTestRecipientEmails.includes(
-        submittedEmail
-      )
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            "Provider-status reconciliation stopped because this enrollment is not on the configured Mailshake Preview test-recipient allowlist.",
-        },
-        {
-          status:
-            409,
-        }
-      );
-    }
 
     const {
       data:
@@ -1860,7 +1754,7 @@ export async function POST(
     }
 
     /*
-     * Mailshake says processing is finished and the allowlisted email
+     * Mailshake says processing is finished and the submitted email
      * is not in any documented problem list.
      *
      * Do not mark CRM confirmed from that inference alone.
@@ -2020,7 +1914,7 @@ export async function POST(
             "partial",
 
           provider_message:
-            "Mailshake finished with a problem, but CRM could not map the problem safely to the submitted allowlisted recipient. Manual reconciliation is required.",
+            "Mailshake finished with a problem, but CRM could not map the problem safely to the submitted recipient. Manual reconciliation is required.",
 
           last_checked_at:
             now,
