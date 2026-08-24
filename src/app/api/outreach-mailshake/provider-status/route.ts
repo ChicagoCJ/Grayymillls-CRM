@@ -19,13 +19,13 @@ const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type ProviderStatusPayload = {
-  providerCampaignId?: string;
-  contactId?: string;
+  providerOperationId?: string;
 };
 
 type EnrollmentRow = {
   id?: string;
   batch_id?: string;
+  provider_campaign_id?: string;
   normalized_email?: string;
   status?: string;
   provider_recipient_id?: string | null;
@@ -968,40 +968,20 @@ export async function POST(
       ) as
         ProviderStatusPayload;
 
-    const providerCampaignId =
+    const providerOperationId =
       cleanText(
-        payload.providerCampaignId
+        payload.providerOperationId
       );
-
-    const contactId =
-      cleanText(
-        payload.contactId
-      );
-
-    if (
-      !providerCampaignId
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            "A Mailshake campaign ID is required.",
-        },
-        {
-          status:
-            400,
-        }
-      );
-    }
 
     if (
       !UUID_PATTERN.test(
-        contactId
+        providerOperationId
       )
     ) {
       return NextResponse.json(
         {
           error:
-            "The CRM contact ID is invalid.",
+            "A valid CRM provider operation ID is required.",
         },
         {
           status:
@@ -1011,159 +991,20 @@ export async function POST(
     }
 
     /*
-     * Reconciliation is deliberately available in both Vercel Preview
-     * and Production. This route reconciles an existing CRM-tracked
-     * provider operation; recipient creation remains in provider-execution.
+     * Reconciliation remains available in both Vercel Preview
+     * and Production.
+     *
+     * Version 13D requires the exact CRM provider-operation ID.
+     * Do not infer an operation from campaign/contact selection
+     * and do not choose the newest operation mapping.
+     *
+     * Recipient creation remains exclusively in provider-execution.
      */
     const supabase =
       getSupabaseAdmin();
 
-    const {
-      data:
-        enrollmentData,
-      error:
-        enrollmentError,
-    } =
-      await supabase
-        .from(
-          "outreach_enrollments"
-        )
-        .select(
-          `
-          id,
-          batch_id,
-          normalized_email,
-          status,
-          provider_recipient_id,
-          provider_status
-          `
-        )
-        .eq(
-          "provider",
-          "mailshake"
-        )
-        .eq(
-          "provider_campaign_id",
-          providerCampaignId
-        )
-        .eq(
-          "contact_id",
-          contactId
-        )
-        .maybeSingle();
-
-    if (enrollmentError) {
-      throw enrollmentError;
-    }
-
-    const enrollment =
-      enrollmentData as
-        EnrollmentRow |
-        null;
-
-    if (!enrollment) {
-      return NextResponse.json(
-        {
-          error:
-            "No CRM Mailshake enrollment exists for this contact and campaign.",
-        },
-        {
-          status:
-            404,
-        }
-      );
-    }
-
-    const enrollmentId =
-      cleanText(
-        enrollment.id
-      );
-
-    const submittedEmail =
-      normalizeEmail(
-        enrollment.normalized_email
-      );
-
-
-    const {
-      data:
-        mappingData,
-      error:
-        mappingError,
-    } =
-      await supabase
-        .from(
-          "outreach_provider_operation_enrollments"
-        )
-        .select(
-          `
-          operation_id,
-          enrollment_id,
-          submitted_email,
-          status,
-          provider_recipient_id,
-          provider_status,
-          created_at
-          `
-        )
-        .eq(
-          "enrollment_id",
-          enrollmentId
-        )
-        .order(
-          "created_at",
-          {
-            ascending:
-              false,
-          }
-        )
-        .limit(1)
-        .maybeSingle();
-
-    if (mappingError) {
-      throw mappingError;
-    }
-
-    const mapping =
-      mappingData as
-        OperationMappingRow |
-        null;
-
-    if (!mapping) {
-      return NextResponse.json(
-        {
-          error:
-            "No CRM provider-operation mapping exists for this enrollment.",
-        },
-        {
-          status:
-            404,
-        }
-      );
-    }
-
-    if (
-      normalizeEmail(
-        mapping.submitted_email
-      ) !==
-      submittedEmail
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            "Provider-status reconciliation stopped because the provider-operation email does not match the CRM enrollment.",
-        },
-        {
-          status:
-            409,
-        }
-      );
-    }
-
     const operationId =
-      cleanText(
-        mapping.operation_id
-      );
+      providerOperationId;
 
     const {
       data:
@@ -1202,7 +1043,88 @@ export async function POST(
       return NextResponse.json(
         {
           error:
-            "The CRM provider operation could not be found.",
+            "The requested CRM provider operation could not be found.",
+        },
+        {
+          status:
+            404,
+        }
+      );
+    }
+
+    const providerCampaignId =
+      cleanText(
+        operation.provider_campaign_id
+      );
+
+    if (!providerCampaignId) {
+      return NextResponse.json(
+        {
+          error:
+            "Provider-status reconciliation stopped because this CRM provider operation does not identify a Mailshake campaign.",
+        },
+        {
+          status:
+            409,
+        }
+      );
+    }
+
+    /*
+     * Provider execution currently permits exactly one recipient
+     * per provider operation. Reconciliation therefore requires
+     * exactly one operation/enrollment mapping as well.
+     *
+     * Read at most two rows so unexpected duplicate mappings
+     * fail closed instead of being silently guessed.
+     */
+    const {
+      data:
+        mappingData,
+      error:
+        mappingError,
+    } =
+      await supabase
+        .from(
+          "outreach_provider_operation_enrollments"
+        )
+        .select(
+          `
+          operation_id,
+          enrollment_id,
+          submitted_email,
+          status,
+          provider_recipient_id,
+          provider_status
+          `
+        )
+        .eq(
+          "operation_id",
+          operationId
+        )
+        .limit(
+          2
+        );
+
+    if (mappingError) {
+      throw mappingError;
+    }
+
+    const mappings =
+      (
+        mappingData ??
+        []
+      ) as
+        OperationMappingRow[];
+
+    if (
+      mappings.length ===
+      0
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "No CRM enrollment mapping exists for this provider operation.",
         },
         {
           status:
@@ -1212,15 +1134,13 @@ export async function POST(
     }
 
     if (
-      cleanText(
-        operation.provider_campaign_id
-      ) !==
-      providerCampaignId
+      mappings.length !==
+      1
     ) {
       return NextResponse.json(
         {
           error:
-            "The CRM provider operation does not belong to the selected Mailshake campaign.",
+            "Provider-status reconciliation stopped because this provider operation does not map to exactly one CRM enrollment.",
         },
         {
           status:
@@ -1229,6 +1149,138 @@ export async function POST(
       );
     }
 
+    const mapping =
+      mappings[0] as
+        OperationMappingRow;
+
+    const enrollmentId =
+      cleanText(
+        mapping.enrollment_id
+      );
+
+    if (
+      !UUID_PATTERN.test(
+        enrollmentId
+      )
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Provider-status reconciliation stopped because the provider-operation mapping does not identify a valid CRM enrollment.",
+        },
+        {
+          status:
+            409,
+        }
+      );
+    }
+
+    const {
+      data:
+        enrollmentData,
+      error:
+        enrollmentError,
+    } =
+      await supabase
+        .from(
+          "outreach_enrollments"
+        )
+        .select(
+          `
+          id,
+          batch_id,
+          provider_campaign_id,
+          normalized_email,
+          status,
+          provider_recipient_id,
+          provider_status
+          `
+        )
+        .eq(
+          "id",
+          enrollmentId
+        )
+        .eq(
+          "provider",
+          "mailshake"
+        )
+        .maybeSingle();
+
+    if (enrollmentError) {
+      throw enrollmentError;
+    }
+
+    const enrollment =
+      enrollmentData as
+        EnrollmentRow |
+        null;
+
+    if (!enrollment) {
+      return NextResponse.json(
+        {
+          error:
+            "The CRM Mailshake enrollment mapped to this provider operation could not be found.",
+        },
+        {
+          status:
+            404,
+        }
+      );
+    }
+
+    const submittedEmail =
+      normalizeEmail(
+        enrollment.normalized_email
+      );
+
+    if (!submittedEmail) {
+      return NextResponse.json(
+        {
+          error:
+            "Provider-status reconciliation stopped because the mapped CRM enrollment does not contain a normalized email.",
+        },
+        {
+          status:
+            409,
+        }
+      );
+    }
+
+    if (
+      normalizeEmail(
+        mapping.submitted_email
+      ) !==
+      submittedEmail
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Provider-status reconciliation stopped because the provider-operation email does not match the mapped CRM enrollment.",
+        },
+        {
+          status:
+            409,
+        }
+      );
+    }
+
+    if (
+      cleanText(
+        enrollment.provider_campaign_id
+      ) !==
+      providerCampaignId
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Provider-status reconciliation stopped because the provider operation and mapped CRM enrollment do not belong to the same Mailshake campaign.",
+        },
+        {
+          status:
+            409,
+        }
+      );
+    }
     const operationStatus =
       cleanText(
         operation.status

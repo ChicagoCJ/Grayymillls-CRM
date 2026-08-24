@@ -711,6 +711,12 @@ export default function OutreachMailshakeSection({
     >(null);
 
   const [
+    providerStatusTargetOperationId,
+    setProviderStatusTargetOperationId,
+  ] =
+    useState("");
+
+  const [
     providerStatusError,
     setProviderStatusError,
   ] =
@@ -2156,25 +2162,28 @@ export default function OutreachMailshakeSection({
     }
   }
 
-  async function checkMailshakeImportStatus() {
-    if (!selectedCampaign) {
-      setProviderStatusError(
-        "Choose the Mailshake campaign first."
-      );
-
-      return;
-    }
+  async function checkMailshakeImportStatus(
+    providerOperationId: string
+  ) {
+    const normalizedProviderOperationId =
+      String(
+        providerOperationId ||
+        ""
+      ).trim();
 
     if (
-      selectedContactIds.length !==
-      1
+      !normalizedProviderOperationId
     ) {
       setProviderStatusError(
-        "Select exactly one recorded CRM enrollment to check its Mailshake import status."
+        "Choose an exact CRM provider operation to reconcile."
       );
 
       return;
     }
+
+    setProviderStatusTargetOperationId(
+      normalizedProviderOperationId
+    );
 
     setIsCheckingProviderStatus(
       true
@@ -2205,11 +2214,8 @@ export default function OutreachMailshakeSection({
 
             body:
               JSON.stringify({
-                providerCampaignId:
-                  selectedCampaign.providerCampaignId,
-
-                contactId:
-                  selectedContactIds[0],
+                providerOperationId:
+                  normalizedProviderOperationId,
               }),
 
             cache:
@@ -2274,10 +2280,6 @@ export default function OutreachMailshakeSection({
 
       setProviderExecutionMessage(
         ""
-      );
-
-      setProviderSubmissionResult(
-        null
       );
 
       setProviderSubmissionError(
@@ -2407,7 +2409,7 @@ export default function OutreachMailshakeSection({
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-wide text-blue-700">
-              Version 3.27E-13C1 - Production-Safe Reconciliation Split
+              Version 3.27E-13D1 - Inline Provider Reconciliation Results
             </p>
 
             <h2 className="mt-1 text-2xl font-bold text-slate-950">
@@ -2425,7 +2427,7 @@ export default function OutreachMailshakeSection({
             </p>
 
             <p className="mt-1 text-xs leading-5">
-              Provider submission remains limited to exactly one recorded enrollment, a paused Mailshake campaign, and an explicit server-side recipient allowlist, and is enabled only on Vercel Preview deployments. Provider-status reconciliation remains available in Preview and Production for existing CRM-tracked provider operations.
+              Provider submission remains limited to exactly one recorded enrollment, a paused Mailshake campaign, and an explicit server-side recipient allowlist, and is enabled only on Vercel Preview deployments. Provider-status reconciliation remains available in Preview and Production for existing CRM-tracked provider operations and now requires an explicit CRM provider operation ID.
             </p>
           </div>
         </div>
@@ -2489,7 +2491,7 @@ export default function OutreachMailshakeSection({
             </h3>
 
             <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
-              Review recent Mailshake provider operations recorded by CRM. This reads CRM audit records only and does not submit recipients, change Mailshake campaigns, or send email.
+              Review recent Mailshake provider operations recorded by CRM. Loading history reads CRM audit records only. Reconcile This Operation targets the exact CRM provider operation and shows the result directly on that operation card; it never submits or re-adds a recipient, changes campaign state, or sends email.
             </p>
           </div>
 
@@ -2572,15 +2574,129 @@ export default function OutreachMailshakeSection({
                         </p>
                       </div>
 
-                      <span
-                        className={`w-fit rounded-full px-3 py-1 text-xs font-black ring-1 ${providerHistoryStatusClasses(
-                          operation.status
-                        )}`}
-                      >
-                        {operation.status ||
-                          "unknown"}
-                      </span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className={`w-fit rounded-full px-3 py-1 text-xs font-black ring-1 ${providerHistoryStatusClasses(
+                            operation.status
+                          )}`}
+                        >
+                          {operation.status ||
+                            "unknown"}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void checkMailshakeImportStatus(
+                              operation.id ||
+                                ""
+                            )
+                          }
+                          disabled={
+                            isCheckingProviderStatus ||
+                            !operation.id
+                          }
+                          className="rounded-xl bg-sky-700 px-4 py-2 text-xs font-black text-white hover:bg-sky-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                        >
+                          {isCheckingProviderStatus &&
+                          providerStatusTargetOperationId ===
+                            operation.id
+                            ? "Checking..."
+                            : "Reconcile This Operation"}
+                        </button>
+                      </div>
                     </div>
+
+                    {providerStatusTargetOperationId ===
+                      operation.id &&
+                      providerStatusError && (
+                        <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-xs leading-5 text-red-950">
+                          <p className="font-black">
+                            Reconciliation did not complete
+                          </p>
+
+                          <p className="mt-2">
+                            {providerStatusError}
+                          </p>
+
+                          <p className="mt-2 break-all font-semibold">
+                            CRM provider operation:{" "}
+                            {operation.id}
+                          </p>
+                        </div>
+                      )}
+
+                    {providerStatusTargetOperationId ===
+                      operation.id &&
+                      providerStatusResult && (
+                        <div
+                          className={`mt-4 rounded-xl border p-4 text-xs leading-5 ${
+                            providerStatusResult.status ===
+                              "failed" ||
+                            providerStatusResult.status ===
+                              "reconciliation_required" ||
+                            providerStatusResult.enrollmentStatus ===
+                              "failed"
+                              ? "border-red-200 bg-red-50 text-red-950"
+                              : providerStatusResult.status ===
+                                  "processing"
+                                ? "border-amber-200 bg-amber-50 text-amber-950"
+                                : "border-emerald-200 bg-emerald-50 text-emerald-950"
+                          }`}
+                        >
+                          <p className="font-black">
+                            Reconciliation result for this operation
+                          </p>
+
+                          <p className="mt-2">
+                            {providerStatusResult.message ||
+                              "CRM checked this provider operation."}
+                          </p>
+
+                          <p className="mt-3 break-all">
+                            <span className="font-black">
+                              CRM provider operation:
+                            </span>{" "}
+                            {providerStatusResult.operationId ||
+                              operation.id}
+                          </p>
+
+                          <p className="mt-1">
+                            <span className="font-black">
+                              CRM enrollment status:
+                            </span>{" "}
+                            {providerStatusResult.enrollmentStatus ||
+                              "unknown"}
+                          </p>
+
+                          <p className="mt-1">
+                            <span className="font-black">
+                              Provider operation status:
+                            </span>{" "}
+                            {providerStatusResult.operationStatus ||
+                              providerStatusResult.status ||
+                              "checked"}
+                          </p>
+
+                          {providerStatusResult.providerCheckStatusId && (
+                            <p className="mt-1 break-all">
+                              <span className="font-black">
+                                Mailshake checkStatusID:
+                              </span>{" "}
+                              {providerStatusResult.providerCheckStatusId}
+                            </p>
+                          )}
+
+                          {providerStatusResult.providerRecipientId && (
+                            <p className="mt-1 break-all">
+                              <span className="font-black">
+                                Mailshake recipient ID:
+                              </span>{" "}
+                              {providerStatusResult.providerRecipientId}
+                            </p>
+                          )}
+                        </div>
+                      )}
 
                     <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                       <div className="rounded-xl bg-white p-3 ring-1 ring-slate-200">
@@ -3936,25 +4052,25 @@ export default function OutreachMailshakeSection({
                       <button
                         type="button"
                         onClick={() =>
-                          void checkMailshakeImportStatus()
+                          void checkMailshakeImportStatus(
+                            providerSubmissionResult?.operationId ||
+                              ""
+                          )
                         }
                         disabled={
                           isCheckingProviderStatus ||
-                          selectedContactIds.length !==
-                            1 ||
-                          !selectedCampaign
+                          !providerSubmissionResult?.operationId
                         }
                         className="mt-4 rounded-xl bg-sky-700 px-5 py-3 text-sm font-black text-white hover:bg-sky-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                       >
                         {isCheckingProviderStatus
-                          ? "Checking Mailshake Import..."
-                          : "Check Mailshake Import Status"}
+                          ? "Checking Exact Provider Operation..."
+                          : "Check This Provider Operation"}
                       </button>
 
-                      {selectedContactIds.length !==
-                        1 && (
+                      {!providerSubmissionResult?.operationId && (
                         <p className="mt-3 text-xs font-semibold text-sky-900">
-                          Select exactly one recorded CRM enrollment before checking its provider status.
+                          No new provider operation is selected here. Use Provider Operations History above to reconcile an existing CRM-tracked operation.
                         </p>
                       )}
 
