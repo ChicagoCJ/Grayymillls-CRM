@@ -207,10 +207,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.27F - Guided Outreach Workflow";
+  "Version 3.27G - Outreach Operational Polish";
 
 const REVISION_NOTE =
-  "Current revision 13F: Outreach now explains the complete selection-to-reconciliation workflow with numbered stages, action-risk guidance, plain-English terminology, and final outcome definitions. Provider behavior and Preview-only submission policy are unchanged.";
+  "Current revision 3.27G: Outreach adds clearer Step 4 readiness explanations, safer plain-English reconciliation outcomes, and a distinct Step 6 final CRM outcome panel. Provider behavior and Preview-only submission policy are unchanged.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean
