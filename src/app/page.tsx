@@ -210,7 +210,7 @@ const APP_VERSION =
   "Version 3.27E - Outreach Integration Foundation";
 
 const REVISION_NOTE =
-  "Current revision 13E: Outreach batches now treat already-present recipients as successful/no-action-needed and unsubscribed recipients as terminal partial outcomes. Provider submission remains Preview-only.";
+  "Current revision 13F: Outreach now explains the complete selection-to-reconciliation workflow with numbered stages, action-risk guidance, plain-English terminology, and final outcome definitions. Provider behavior and Preview-only submission policy are unchanged.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean

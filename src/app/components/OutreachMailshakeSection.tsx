@@ -2409,7 +2409,7 @@ export default function OutreachMailshakeSection({
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-wide text-blue-700">
-              Version 3.27E-13E - Honest Batch Outcome Semantics
+              Version 3.27E-13F - Guided Outreach Workflow
             </p>
 
             <h2 className="mt-1 text-2xl font-bold text-slate-950">
@@ -2429,6 +2429,55 @@ export default function OutreachMailshakeSection({
             <p className="mt-1 text-xs leading-5">
               Provider submission remains limited to exactly one recorded enrollment, a paused Mailshake campaign, and an explicit server-side recipient allowlist, and is enabled only on Vercel Preview deployments. Provider-status reconciliation remains available in Preview and Production for existing CRM-tracked provider operations and now requires an explicit CRM provider operation ID.
             </p>
+
+            <details className="mt-4 rounded-xl border border-blue-200 bg-white/80 p-4">
+              <summary className="cursor-pointer font-black text-blue-950">
+                How Outreach Works — workflow, safety, and terminology
+              </summary>
+
+              <div className="mt-4 space-y-5 text-xs leading-5 text-slate-700">
+                <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                  <p className="font-black text-slate-950">
+                    New Outreach Workflow
+                  </p>
+
+                  <ol className="mt-3 space-y-3">
+                    <li><span className="font-black text-slate-900">0. Choose campaign and recipients.</span>{" "}Selecting contacts does not create a CRM enrollment and does not change Mailshake.</li>
+                    <li><span className="font-black text-blue-800">1. Review Selection on Server — CHECK ONLY.</span>{" "}Re-validates the current selection against CRM data. Nothing is submitted to Mailshake.</li>
+                    <li><span className="font-black text-violet-800">2. Record Enrollment in CRM — CRM WRITE.</span>{" "}Creates CRM enrollment and batch tracking records. It does not add a recipient to Mailshake and does not send email.</li>
+                    <li><span className="font-black text-rose-800">3. Check Recorded Enrollment and Mailshake Readiness — CHECK ONLY.</span>{" "}Re-checks CRM eligibility and reads the current Mailshake campaign state immediately before any provider action.</li>
+                    <li><span className="font-black text-red-800">4. Submit to Mailshake — MAILSHAKE WRITE.</span>{" "}This is the first step that can actually add a recipient to Mailshake. Current rollout permits one server-approved recipient on Vercel Preview only, and the campaign must remain paused.</li>
+                    <li><span className="font-black text-sky-800">5. Reconcile the Mailshake Result — STATUS / CRM SYNC.</span>{" "}Checks the exact existing CRM-tracked provider operation and records the provider result. Reconcile never means submit again.</li>
+                    <li><span className="font-black text-emerald-800">6. Understand the Final CRM Outcome.</span>{" "}Review the final enrollment, provider-operation, and batch statuses before considering the outreach action complete.</li>
+                  </ol>
+                </div>
+
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <div className="rounded-xl bg-white p-4 ring-1 ring-slate-200">
+                    <p className="font-black text-slate-950">What the terms mean</p>
+                    <dl className="mt-3 space-y-3">
+                      <div><dt className="font-bold text-slate-900">CRM Enrollment</dt><dd>CRM record saying that a contact is intended for an outreach campaign.</dd></div>
+                      <div><dt className="font-bold text-slate-900">Batch</dt><dd>CRM record grouping one or more enrollment instructions.</dd></div>
+                      <div><dt className="font-bold text-slate-900">Provider Operation</dt><dd>CRM audit record for one specific attempted Mailshake provider action.</dd></div>
+                      <div><dt className="font-bold text-slate-900">Mailshake checkStatusID</dt><dd>Mailshake identifier used to check its asynchronous recipient import.</dd></div>
+                      <div><dt className="font-bold text-slate-900">Reconcile</dt><dd>Check an existing provider operation and synchronize the result into CRM. It does not create another Mailshake submission.</dd></div>
+                    </dl>
+                  </div>
+
+                  <div className="rounded-xl bg-white p-4 ring-1 ring-slate-200">
+                    <p className="font-black text-slate-950">Final outcome guide</p>
+                    <dl className="mt-3 space-y-3">
+                      <div><dt className="font-bold text-emerald-800">Confirmed / Enrolled</dt><dd>Mailshake confirms the recipient exists in the intended campaign.</dd></div>
+                      <div><dt className="font-bold text-emerald-800">Already in campaign</dt><dd>No new add was required. CRM treats this as successful / no action needed.</dd></div>
+                      <div><dt className="font-bold text-amber-800">Unsubscribed</dt><dd>Mailshake did not enroll the recipient because the address is unsubscribed.</dd></div>
+                      <div><dt className="font-bold text-red-800">Failed</dt><dd>The requested provider action could not be completed.</dd></div>
+                      <div><dt className="font-bold text-amber-800">Submitted / Processing</dt><dd>The provider operation is not final yet. Reconcile the same operation again later; do not resubmit.</dd></div>
+                      <div><dt className="font-bold text-amber-800">Reconciliation required</dt><dd>CRM cannot safely classify the provider result automatically. Stop and investigate; do not retry the original submission.</dd></div>
+                    </dl>
+                  </div>
+                </div>
+              </div>
+            </details>
           </div>
         </div>
 
@@ -2487,11 +2536,11 @@ export default function OutreachMailshakeSection({
             </p>
 
             <h3 className="mt-1 text-xl font-bold text-slate-950">
-              Provider Operations History
+              Existing Operations / Reconciliation
             </h3>
 
             <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
-              Review recent Mailshake provider operations recorded by CRM. Loading history reads CRM audit records only. Reconcile This Operation targets the exact CRM provider operation and shows the result directly on that operation card; it never submits or re-adds a recipient, changes campaign state, or sends email.
+              Use this area for Mailshake operations that CRM already tracks. Loading history is read-only. Reconcile This Operation checks the exact existing provider operation and synchronizes its result into CRM; it never submits or re-adds a recipient, changes campaign state, or sends email.
             </p>
           </div>
 
@@ -3753,7 +3802,7 @@ export default function OutreachMailshakeSection({
 
                   <div className="rounded-xl border border-violet-200 bg-white p-4">
                     <p className="text-xs font-bold uppercase text-violet-700">
-                      Current CRM Selection
+                      Step 0 — Current CRM Selection
                     </p>
 
                     <p className="mt-1 text-2xl font-black text-violet-950">
@@ -3814,7 +3863,7 @@ export default function OutreachMailshakeSection({
                   >
                     {isReviewingEnrollment
                       ? "Reviewing CRM Selection..."
-                      : "Review Selection on Server"}
+                      : "Step 1 — Review Selection on Server"}
                   </button>
                 </div>
 
@@ -3833,13 +3882,13 @@ export default function OutreachMailshakeSection({
                 {enrollmentReview && (
                   <div className="mt-5 rounded-2xl border border-violet-200 bg-white p-5">
                     <h5 className="font-bold text-slate-950">
-                      Server-Validated Enrollment Review
+                      Step 1 Result — Server-Validated Enrollment Review
                     </h5>
 
                     {enrollmentReviewFingerprint !==
                       enrollmentSelectionFingerprint && (
                       <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-900">
-                        The selection or filters changed after this review. Run Review Selection on Server again before recording.
+                        The selection or filters changed after Step 1. Run Step 1 — Review Selection on Server again before recording anything in CRM.
                       </div>
                     )}
 
@@ -3951,14 +4000,14 @@ export default function OutreachMailshakeSection({
                           : recordedEnrollmentFingerprint ===
                               enrollmentSelectionFingerprint
                             ? "Recorded in CRM"
-                            : `Record ${Number(
+                            : `Step 2 — Record ${Number(
                                 enrollmentReview.newEnrollmentCount ??
                                   0
                               )} in CRM — Not Mailshake`}
                       </button>
 
                       <p className="mt-3 text-xs font-semibold leading-5 text-violet-900">
-                        This button creates CRM enrollment records only. There is still no API call here that adds recipients to Mailshake.
+                        CRM WRITE — NO MAILSHAKE ACTION — NO EMAIL SENT. Step 2 creates the CRM enrollment and batch tracking records only. After recording, continue to Step 3 and run a fresh readiness review before any provider submission.
                       </p>
 
                       {enrollmentReview.batchId && (
@@ -3988,11 +4037,11 @@ export default function OutreachMailshakeSection({
                     </p>
 
                     <h5 className="mt-1 text-lg font-bold text-rose-950">
-                      Re-check CRM and Mailshake before any future submission
+                      Step 3 — Check Recorded Enrollment & Mailshake Readiness
                     </h5>
 
                     <p className="mt-2 max-w-4xl text-xs leading-5 text-rose-900">
-                      This performs a fresh server-side CRM eligibility check and reads the current campaign directly from Mailshake. It does not add recipients to Mailshake, change enrollment status, or send email.
+                      CHECK ONLY — Step 3 re-validates the recorded CRM enrollment and reads the current campaign directly from Mailshake. It does not add a recipient, change the enrollment outcome, or send email. Run this immediately before Step 4 because CRM or campaign conditions may have changed.
                     </p>
 
                     <div className="mt-4">
@@ -4036,158 +4085,12 @@ export default function OutreachMailshakeSection({
                       </div>
                     )}
 
-                    <div className="mt-5 rounded-xl border border-sky-300 bg-sky-50 p-5 text-sm text-sky-950">
-                      <p className="text-xs font-black uppercase tracking-wide text-sky-700">
-                        Asynchronous Import Reconciliation
-                      </p>
-
-                      <h5 className="mt-1 text-lg font-bold">
-                        Check Mailshake import status
-                      </h5>
-
-                      <p className="mt-2 max-w-4xl text-xs leading-5">
-                        This checks the existing Mailshake asynchronous import for the selected CRM enrollment. It does not add or re-add the recipient, unpause the campaign, or send email.
-                      </p>
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          void checkMailshakeImportStatus(
-                            providerSubmissionResult?.operationId ||
-                              ""
-                          )
-                        }
-                        disabled={
-                          isCheckingProviderStatus ||
-                          !providerSubmissionResult?.operationId
-                        }
-                        className="mt-4 rounded-xl bg-sky-700 px-5 py-3 text-sm font-black text-white hover:bg-sky-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-                      >
-                        {isCheckingProviderStatus
-                          ? "Checking Exact Provider Operation..."
-                          : "Check This Provider Operation"}
-                      </button>
-
-                      {!providerSubmissionResult?.operationId && (
-                        <p className="mt-3 text-xs font-semibold text-sky-900">
-                          No new provider operation is selected here. Use Provider Operations History above to reconcile an existing CRM-tracked operation.
-                        </p>
-                      )}
-
-                      {providerStatusError && (
-                        <div className="mt-4 rounded-xl border border-red-300 bg-red-50 p-4 font-semibold text-red-950">
-                          {providerStatusError}
-                        </div>
-                      )}
-
-                      {providerStatusResult && (
-                        <div
-                          className={`mt-4 rounded-xl border p-4 ${
-                            providerStatusResult.status ===
-                              "confirmed" ||
-                            providerStatusResult.enrollmentStatus ===
-                              "confirmed"
-                              ? "border-emerald-300 bg-emerald-50 text-emerald-950"
-                              : providerStatusResult.status ===
-                                  "processing" ||
-                                providerStatusResult.operationStatus ===
-                                  "checking"
-                                ? "border-blue-300 bg-blue-50 text-blue-950"
-                                : providerStatusResult.status ===
-                                      "failed" ||
-                                    providerStatusResult.status ===
-                                      "reconciliation_required" ||
-                                    providerStatusResult.enrollmentStatus ===
-                                      "failed"
-                                  ? "border-red-300 bg-red-50 text-red-950"
-                                  : "border-amber-300 bg-amber-50 text-amber-950"
-                          }`}
-                        >
-                          <p className="font-black">
-                            {providerStatusResult.status ===
-                              "confirmed" ||
-                            providerStatusResult.enrollmentStatus ===
-                              "confirmed"
-                              ? "Recipient confirmed in Mailshake."
-                              : providerStatusResult.status ===
-                                  "processing"
-                                ? "Mailshake import is still processing."
-                                : providerStatusResult.status ===
-                                    "already_present" ||
-                                  providerStatusResult.enrollmentStatus ===
-                                    "already_present"
-                                  ? "Recipient was already present in Mailshake."
-                                  : providerStatusResult.status ===
-                                      "unsubscribed" ||
-                                    providerStatusResult.enrollmentStatus ===
-                                      "unsubscribed"
-                                    ? "Mailshake reports this recipient as unsubscribed."
-                                    : providerStatusResult.status ===
-                                        "failed" ||
-                                      providerStatusResult.enrollmentStatus ===
-                                        "failed"
-                                      ? "Mailshake import failed."
-                                      : providerStatusResult.status ===
-                                          "reconciliation_required"
-                                        ? "Manual reconciliation is required."
-                                        : "Mailshake reconciliation result."}
-                          </p>
-
-                          <p className="mt-2 leading-6">
-                            {providerStatusResult.message}
-                          </p>
-
-                          <p className="mt-3 text-xs">
-                            CRM enrollment status:{" "}
-                            <span className="font-black">
-                              {providerStatusResult.enrollmentStatus ||
-                                "unknown"}
-                            </span>
-                          </p>
-
-                          <p className="mt-1 text-xs">
-                            Provider operation status:{" "}
-                            <span className="font-black">
-                              {providerStatusResult.operationStatus ||
-                                providerStatusResult.status ||
-                                "checked"}
-                            </span>
-                          </p>
-
-                          {providerStatusResult.operationId && (
-                            <p className="mt-1 break-all text-xs">
-                              CRM provider operation:{" "}
-                              {providerStatusResult.operationId}
-                            </p>
-                          )}
-
-                          {providerStatusResult.providerCheckStatusId && (
-                            <p className="mt-1 break-all text-xs">
-                              Mailshake checkStatusID:{" "}
-                              {providerStatusResult.providerCheckStatusId}
-                            </p>
-                          )}
-
-                          {providerStatusResult.providerRecipientId && (
-                            <p className="mt-1 break-all text-xs">
-                              Mailshake recipient ID:{" "}
-                              {providerStatusResult.providerRecipientId}
-                            </p>
-                          )}
-
-                          <p className="mt-3 text-xs font-black uppercase tracking-wide">
-                            Keep this campaign paused until the CRM audit rows are verified.
-                          </p>
-                        </div>
-                      )}
-                    </div>
-
                     {providerExecutionReview?.providerReview && (
                       <div className="mt-5 rounded-xl border border-rose-200 bg-white p-5">
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                           <div>
                             <p className="text-xs font-bold uppercase text-slate-500">
-                              Fresh Mailshake Campaign
+                              Step 4 — Mailshake Submission Readiness
                             </p>
 
                             <p className="mt-1 font-bold text-slate-950">
@@ -4300,7 +4203,7 @@ export default function OutreachMailshakeSection({
 
                             <div className="rounded-xl border-2 border-red-300 bg-red-50 p-5">
                               <p className="text-xs font-black uppercase tracking-wide text-red-700">
-                                Real Mailshake Action
+                                Step 4 — Real Mailshake Write
                               </p>
 
                               <h6 className="mt-1 font-bold text-red-950">
@@ -4339,13 +4242,13 @@ export default function OutreachMailshakeSection({
                               >
                                 {isSubmittingProvider
                                   ? "Submitting 1 to Mailshake..."
-                                  : "Submit 1 to PAUSED Mailshake Campaign"}
+                                  : "Step 4 — Submit 1 to PAUSED Mailshake Campaign"}
                               </button>
                             </div>
                           </div>
                         ) : (
                           <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-900">
-                            Initial safety policy does not currently permit provider submission. Mailshake must report this campaign as paused.
+                            MAILSHAKE WRITE is not permitted by the current server safety policy for this state. Provider submission is enabled only on Vercel Preview, for exactly one server-approved recipient, and only while Mailshake reports the campaign as paused. Production may review and reconcile existing operations but cannot create a new Mailshake recipient through this control.
                           </div>
                         )}
 
@@ -4418,6 +4321,150 @@ export default function OutreachMailshakeSection({
                           </p>
                         )}
                       </div>
+                    )}
+
+                    {providerSubmissionResult?.operationId && (
+                    <div className="mt-5 rounded-xl border border-sky-300 bg-sky-50 p-5 text-sm text-sky-950">
+                      <p className="text-xs font-black uppercase tracking-wide text-sky-700">
+                        Asynchronous Import Reconciliation
+                      </p>
+
+                      <h5 className="mt-1 text-lg font-bold">
+                        Step 5 — Reconcile the Mailshake Result
+                      </h5>
+
+                      <p className="mt-2 max-w-4xl text-xs leading-5">
+                        STATUS / CRM SYNC — Step 5 checks the exact existing CRM-tracked Mailshake provider operation and synchronizes its result into CRM. It does not submit or re-add the recipient, unpause the campaign, or send email. If processing is not final, check this same operation again later; do not resubmit. A final reconciliation result is Step 6 — the final CRM outcome.
+                      </p>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void checkMailshakeImportStatus(
+                            providerSubmissionResult?.operationId ||
+                              ""
+                          )
+                        }
+                        disabled={
+                          isCheckingProviderStatus ||
+                          !providerSubmissionResult?.operationId
+                        }
+                        className="mt-4 rounded-xl bg-sky-700 px-5 py-3 text-sm font-black text-white hover:bg-sky-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                      >
+                        {isCheckingProviderStatus
+                          ? "Checking Exact Provider Operation..."
+                          : "Check This Provider Operation"}
+                      </button>
+
+
+
+                      {providerStatusError && (
+                        <div className="mt-4 rounded-xl border border-red-300 bg-red-50 p-4 font-semibold text-red-950">
+                          {providerStatusError}
+                        </div>
+                      )}
+
+                      {providerStatusResult && (
+                        <div
+                          className={`mt-4 rounded-xl border p-4 ${
+                            providerStatusResult.status ===
+                              "confirmed" ||
+                            providerStatusResult.enrollmentStatus ===
+                              "confirmed"
+                              ? "border-emerald-300 bg-emerald-50 text-emerald-950"
+                              : providerStatusResult.status ===
+                                  "processing" ||
+                                providerStatusResult.operationStatus ===
+                                  "checking"
+                                ? "border-blue-300 bg-blue-50 text-blue-950"
+                                : providerStatusResult.status ===
+                                      "failed" ||
+                                    providerStatusResult.status ===
+                                      "reconciliation_required" ||
+                                    providerStatusResult.enrollmentStatus ===
+                                      "failed"
+                                  ? "border-red-300 bg-red-50 text-red-950"
+                                  : "border-amber-300 bg-amber-50 text-amber-950"
+                          }`}
+                        >
+                          <p className="font-black">
+                            {providerStatusResult.status ===
+                              "confirmed" ||
+                            providerStatusResult.enrollmentStatus ===
+                              "confirmed"
+                              ? "Recipient confirmed in Mailshake."
+                              : providerStatusResult.status ===
+                                  "processing"
+                                ? "Mailshake import is still processing."
+                                : providerStatusResult.status ===
+                                    "already_present" ||
+                                  providerStatusResult.enrollmentStatus ===
+                                    "already_present"
+                                  ? "Recipient was already present in Mailshake."
+                                  : providerStatusResult.status ===
+                                      "unsubscribed" ||
+                                    providerStatusResult.enrollmentStatus ===
+                                      "unsubscribed"
+                                    ? "Mailshake reports this recipient as unsubscribed."
+                                    : providerStatusResult.status ===
+                                        "failed" ||
+                                      providerStatusResult.enrollmentStatus ===
+                                        "failed"
+                                      ? "Mailshake import failed."
+                                      : providerStatusResult.status ===
+                                          "reconciliation_required"
+                                        ? "Manual reconciliation is required."
+                                        : "Mailshake reconciliation result."}
+                          </p>
+
+                          <p className="mt-2 leading-6">
+                            {providerStatusResult.message}
+                          </p>
+
+                          <p className="mt-3 text-xs">
+                            CRM enrollment status:{" "}
+                            <span className="font-black">
+                              {providerStatusResult.enrollmentStatus ||
+                                "unknown"}
+                            </span>
+                          </p>
+
+                          <p className="mt-1 text-xs">
+                            Provider operation status:{" "}
+                            <span className="font-black">
+                              {providerStatusResult.operationStatus ||
+                                providerStatusResult.status ||
+                                "checked"}
+                            </span>
+                          </p>
+
+                          {providerStatusResult.operationId && (
+                            <p className="mt-1 break-all text-xs">
+                              CRM provider operation:{" "}
+                              {providerStatusResult.operationId}
+                            </p>
+                          )}
+
+                          {providerStatusResult.providerCheckStatusId && (
+                            <p className="mt-1 break-all text-xs">
+                              Mailshake checkStatusID:{" "}
+                              {providerStatusResult.providerCheckStatusId}
+                            </p>
+                          )}
+
+                          {providerStatusResult.providerRecipientId && (
+                            <p className="mt-1 break-all text-xs">
+                              Mailshake recipient ID:{" "}
+                              {providerStatusResult.providerRecipientId}
+                            </p>
+                          )}
+
+                          <p className="mt-3 text-xs font-black uppercase tracking-wide">
+                            Keep this campaign paused until the CRM audit rows are verified.
+                          </p>
+                        </div>
+                      )}
+                    </div>
                     )}
                   </div>
                 )}
