@@ -275,7 +275,8 @@ function providerHistoryStatusClasses(
 
   if (
     status === "completed" ||
-    status === "confirmed"
+    status === "confirmed" ||
+    status === "already_present"
   ) {
     return "bg-emerald-100 text-emerald-800 ring-emerald-200";
   }
@@ -298,7 +299,6 @@ function providerHistoryStatusClasses(
 
   if (
     status === "partial" ||
-    status === "already_present" ||
     status === "unsubscribed" ||
     status === "cancelled"
   ) {
@@ -2409,7 +2409,7 @@ export default function OutreachMailshakeSection({
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-wide text-blue-700">
-              Version 3.27E-13D1 - Inline Provider Reconciliation Results
+              Version 3.27E-13E - Honest Batch Outcome Semantics
             </p>
 
             <h2 className="mt-1 text-2xl font-bold text-slate-950">

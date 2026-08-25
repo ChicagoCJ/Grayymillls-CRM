@@ -210,7 +210,7 @@ const APP_VERSION =
   "Version 3.27E - Outreach Integration Foundation";
 
 const REVISION_NOTE =
-  "Current revision 13D1: Explicit provider-operation reconciliation now shows its result directly on the matching Provider Operations History card. Provider submission remains Preview-only.";
+  "Current revision 13E: Outreach batches now treat already-present recipients as successful/no-action-needed and unsubscribed recipients as terminal partial outcomes. Provider submission remains Preview-only.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean

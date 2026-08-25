@@ -574,6 +574,13 @@ async function refreshEnrollmentBatchStatus(
         "cancelled"
     ).length;
 
+  const unsubscribedCount =
+    statuses.filter(
+      (status) =>
+        status ===
+        "unsubscribed"
+    ).length;
+
   let batchStatus:
     "submitting" |
     "completed" |
@@ -600,6 +607,8 @@ async function refreshEnrollmentBatchStatus(
     batchStatus =
       "failed";
   } else if (
+    unsubscribedCount >
+      0 ||
     failedCount >
       0 ||
     cancelledCount >
@@ -646,7 +655,7 @@ async function refreshEnrollmentBatchStatus(
     "partial"
   ) {
     update.error_message =
-      "Provider enrollment batch completed with one or more failed or cancelled outcomes.";
+      "Provider enrollment batch completed with one or more unsubscribed, failed, or cancelled outcomes.";
   } else {
     update.error_message =
       null;
