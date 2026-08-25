@@ -2409,7 +2409,7 @@ export default function OutreachMailshakeSection({
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-wide text-blue-700">
-              Version 3.27E-13F - Guided Outreach Workflow
+              Version 3.27F - Guided Outreach Workflow
             </p>
 
             <h2 className="mt-1 text-2xl font-bold text-slate-950">

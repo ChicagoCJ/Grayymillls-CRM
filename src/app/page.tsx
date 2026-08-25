@@ -207,7 +207,7 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.27E - Outreach Integration Foundation";
+  "Version 3.27F - Guided Outreach Workflow";
 
 const REVISION_NOTE =
   "Current revision 13F: Outreach now explains the complete selection-to-reconciliation workflow with numbered stages, action-risk guidance, plain-English terminology, and final outcome definitions. Provider behavior and Preview-only submission policy are unchanged.";
