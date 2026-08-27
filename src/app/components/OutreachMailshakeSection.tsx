@@ -153,7 +153,10 @@ type EnrollmentRequestResponse = {
     nonRequestedCount?: number;
     batchIds?: string[];
     providerExecutionAllowed?: boolean;
-    providerWriteEnvironmentAllowed?: boolean;
+    providerWritePolicyAllowed?: boolean;
+    providerWritePolicyMode?: string;
+    providerWriteEnvironment?: string;
+    providerWritePolicyReason?: string;
   };
   message?: string;
   error?: string;
@@ -2191,11 +2194,12 @@ export default function OutreachMailshakeSection({
     }
 
     if (
-      providerReview.providerWriteEnvironmentAllowed !==
+      providerReview.providerWritePolicyAllowed !==
       true
     ) {
       setProviderSubmissionError(
-        "Real Mailshake provider writes are disabled in this environment. Controlled provider submission is allowed only from a Vercel Preview deployment."
+        providerReview.providerWritePolicyReason ||
+          "Mailshake provider writes are disabled by the current server safety policy."
       );
 
       return;
@@ -2798,7 +2802,7 @@ export default function OutreachMailshakeSection({
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-wide text-blue-700">
-              Version 3.27H2C - Batch Messaging Cleanup
+              Version 3.27H3A - Production Safety Gate Scaffolding
             </p>
 
             <h2 className="mt-1 text-2xl font-bold text-slate-950">
@@ -4790,7 +4794,7 @@ export default function OutreachMailshakeSection({
                               </h6>
 
                               <p className="mt-2 text-xs leading-5 text-red-900">
-                                Version 3.27H2B supports CRM/List batches containing 100+ recipients. A controlled run processes up to {MAX_CONTROLLED_PROVIDER_RUN_SIZE} server-verified ready recipients sequentially. Each recipient still receives a separate CRM provider operation and a separate one-recipient Mailshake request. The run stops immediately on the first abnormal or uncertain result.
+                                Version 3.27H3A preserves CRM/List batches containing 100+ recipients. A controlled run processes up to {MAX_CONTROLLED_PROVIDER_RUN_SIZE} server-verified ready recipients sequentially. Each recipient still receives a separate CRM provider operation and a separate one-recipient Mailshake request. The run stops immediately on the first abnormal or uncertain result.
                               </p>
 
                               <p className="mt-2 text-xs font-black text-red-950">
@@ -4811,13 +4815,15 @@ export default function OutreachMailshakeSection({
                               </p>
 
                               {providerExecutionReview.providerReview
-                                .providerWriteEnvironmentAllowed ? (
+                                .providerWritePolicyAllowed ? (
                                 <div className="mt-3 rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-xs font-bold text-emerald-900">
-                                  Preview provider-write environment confirmed. The server still applies the recipient allowlist and all per-recipient safety checks.
+                                  Controlled Preview provider-write policy confirmed. The server still applies the recipient allowlist and all per-recipient safety checks.
                                 </div>
                               ) : (
                                 <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs font-bold text-amber-950">
-                                  Real provider writes are disabled in this environment. Deploy this revision to Vercel Preview before performing a controlled Mailshake test.
+                                  {providerExecutionReview.providerReview
+                                    .providerWritePolicyReason ||
+                                    "Mailshake provider writes are disabled by the current server safety policy."}
                                 </div>
                               )}
 
@@ -4835,7 +4841,7 @@ export default function OutreachMailshakeSection({
                                   providerExecutionReviewFingerprint !==
                                     enrollmentSelectionFingerprint ||
                                   providerExecutionReview.providerReview
-                                    .providerWriteEnvironmentAllowed !==
+                                    .providerWritePolicyAllowed !==
                                     true ||
                                   (providerExecutionReview.providerReview
                                     .readyContactIds?.length ??

@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
 import { verifySignedInCrmUser } from "../../_shared/verified-auth";
+import { getMailshakeProviderWritePolicy } from "../_shared/provider-write-policy";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -1910,6 +1911,9 @@ export async function POST(
        *
        * This revision does not submit anything.
        */
+      const providerWritePolicy =
+        getMailshakeProviderWritePolicy();
+
       const providerExecutionAllowed =
         !providerIsArchived &&
         providerIsPaused &&
@@ -1989,11 +1993,17 @@ export async function POST(
 
           providerExecutionAllowed,
 
-          providerWriteEnvironmentAllowed:
-            cleanText(
-              process.env.VERCEL_ENV
-            ).toLowerCase() ===
-            "preview",
+          providerWritePolicyAllowed:
+            providerWritePolicy.enabled,
+
+          providerWritePolicyMode:
+            providerWritePolicy.mode,
+
+          providerWriteEnvironment:
+            providerWritePolicy.environment,
+
+          providerWritePolicyReason:
+            providerWritePolicy.reason,
         },
 
         message:

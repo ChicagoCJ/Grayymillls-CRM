@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
 import { verifySignedInCrmUser } from "../../_shared/verified-auth";
+import { getMailshakeProviderWritePolicy } from "../_shared/provider-write-policy";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -98,77 +99,6 @@ function normalizeEmail(
   return cleanText(
     value
   ).toLowerCase();
-}
-
-function getPreviewTestRecipientEmails() {
-  /*
-   * Provider writes are deliberately disabled outside Vercel
-   * Preview deployments during this rollout stage.
-   *
-   * Production therefore fails closed even if an older provider
-   * test environment variable still exists there.
-   */
-  const vercelEnvironment =
-    cleanText(
-      process.env.VERCEL_ENV
-    ).toLowerCase();
-
-  if (
-    vercelEnvironment !==
-    "preview"
-  ) {
-    return {
-      enabled:
-        false,
-
-      emails:
-        [] as string[],
-
-      reason:
-        "Mailshake provider submission is currently enabled only on Vercel Preview deployments.",
-    };
-  }
-
-  const emails =
-    Array.from(
-      new Set(
-        cleanText(
-          process.env.MAILSHAKE_PREVIEW_TEST_EMAILS
-        )
-          .split(
-            /[,;\n\r]+/
-          )
-          .map(
-            normalizeEmail
-          )
-          .filter(Boolean)
-      )
-    );
-
-  if (
-    emails.length ===
-    0
-  ) {
-    return {
-      enabled:
-        false,
-
-      emails,
-
-      reason:
-        "Mailshake provider submission is disabled because MAILSHAKE_PREVIEW_TEST_EMAILS is not configured for Preview.",
-    };
-  }
-
-  return {
-    enabled:
-      true,
-
-    emails,
-
-    reason:
-      "",
-  };
 }
 
 function getSupabaseAdmin() {
@@ -975,16 +905,16 @@ export async function POST(
       ) as
         ProviderExecutionPayload;
 
-    const previewTestRecipientPolicy =
-      getPreviewTestRecipientEmails();
+    const providerWritePolicy =
+      getMailshakeProviderWritePolicy();
 
     if (
-      !previewTestRecipientPolicy.enabled
+      !providerWritePolicy.enabled
     ) {
       return NextResponse.json(
         {
           error:
-            previewTestRecipientPolicy.reason,
+            providerWritePolicy.reason,
         },
         {
           status:
@@ -994,7 +924,7 @@ export async function POST(
     }
 
     const previewTestRecipientEmails =
-      previewTestRecipientPolicy.emails;
+      providerWritePolicy.allowedRecipientEmails;
 
     const providerCampaignId =
       cleanText(

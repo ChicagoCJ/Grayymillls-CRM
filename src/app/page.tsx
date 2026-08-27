@@ -207,10 +207,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.27H2C - Batch Messaging Cleanup";
+  "Version 3.27H3A - Production Safety Gate Scaffolding";
 
 const REVISION_NOTE =
-  "Current revision 3.27H2C: Outreach supports resumable controlled processing for CRM/List batches containing 100+ recipients and clarifies the provider safety messaging. Controlled Preview runs process recipients sequentially while each recipient remains independently tracked through its own provider operation. Production provider writes remain disabled.";
+  "Current revision 3.27H3A: Mailshake provider-write policy is centralized so provider review and provider execution use the same server-side safety gate. Controlled Preview writes remain restricted to configured test recipients, while Production provider writes remain explicitly locked. No Production authorization mechanism is enabled in this revision.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean
