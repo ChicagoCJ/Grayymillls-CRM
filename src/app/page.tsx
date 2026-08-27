@@ -207,10 +207,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.27H1 - List Batch Safety Foundation";
+  "Version 3.27H2B - Resumable Mailshake Batch Controller";
 
 const REVISION_NOTE =
-  "Current revision 3.27H1: Outreach adds protected whole-CRM-List batch selection and server-side List membership verification before CRM batch recording. Multi-recipient Mailshake provider submission is not enabled in H1.";
+  "Current revision 3.27H2B: Outreach supports resumable controlled processing for CRM/List batches containing 100+ recipients. Each recipient remains independently tracked through its own provider operation. Real Mailshake writes remain Preview-only, allowlisted, sequential, and paused-campaign only.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean

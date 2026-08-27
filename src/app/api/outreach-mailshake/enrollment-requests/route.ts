@@ -1971,6 +1971,8 @@ export async function POST(
           readyToSubmitCount:
             readyContactIds.length,
 
+          readyContactIds,
+
           blockedNowCount:
             review.blocked.length,
 
@@ -1986,6 +1988,12 @@ export async function POST(
           batchIds,
 
           providerExecutionAllowed,
+
+          providerWriteEnvironmentAllowed:
+            cleanText(
+              process.env.VERCEL_ENV
+            ).toLowerCase() ===
+            "preview",
         },
 
         message:

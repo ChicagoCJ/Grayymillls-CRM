@@ -146,12 +146,14 @@ type EnrollmentRequestResponse = {
     isPaused?: boolean;
     recordedEnrollmentCount?: number;
     readyToSubmitCount?: number;
+    readyContactIds?: string[];
     blockedNowCount?: number;
     missingCrmEnrollmentCount?: number;
     emailChangedCount?: number;
     nonRequestedCount?: number;
     batchIds?: string[];
     providerExecutionAllowed?: boolean;
+    providerWriteEnvironmentAllowed?: boolean;
   };
   message?: string;
   error?: string;
@@ -174,6 +176,19 @@ type ProviderSubmissionResponse = {
   message?: string;
   error?: string;
 };
+
+type ProviderBatchSubmissionItem = {
+  sequence: number;
+  contactId: string;
+  status: string;
+  httpStatus?: number;
+  operationId?: string;
+  providerCheckStatusId?: string | null;
+  message?: string;
+  error?: string;
+};
+
+const MAX_CONTROLLED_PROVIDER_RUN_SIZE = 10;
 
 type ProviderStatusResponse = {
   status?: string;
@@ -713,6 +728,25 @@ export default function OutreachMailshakeSection({
   ] =
     useState(false);
 
+  const [
+    providerBatchSubmissionResults,
+    setProviderBatchSubmissionResults,
+  ] =
+    useState<
+      ProviderBatchSubmissionItem[]
+    >([]);
+
+  const [
+    providerBatchPlannedCount,
+    setProviderBatchPlannedCount,
+  ] =
+    useState(0);
+
+  const [
+    providerBatchMessage,
+    setProviderBatchMessage,
+  ] =
+    useState("");
   const [
     providerStatusResult,
     setProviderStatusResult,
@@ -1995,6 +2029,17 @@ export default function OutreachMailshakeSection({
       ""
     );
 
+    setProviderBatchSubmissionResults(
+      []
+    );
+
+    setProviderBatchPlannedCount(
+      0
+    );
+
+    setProviderBatchMessage(
+      ""
+    );
     try {
       const response =
         await fetch(
@@ -2146,20 +2191,58 @@ export default function OutreachMailshakeSection({
     }
 
     if (
-      selectedContactIds.length !==
-        1 ||
-      Number(
-        providerReview.readyToSubmitCount ??
-          0
-      ) !==
-        1
+      providerReview.providerWriteEnvironmentAllowed !==
+      true
     ) {
       setProviderSubmissionError(
-        "The initial provider rollout permits exactly one ready CRM enrollment per submission."
+        "Real Mailshake provider writes are disabled in this environment. Controlled provider submission is allowed only from a Vercel Preview deployment."
       );
 
       return;
     }
+
+    const readyContactIds =
+      Array.from(
+        new Set(
+          (
+            providerReview.readyContactIds ??
+            []
+          )
+            .map(
+              (contactId) =>
+                String(
+                  contactId ||
+                    ""
+                ).trim()
+            )
+            .filter(Boolean)
+        )
+      );
+
+    const readyToSubmitCount =
+      Number(
+        providerReview.readyToSubmitCount ??
+          0
+      );
+
+    if (
+      readyContactIds.length ===
+        0 ||
+      readyContactIds.length !==
+        readyToSubmitCount
+    ) {
+      setProviderSubmissionError(
+        "The server-verified ready contact set does not match the reviewed ready count. Run Step 3 again before any provider action."
+      );
+
+      return;
+    }
+
+    const runContactIds =
+      readyContactIds.slice(
+        0,
+        MAX_CONTROLLED_PROVIDER_RUN_SIZE
+      );
 
     const campaignName =
       providerReview.providerCampaignTitle ||
@@ -2168,7 +2251,7 @@ export default function OutreachMailshakeSection({
 
     const confirmed =
       window.confirm(
-        `SUBMIT 1 RECORDED CRM ENROLLMENT TO MAILSHAKE?\n\nCampaign: ${campaignName}\n\nThis is a REAL Mailshake provider action. The server will re-check CRM eligibility and confirm that Mailshake still reports the campaign as PAUSED immediately before submission.\n\nIf Mailshake accepts the recipient, CRM will record the enrollment as submitted. It will NOT be treated as confirmed until the asynchronous Mailshake add-status result is checked.\n\nKEEP THE CAMPAIGN PAUSED until that verification is complete.\n\nContinue?`
+        `SUBMIT A CONTROLLED MAILSHAKE BATCH?\n\nCampaign: ${campaignName}\n\nServer-verified ready recipients: ${readyContactIds.length}\nRecipients in this controlled run: ${runContactIds.length}\n\nThis is a REAL Mailshake provider action. Recipients are processed ONE AT A TIME. Each recipient gets a separate CRM provider-operation record and the server re-checks eligibility, existing Mailshake membership, and PAUSED campaign status for every recipient.\n\nThe controller STOPS on the first blocked, failed, unreadable, or uncertain result. It never automatically retries an uncertain recipient.\n\nA campaign may contain 100+ recipients. The ${MAX_CONTROLLED_PROVIDER_RUN_SIZE}-recipient run size is only a controlled processing increment, not a campaign limit.\n\nKEEP THE CAMPAIGN PAUSED until asynchronous results are reconciled.\n\nContinue?`
       );
 
     if (!confirmed) {
@@ -2187,6 +2270,18 @@ export default function OutreachMailshakeSection({
       null
     );
 
+    setProviderBatchSubmissionResults(
+      []
+    );
+
+    setProviderBatchPlannedCount(
+      runContactIds.length
+    );
+
+    setProviderBatchMessage(
+      ""
+    );
+
     setProviderStatusResult(
       null
     );
@@ -2195,76 +2290,250 @@ export default function OutreachMailshakeSection({
       ""
     );
 
+    const batchResults:
+      ProviderBatchSubmissionItem[] = [];
+
+    let submittedCount =
+      0;
+
+    let stopped =
+      false;
+
     try {
-      const response =
-        await fetch(
-          "/api/outreach-mailshake/provider-execution",
-          {
-            method:
-              "POST",
-
-            headers: {
-              ...(await getBearerHeaders()),
-
-              "Content-Type":
-                "application/json",
-            },
-
-            body:
-              JSON.stringify({
-                providerCampaignId:
-                  selectedCampaign.providerCampaignId,
-
-                contactId:
-                  selectedContactIds[0],
-
-                confirmationPhrase:
-                  "SUBMIT_ONE_TO_PAUSED_MAILSHAKE",
-              }),
-
-            cache:
-              "no-store",
-          }
-        );
-
-      const rawText =
-        await response.text();
-
-      let data:
-        ProviderSubmissionResponse;
-
-      try {
-        data =
-          rawText
-            ? JSON.parse(
-                rawText
-              )
-            : {};
-      } catch {
-        throw new Error(
-          `CRM provider submission endpoint returned an unreadable response with HTTP status ${response.status}.`
-        );
-      }
-
-      if (!response.ok) {
-        throw new Error(
-          data.error ||
-            "The controlled Mailshake submission did not complete."
-        );
-      }
-
-      setProviderSubmissionResult(
-        data
-      );
+      const bearerHeaders =
+        await getBearerHeaders();
 
       /*
-       * The provider review is stale as soon as a provider
-       * operation is attempted. Require a fresh review before
-       * any possible later action.
+       * The Step 3 review becomes stale as soon as this controlled
+       * run begins. The run itself uses the immutable server-reviewed
+       * contact ID snapshot captured above.
        */
       setProviderExecutionReviewFingerprint(
         ""
       );
+
+      for (
+        let index = 0;
+        index < runContactIds.length;
+        index += 1
+      ) {
+        const contactId =
+          runContactIds[index];
+
+        let response:
+          Response;
+
+        try {
+          response =
+            await fetch(
+              "/api/outreach-mailshake/provider-execution",
+              {
+                method:
+                  "POST",
+
+                headers: {
+                  ...bearerHeaders,
+
+                  "Content-Type":
+                    "application/json",
+                },
+
+                body:
+                  JSON.stringify({
+                    providerCampaignId:
+                      selectedCampaign.providerCampaignId,
+
+                    contactId,
+
+                    confirmationPhrase:
+                      "SUBMIT_ONE_TO_PAUSED_MAILSHAKE",
+                  }),
+
+                cache:
+                  "no-store",
+              }
+            );
+        } catch (error) {
+          const message =
+            error instanceof Error
+              ? error.message
+              : "The browser did not receive a response from the CRM provider endpoint.";
+
+          batchResults.push({
+            sequence:
+              index + 1,
+
+            contactId,
+
+            status:
+              "client_transport_unknown",
+
+            error:
+              message,
+          });
+
+          setProviderBatchSubmissionResults(
+            [...batchResults]
+          );
+
+          setProviderSubmissionError(
+            `Controlled batch stopped on recipient ${index + 1}. The browser did not receive a definitive CRM response. Do not retry this recipient automatically. Run a fresh Step 3 review and inspect Existing Operations before deciding what to do next. ${message}`
+          );
+
+          stopped =
+            true;
+
+          break;
+        }
+
+        const rawText =
+          await response.text();
+
+        let data:
+          ProviderSubmissionResponse;
+
+        try {
+          data =
+            rawText
+              ? JSON.parse(
+                  rawText
+                )
+              : {};
+        } catch {
+          batchResults.push({
+            sequence:
+              index + 1,
+
+            contactId,
+
+            status:
+              "client_response_unreadable",
+
+            httpStatus:
+              response.status,
+
+            error:
+              `CRM returned an unreadable response with HTTP status ${response.status}.`,
+          });
+
+          setProviderBatchSubmissionResults(
+            [...batchResults]
+          );
+
+          setProviderSubmissionError(
+            `Controlled batch stopped on recipient ${index + 1} because the CRM response could not be read. Do not retry this recipient automatically. Run Step 3 again and inspect Existing Operations first.`
+          );
+
+          stopped =
+            true;
+
+          break;
+        }
+
+        const item:
+          ProviderBatchSubmissionItem = {
+            sequence:
+              index + 1,
+
+            contactId,
+
+            status:
+              String(
+                data.status ||
+                  (response.ok
+                    ? "unknown"
+                    : "blocked")
+              ),
+
+            httpStatus:
+              response.status,
+
+            operationId:
+              data.operationId,
+
+            providerCheckStatusId:
+              data.providerCheckStatusId,
+
+            message:
+              data.message,
+
+            error:
+              data.error,
+          };
+
+        batchResults.push(
+          item
+        );
+
+        setProviderBatchSubmissionResults(
+          [...batchResults]
+        );
+
+        if (
+          data.operationId
+        ) {
+          setProviderSubmissionResult(
+            data
+          );
+        }
+
+        if (
+          !response.ok
+        ) {
+          setProviderSubmissionError(
+            `Controlled batch stopped on recipient ${index + 1}. ${data.error || "The CRM provider endpoint blocked this recipient."} Run a fresh Step 3 review before taking another provider action.`
+          );
+
+          stopped =
+            true;
+
+          break;
+        }
+
+        if (
+          data.status !==
+          "submitted"
+        ) {
+          setProviderSubmissionError(
+            `Controlled batch stopped on recipient ${index + 1} because its provider status is "${data.status || "unknown"}". Do not automatically retry this recipient. Reconcile the exact provider operation first.`
+          );
+
+          stopped =
+            true;
+
+          break;
+        }
+
+        submittedCount +=
+          1;
+      }
+
+      if (
+        !stopped &&
+        submittedCount ===
+          runContactIds.length
+      ) {
+        const remainingAfterRun =
+          Math.max(
+            0,
+            readyContactIds.length -
+              submittedCount
+          );
+
+        setProviderBatchMessage(
+          remainingAfterRun > 0
+            ? `${submittedCount} recipient${submittedCount === 1 ? "" : "s"} in this controlled run were accepted asynchronously by Mailshake. ${remainingAfterRun} recipient${remainingAfterRun === 1 ? "" : "s"} were in the prior server-ready set but were not attempted in this run. Run Step 3 again before continuing.`
+            : `${submittedCount} recipient${submittedCount === 1 ? "" : "s"} in this controlled run were accepted asynchronously by Mailshake. Run Step 3 again to verify the CRM batch state before any further provider action.`
+        );
+      } else if (
+        stopped &&
+        submittedCount >
+          0
+      ) {
+        setProviderBatchMessage(
+          `${submittedCount} recipient${submittedCount === 1 ? "" : "s"} were accepted before the controlled run stopped. The remaining recipients were not automatically attempted after the stop condition.`
+        );
+      }
     } catch (error) {
       setProviderExecutionReviewFingerprint(
         ""
@@ -2272,8 +2541,8 @@ export default function OutreachMailshakeSection({
 
       setProviderSubmissionError(
         error instanceof Error
-          ? error.message
-          : "The controlled Mailshake submission did not complete."
+          ? `Controlled batch stopped. ${error.message}`
+          : "Controlled batch stopped before completion. Run Step 3 again before another provider action."
       );
     } finally {
       setIsSubmittingProvider(
@@ -2529,7 +2798,7 @@ export default function OutreachMailshakeSection({
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-wide text-blue-700">
-              Version 3.27H1 - List Batch Safety Foundation
+              Version 3.27H2B - Resumable Mailshake Batch Controller
             </p>
 
             <h2 className="mt-1 text-2xl font-bold text-slate-950">
@@ -4517,15 +4786,43 @@ export default function OutreachMailshakeSection({
                               </p>
 
                               <h6 className="mt-1 font-bold text-red-950">
-                                Submit one recorded enrollment to the paused campaign
+                                Submit the next controlled group to the paused campaign
                               </h6>
 
                               <p className="mt-2 text-xs leading-5 text-red-900">
-                                The provider-write rollout is still limited to exactly one recipient. Version 3.27H1 can safely select, review, and record a whole CRM List as a CRM batch, but multi-recipient Mailshake submission is not enabled yet. For an allowed single-recipient provider action, the server still revalidates CRM eligibility, checks whether the recipient already exists in Mailshake, and checks the campaign twice. The final provider check must still report Paused.
+                                Version 3.27H2B supports CRM/List batches containing 100+ recipients. A controlled run processes up to {MAX_CONTROLLED_PROVIDER_RUN_SIZE} server-verified ready recipients sequentially. Each recipient still receives a separate CRM provider operation and a separate one-recipient Mailshake request. The run stops immediately on the first abnormal or uncertain result.
                               </p>
 
-                              <p className="mt-2 text-xs font-bold leading-5 text-red-950">
-                                If Mailshake accepts the request, keep the campaign paused. Acceptance is asynchronous and does not mean the recipient is confirmed yet.
+                              <p className="mt-2 text-xs font-black text-red-950">
+                                Server-verified ready set:{" "}
+                                {providerExecutionReview.providerReview
+                                  .readyContactIds?.length ?? 0}{" "}
+                                contact(s).
+                              </p>
+
+                              <p className="mt-1 text-xs font-bold text-red-950">
+                                Next controlled run: up to{" "}
+                                {Math.min(
+                                  providerExecutionReview.providerReview
+                                    .readyContactIds?.length ?? 0,
+                                  MAX_CONTROLLED_PROVIDER_RUN_SIZE
+                                )}{" "}
+                                contact(s). This is not a campaign-size limit.
+                              </p>
+
+                              {providerExecutionReview.providerReview
+                                .providerWriteEnvironmentAllowed ? (
+                                <div className="mt-3 rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-xs font-bold text-emerald-900">
+                                  Preview provider-write environment confirmed. The server still applies the recipient allowlist and all per-recipient safety checks.
+                                </div>
+                              ) : (
+                                <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs font-bold text-amber-950">
+                                  Real provider writes are disabled in this environment. Deploy this revision to Vercel Preview before performing a controlled Mailshake test.
+                                </div>
+                              )}
+
+                              <p className="mt-3 text-xs font-bold leading-5 text-red-950">
+                                Keep the campaign paused. Mailshake acceptance is asynchronous and does not mean recipients are confirmed yet.
                               </p>
 
                               <button
@@ -4537,23 +4834,109 @@ export default function OutreachMailshakeSection({
                                   isSubmittingProvider ||
                                   providerExecutionReviewFingerprint !==
                                     enrollmentSelectionFingerprint ||
-                                  providerSubmissionResult !==
-                                    null ||
-                                  selectedContactIds.length !==
-                                    1 ||
+                                  providerExecutionReview.providerReview
+                                    .providerWriteEnvironmentAllowed !==
+                                    true ||
+                                  (providerExecutionReview.providerReview
+                                    .readyContactIds?.length ??
+                                    0) ===
+                                    0 ||
                                   Number(
                                     providerExecutionReview.providerReview
-                                      ?.readyToSubmitCount ??
+                                      .readyToSubmitCount ??
                                       0
                                   ) !==
-                                    1
+                                    (providerExecutionReview.providerReview
+                                      .readyContactIds?.length ??
+                                      0)
                                 }
                                 className="mt-4 rounded-xl bg-red-700 px-5 py-3 text-sm font-black text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                               >
                                 {isSubmittingProvider
-                                  ? "Submitting 1 to Mailshake..."
-                                  : "Step 4 — Submit 1 to PAUSED Mailshake Campaign"}
+                                  ? `Submitting controlled run — ${providerBatchSubmissionResults.length} of ${providerBatchPlannedCount} attempted...`
+                                  : `Step 4 — Submit Next ${Math.min(
+                                      providerExecutionReview.providerReview
+                                        .readyContactIds?.length ?? 0,
+                                      MAX_CONTROLLED_PROVIDER_RUN_SIZE
+                                    )} to PAUSED Mailshake`}
                               </button>
+
+                              {(isSubmittingProvider ||
+                                providerBatchSubmissionResults.length >
+                                  0) && (
+                                <div className="mt-4 rounded-xl border border-red-200 bg-white p-4">
+                                  <p className="text-xs font-black uppercase tracking-wide text-red-700">
+                                    Controlled Run Progress
+                                  </p>
+
+                                  <p className="mt-2 text-sm font-bold text-slate-950">
+                                    Attempted:{" "}
+                                    {providerBatchSubmissionResults.length}
+                                    {" / "}
+                                    {providerBatchPlannedCount}
+                                    {" · "}
+                                    Accepted asynchronously:{" "}
+                                    {
+                                      providerBatchSubmissionResults.filter(
+                                        (item) =>
+                                          item.status ===
+                                          "submitted"
+                                      ).length
+                                    }
+                                  </p>
+
+                                  {providerBatchSubmissionResults.length >
+                                    0 && (
+                                    <div className="mt-3 grid gap-2">
+                                      {providerBatchSubmissionResults.map(
+                                        (item) => (
+                                          <div
+                                            key={`${item.sequence}-${item.contactId}`}
+                                            className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs"
+                                          >
+                                            <p className="font-bold text-slate-900">
+                                              Recipient {item.sequence}:{" "}
+                                              {item.status}
+                                            </p>
+
+                                            <p className="mt-1 break-all text-slate-600">
+                                              CRM contact: {item.contactId}
+                                            </p>
+
+                                            {item.operationId && (
+                                              <p className="mt-1 break-all text-slate-600">
+                                                Provider operation:{" "}
+                                                {item.operationId}
+                                              </p>
+                                            )}
+
+                                            {item.providerCheckStatusId && (
+                                              <p className="mt-1 break-all text-slate-600">
+                                                Mailshake checkStatusID:{" "}
+                                                {item.providerCheckStatusId}
+                                              </p>
+                                            )}
+
+                                            {(item.error ||
+                                              item.message) && (
+                                              <p className="mt-1 text-slate-700">
+                                                {item.error ||
+                                                  item.message}
+                                              </p>
+                                            )}
+                                          </div>
+                                        )
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {providerBatchMessage && (
+                                <div className="mt-4 rounded-xl border border-blue-300 bg-blue-50 p-4 text-sm font-semibold text-blue-950">
+                                  {providerBatchMessage}
+                                </div>
+                              )}
                             </div>
                           </div>
                         ) : (
