@@ -207,10 +207,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.27H3A - Production Safety Gate Scaffolding";
+  "Version 3.27H3B1 - Production Run Authorization Schema";
 
 const REVISION_NOTE =
-  "Current revision 3.27H3A: Mailshake provider-write policy is centralized so provider review and provider execution use the same server-side safety gate. Controlled Preview writes remain restricted to configured test recipients, while Production provider writes remain explicitly locked. No Production authorization mechanism is enabled in this revision.";
+  "Current revision 3.27H3B1: CRM now has server-controlled schema for auditable Production run authorizations and exact authorized enrollment items. No authorization records are created automatically, and Production Mailshake provider writes remain explicitly locked.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean

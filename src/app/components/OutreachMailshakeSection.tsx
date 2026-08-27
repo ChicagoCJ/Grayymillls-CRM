@@ -2802,7 +2802,7 @@ export default function OutreachMailshakeSection({
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-wide text-blue-700">
-              Version 3.27H3A - Production Safety Gate Scaffolding
+              Version 3.27H3B1 - Production Run Authorization Schema
             </p>
 
             <h2 className="mt-1 text-2xl font-bold text-slate-950">
@@ -4794,7 +4794,7 @@ export default function OutreachMailshakeSection({
                               </h6>
 
                               <p className="mt-2 text-xs leading-5 text-red-900">
-                                Version 3.27H3A preserves CRM/List batches containing 100+ recipients. A controlled run processes up to {MAX_CONTROLLED_PROVIDER_RUN_SIZE} server-verified ready recipients sequentially. Each recipient still receives a separate CRM provider operation and a separate one-recipient Mailshake request. The run stops immediately on the first abnormal or uncertain result.
+                                Version 3.27H3B1 preserves CRM/List batches containing 100+ recipients. A controlled run processes up to {MAX_CONTROLLED_PROVIDER_RUN_SIZE} server-verified ready recipients sequentially. Each recipient still receives a separate CRM provider operation and a separate one-recipient Mailshake request. The run stops immediately on the first abnormal or uncertain result.
                               </p>
 
                               <p className="mt-2 text-xs font-black text-red-950">
