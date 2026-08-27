@@ -207,10 +207,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.27H2B - Resumable Mailshake Batch Controller";
+  "Version 3.27H2C - Batch Messaging Cleanup";
 
 const REVISION_NOTE =
-  "Current revision 3.27H2B: Outreach supports resumable controlled processing for CRM/List batches containing 100+ recipients. Each recipient remains independently tracked through its own provider operation. Real Mailshake writes remain Preview-only, allowlisted, sequential, and paused-campaign only.";
+  "Current revision 3.27H2C: Outreach supports resumable controlled processing for CRM/List batches containing 100+ recipients and clarifies the provider safety messaging. Controlled Preview runs process recipients sequentially while each recipient remains independently tracked through its own provider operation. Production provider writes remain disabled.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean

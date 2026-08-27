@@ -2798,7 +2798,7 @@ export default function OutreachMailshakeSection({
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-wide text-blue-700">
-              Version 3.27H2B - Resumable Mailshake Batch Controller
+              Version 3.27H2C - Batch Messaging Cleanup
             </p>
 
             <h2 className="mt-1 text-2xl font-bold text-slate-950">
@@ -4941,7 +4941,7 @@ export default function OutreachMailshakeSection({
                           </div>
                         ) : (
                           <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-900">
-                            MAILSHAKE WRITE is not permitted by the current server safety policy for this state. Provider submission is enabled only on Vercel Preview, for exactly one server-approved recipient, and only while Mailshake reports the campaign as paused. Production may review and reconcile existing operations but cannot create a new Mailshake recipient through this control.
+                            MAILSHAKE WRITE is not permitted by the current server safety policy for this state. Controlled provider submission is enabled only on Vercel Preview, only for server-approved allowlisted recipients, and only while Mailshake reports the campaign as paused. A controlled run may process up to 10 ready recipients sequentially, while each provider operation still handles exactly one recipient. Production may review and reconcile existing operations but cannot create a new Mailshake recipient through this control.
                           </div>
                         )}
 
