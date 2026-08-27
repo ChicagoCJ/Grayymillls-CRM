@@ -207,10 +207,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.27G - Outreach Operational Polish";
+  "Version 3.27H1 - List Batch Safety Foundation";
 
 const REVISION_NOTE =
-  "Current revision 3.27G: Outreach adds clearer Step 4 readiness explanations, safer plain-English reconciliation outcomes, and a distinct Step 6 final CRM outcome panel. Provider behavior and Preview-only submission policy are unchanged.";
+  "Current revision 3.27H1: Outreach adds protected whole-CRM-List batch selection and server-side List membership verification before CRM batch recording. Multi-recipient Mailshake provider submission is not enabled in H1.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean
@@ -1956,6 +1956,32 @@ async function loadCompanyOwnerFilterData() {
     }
   }
 
+  async function openContactFromContacts(contact: ContactSummary) {
+    const companyId = String(contact?.company_id || "").trim();
+
+    if (!companyId) {
+      setErrorMessage(
+        "This contact is not attached to a company, so Company Detail cannot be opened."
+      );
+      return;
+    }
+
+    await loadCompanyDetail(companyId);
+
+    if (typeof window !== "undefined") {
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          document
+            .getElementById("company-detail-contacts")
+            ?.scrollIntoView({
+              behavior: "smooth",
+              block: "start",
+            });
+        });
+      });
+    }
+  }
+
   async function handleCompleteActivity(activityId: string, companyId?: string | null) {
     setIsCompletingActivity(activityId);
     setErrorMessage("");
@@ -3386,6 +3412,7 @@ async function handleAnalyzeProspect() {
             <ContactsSection
               contacts={filteredContacts}
               totalContactCount={crmSummary.contacts.length}
+              onOpenContact={openContactFromContacts}
             />
           </section>
         )}
@@ -3497,33 +3524,142 @@ async function handleAnalyzeProspect() {
         )}
 
         {activeTab === "admin" && (
-          <section className="grid max-w-full gap-6 overflow-hidden">
-            <UserRolePermissionsReference />
-            <AdminKnowledgeLibrarySection
-              canManageKnowledge={currentPermissions.canManageAdminSettings}
-            />
-            <AdminUsersSection
-              canManageAdminUsers={currentPermissions.canManageAdminSettings}
-              apiPermissionHeaders={apiPermissionHeaders}
-            />
-            <AdminProjectsListsSection
-              canManageProjectsLists={currentPermissions.canManageAdminSettings}
-            />
-            <AdminWorkflowAutomationRulesSection
-              canManageWorkflowAutomations={currentPermissions.canManageAdminSettings}
-            />
-            <AdminFunnelStagesSection
-              canManageFunnelStages={currentPermissions.canManageFunnelStages}
-              apiPermissionHeaders={apiPermissionHeaders}
-            />
-            <AdminBuyerPersonaDefinitionsSection
-              canManageBuyerPersonas={currentPermissions.canManageAdminSettings}
-              apiPermissionHeaders={apiPermissionHeaders}
-            />
-            <AdminTagsSection
-              canManageTags={currentPermissions.canManageAdminSettings}
-              apiPermissionHeaders={apiPermissionHeaders}
-            />
+          <section className="grid max-w-full gap-6 overflow-visible">
+            <div className="sticky top-16 z-30 self-start rounded-2xl border border-blue-200 bg-white/95 p-4 shadow-md backdrop-blur supports-[backdrop-filter]:bg-white/90">
+              <p className="text-xs font-black uppercase tracking-wide text-blue-700">
+                Admin Quick Navigation
+              </p>
+
+              <nav
+                aria-label="Admin section navigation"
+                className="mt-3 flex flex-nowrap gap-2 overflow-x-auto pb-1"
+              >
+                {[
+                  {
+                    id: "admin-roles-permissions",
+                    label: "Roles & Permissions",
+                  },
+                  {
+                    id: "admin-knowledge-library",
+                    label: "Knowledge Library",
+                  },
+                  {
+                    id: "admin-crm-users",
+                    label: "CRM Users",
+                  },
+                  {
+                    id: "admin-projects-lists",
+                    label: "Projects / Lists",
+                  },
+                  {
+                    id: "admin-workflow-automation",
+                    label: "Workflow Automation",
+                  },
+                  {
+                    id: "admin-funnel-stages",
+                    label: "Funnel Stages",
+                  },
+                  {
+                    id: "admin-buyer-personas",
+                    label: "Buyer Personas",
+                  },
+                  {
+                    id: "admin-tags",
+                    label: "Markets / Sectors / Categories",
+                  },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() =>
+                      document
+                        .getElementById(item.id)
+                        ?.scrollIntoView({
+                          behavior: "smooth",
+                          block: "start",
+                        })
+                    }
+                    className="shrink-0 whitespace-nowrap rounded-xl bg-blue-50 px-3 py-2 text-xs font-bold text-blue-800 ring-1 ring-blue-200 transition hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </nav>
+            </div>
+
+            <div
+              id="admin-roles-permissions"
+              className="scroll-mt-32"
+            >
+              <UserRolePermissionsReference />
+            </div>
+
+            <div
+              id="admin-knowledge-library"
+              className="scroll-mt-32"
+            >
+              <AdminKnowledgeLibrarySection
+                canManageKnowledge={currentPermissions.canManageAdminSettings}
+              />
+            </div>
+
+            <div
+              id="admin-crm-users"
+              className="scroll-mt-32"
+            >
+              <AdminUsersSection
+                canManageAdminUsers={currentPermissions.canManageAdminSettings}
+                apiPermissionHeaders={apiPermissionHeaders}
+              />
+            </div>
+
+            <div
+              id="admin-projects-lists"
+              className="scroll-mt-32"
+            >
+              <AdminProjectsListsSection
+                canManageProjectsLists={currentPermissions.canManageAdminSettings}
+              />
+            </div>
+
+            <div
+              id="admin-workflow-automation"
+              className="scroll-mt-32"
+            >
+              <AdminWorkflowAutomationRulesSection
+                canManageWorkflowAutomations={currentPermissions.canManageAdminSettings}
+              />
+            </div>
+
+            <div
+              id="admin-funnel-stages"
+              className="scroll-mt-32"
+            >
+              <AdminFunnelStagesSection
+                canManageFunnelStages={currentPermissions.canManageFunnelStages}
+                apiPermissionHeaders={apiPermissionHeaders}
+              />
+            </div>
+
+            <div
+              id="admin-buyer-personas"
+              className="scroll-mt-32"
+            >
+              <AdminBuyerPersonaDefinitionsSection
+                canManageBuyerPersonas={currentPermissions.canManageAdminSettings}
+                apiPermissionHeaders={apiPermissionHeaders}
+              />
+            </div>
+
+            <div
+              id="admin-tags"
+              className="scroll-mt-32"
+            >
+              <AdminTagsSection
+                canManageTags={currentPermissions.canManageAdminSettings}
+                apiPermissionHeaders={apiPermissionHeaders}
+              />
+            </div>
           </section>
         )}
 
@@ -15771,9 +15907,11 @@ function ContactTagFilterPanel({
 function ContactsSection({
   contacts,
   totalContactCount,
+  onOpenContact,
 }: {
   contacts: ContactSummary[];
   totalContactCount: number;
+  onOpenContact: (contact: ContactSummary) => void;
 }) {
 
   return (
@@ -15805,9 +15943,31 @@ function ContactsSection({
               {contacts.map((contact: any) => (
                 <tr key={contact.id} className="border-b border-slate-100 align-top">
                   <td className="py-3 pr-4 font-semibold">
-                    {contact.full_name ||
-                      [contact.first_name, contact.last_name].filter(Boolean).join(" ") ||
-                      "Not provided"}
+                    {contact.company_id ? (
+                      <button
+                        type="button"
+                        onClick={() => onOpenContact(contact)}
+                        className="text-left font-bold text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900 hover:decoration-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                        title="Open this contact in Company Detail"
+                      >
+                        {[contact.first_name, contact.last_name]
+                          .filter(Boolean)
+                          .join(" ") ||
+                          contact.full_name ||
+                          "Not provided"}
+                      </button>
+                    ) : (
+                      <span
+                        className="text-slate-500"
+                        title="This contact is not attached to a company."
+                      >
+                        {[contact.first_name, contact.last_name]
+                          .filter(Boolean)
+                          .join(" ") ||
+                          contact.full_name ||
+                          "Not provided"}
+                      </span>
+                    )}
                   </td>
                   <td className="py-3 pr-4 text-slate-700">
                     {contact.companies?.company_name || "Not attached"}
@@ -21141,7 +21301,13 @@ function CompanyDetailSection({
               >
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
-                    <p className="font-semibold">{displayValue(contact.full_name)}</p>
+                    <p className="font-semibold">
+                      {displayValue(
+                        [contact.first_name, contact.last_name]
+                          .filter(Boolean)
+                          .join(" ") || contact.full_name
+                      )}
+                    </p>
                     <p className="mt-1 text-sm text-slate-600">{displayValue(contact.title)}</p>
                   </div>
                   {contact.is_primary ? (

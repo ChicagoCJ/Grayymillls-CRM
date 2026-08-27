@@ -124,6 +124,11 @@ type EnrollmentRequestResponse = {
   blockedCount?: number;
   alreadyRecordedCount?: number;
   newEnrollmentCount?: number;
+  sourceListId?: string | null;
+  sourceListName?: string | null;
+  listMemberCount?: number | null;
+  listEligibleCount?: number | null;
+  listBlockedCount?: number | null;
   blocked?: {
     contactId: string;
     reason: string;
@@ -605,6 +610,12 @@ export default function OutreachMailshakeSection({
     setSelectionUsedSelectAll,
   ] =
     useState(false);
+
+  const [
+    listBatchSourceListId,
+    setListBatchSourceListId,
+  ] =
+    useState("");
 
   const [
     enrollmentReview,
@@ -1300,6 +1311,63 @@ export default function OutreachMailshakeSection({
         )
     ).length;
 
+  const selectedListFilterOption =
+    useMemo(
+      () =>
+        (
+          filterOptions?.projects ??
+          []
+        ).find(
+          (option) =>
+            option.id ===
+              projectFilter &&
+            option.kind ===
+              "list"
+        ) ??
+        null,
+      [
+        filterOptions,
+        projectFilter,
+      ]
+    );
+
+  const selectedListContacts =
+    useMemo(
+      () =>
+        selectedListFilterOption
+          ? contacts.filter(
+              (contact) =>
+                contact.projects.some(
+                  (project) =>
+                    project.id ===
+                      selectedListFilterOption.id &&
+                    project.kind ===
+                      "list"
+                )
+            )
+          : [],
+      [
+        contacts,
+        selectedListFilterOption,
+      ]
+    );
+
+  const selectedListEligibleContacts =
+    useMemo(
+      () =>
+        selectedListContacts.filter(
+          (contact) =>
+            contact.eligibleForMailshake
+        ),
+      [
+        selectedListContacts,
+      ]
+    );
+
+  const selectedListBlockedCount =
+    selectedListContacts.length -
+    selectedListEligibleContacts.length;
+
   const selectedCampaign =
     useMemo(
       () =>
@@ -1373,6 +1441,10 @@ export default function OutreachMailshakeSection({
           campaignId:
             selectedCampaignId,
 
+          sourceListId:
+            listBatchSourceListId ||
+            null,
+
           selectedContactIds:
             [...selectedContactIds].sort(),
 
@@ -1381,6 +1453,7 @@ export default function OutreachMailshakeSection({
         }),
       [
         selectedCampaignId,
+        listBatchSourceListId,
         selectedContactIds,
         enrollmentFilterSnapshot,
       ]
@@ -1423,6 +1496,14 @@ export default function OutreachMailshakeSection({
       return;
     }
 
+    setListBatchSourceListId(
+      ""
+    );
+
+    setSelectionUsedSelectAll(
+      false
+    );
+
     setSelectedContactIds(
       (previous) =>
         previous.includes(
@@ -1440,9 +1521,36 @@ export default function OutreachMailshakeSection({
     );
   }
 
+  function selectAllEligibleFromList() {
+    if (
+      !selectedListFilterOption
+    ) {
+      return;
+    }
+
+    setSelectionUsedSelectAll(
+      true
+    );
+
+    setListBatchSourceListId(
+      selectedListFilterOption.id
+    );
+
+    setSelectedContactIds(
+      selectedListEligibleContacts.map(
+        (contact) =>
+          contact.contactId
+      )
+    );
+  }
+
   function selectAllFiltered() {
     setSelectionUsedSelectAll(
       true
+    );
+
+    setListBatchSourceListId(
+      ""
     );
 
     setSelectedContactIds(
@@ -1463,6 +1571,10 @@ export default function OutreachMailshakeSection({
   function clearSelection() {
     setSelectedContactIds(
       []
+    );
+
+    setListBatchSourceListId(
+      ""
     );
 
     setSelectionUsedSelectAll(
@@ -1661,6 +1773,10 @@ export default function OutreachMailshakeSection({
                   selectionUsedSelectAll
                     ? "select_all_filtered"
                     : "individual",
+
+                sourceListId:
+                  listBatchSourceListId ||
+                  undefined,
 
                 filterSnapshot:
                   enrollmentFilterSnapshot,
@@ -1912,6 +2028,10 @@ export default function OutreachMailshakeSection({
                   selectionUsedSelectAll
                     ? "select_all_filtered"
                     : "individual",
+
+                sourceListId:
+                  listBatchSourceListId ||
+                  undefined,
 
                 filterSnapshot:
                   enrollmentFilterSnapshot,
@@ -2409,7 +2529,7 @@ export default function OutreachMailshakeSection({
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-wide text-blue-700">
-              Version 3.27G - Outreach Operational Polish
+              Version 3.27H1 - List Batch Safety Foundation
             </p>
 
             <h2 className="mt-1 text-2xl font-bold text-slate-950">
@@ -3454,11 +3574,22 @@ export default function OutreachMailshakeSection({
                       }
                       onChange={(
                         event
-                      ) =>
+                      ) => {
+                        const nextValue =
+                          event.target.value;
+
                         setProjectFilter(
-                          event.target.value
-                        )
-                      }
+                          nextValue
+                        );
+
+                        if (
+                          listBatchSourceListId &&
+                          nextValue !==
+                            listBatchSourceListId
+                        ) {
+                          clearSelection();
+                        }
+                      }}
                       className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm shadow-sm"
                     >
                       <option value="All">
@@ -3520,21 +3651,84 @@ export default function OutreachMailshakeSection({
                 </div>
 
                 <div className="mt-5 flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={
-                      selectAllFiltered
-                    }
-                    disabled={
-                      eligibleFilteredContacts.length ===
-                      0
-                    }
-                    className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-violet-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-                  >
-                    Select All Filtered (
-                    {eligibleFilteredContacts.length}
-                    )
-                  </button>
+                  {selectedListFilterOption && (
+                    <div className="w-full rounded-xl border border-violet-200 bg-violet-50 p-4">
+                      <p className="text-xs font-black uppercase tracking-wide text-violet-700">
+                        CRM List Batch Mode
+                      </p>
+
+                      <p className="mt-1 font-black text-violet-950">
+                        {selectedListFilterOption.label}
+                      </p>
+
+                      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                        <div className="rounded-lg bg-white p-3 ring-1 ring-violet-100">
+                          <p className="text-xs font-bold text-slate-500">
+                            List Members
+                          </p>
+                          <p className="mt-1 text-xl font-black text-slate-950">
+                            {selectedListContacts.length}
+                          </p>
+                        </div>
+
+                        <div className="rounded-lg bg-emerald-50 p-3 ring-1 ring-emerald-200">
+                          <p className="text-xs font-bold text-emerald-700">
+                            Eligible
+                          </p>
+                          <p className="mt-1 text-xl font-black text-emerald-950">
+                            {selectedListEligibleContacts.length}
+                          </p>
+                        </div>
+
+                        <div className="rounded-lg bg-amber-50 p-3 ring-1 ring-amber-200">
+                          <p className="text-xs font-bold text-amber-700">
+                            Blocked
+                          </p>
+                          <p className="mt-1 text-xl font-black text-amber-950">
+                            {selectedListBlockedCount}
+                          </p>
+                        </div>
+                      </div>
+
+                      <p className="mt-3 text-xs leading-5 text-violet-900">
+                        Whole-List selection ignores the other contact filters and replaces any previous selection. The server will independently verify current List membership and eligibility again before CRM records can be created.
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedListFilterOption ? (
+                    <button
+                      type="button"
+                      onClick={
+                        selectAllEligibleFromList
+                      }
+                      disabled={
+                        selectedListEligibleContacts.length ===
+                        0
+                      }
+                      className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-violet-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                    >
+                      Select All Eligible From This List (
+                      {selectedListEligibleContacts.length}
+                      )
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={
+                        selectAllFiltered
+                      }
+                      disabled={
+                        eligibleFilteredContacts.length ===
+                        0
+                      }
+                      className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-violet-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                    >
+                      Select All Filtered (
+                      {eligibleFilteredContacts.length}
+                      )
+                    </button>
+                  )}
 
                   <button
                     type="button"
@@ -3562,7 +3756,9 @@ export default function OutreachMailshakeSection({
                 </div>
 
                 <p className="mt-3 text-xs leading-5 text-slate-600">
-                  Select All Filtered adds every eligible contact matching the current filters. Existing selections remain selected when you change filters, so you can review or add another filtered group. Clear Selection removes the entire selection.
+                  {selectedListFilterOption
+                    ? "For a CRM List, use Select All Eligible From This List. It replaces previous selections and creates a protected whole-List selection that the server verifies again before CRM recording."
+                    : "Select All Filtered adds every eligible contact matching the current filters. Existing selections remain selected when you change filters, so you can review or add another filtered group. Clear Selection removes the entire selection."}
                 </p>
               </div>
 
@@ -3905,9 +4101,13 @@ export default function OutreachMailshakeSection({
                     </p>
 
                     <p className="mt-1 text-xs text-violet-800">
-                      {selectionUsedSelectAll
-                        ? "Selection includes Select All Filtered."
-                        : "Selection was made individually."}
+                      {listBatchSourceListId
+                        ? `Protected whole-List selection: ${
+                            selectedListFilterOption?.label || "CRM List"
+                          }.`
+                        : selectionUsedSelectAll
+                          ? "Selection includes Select All Filtered."
+                          : "Selection was made individually."}
                     </p>
                   </div>
                 </div>
@@ -4321,7 +4521,7 @@ export default function OutreachMailshakeSection({
                               </h6>
 
                               <p className="mt-2 text-xs leading-5 text-red-900">
-                                The initial rollout is limited to exactly one recipient. The server will revalidate CRM eligibility, check whether the recipient already exists in Mailshake, and check the campaign twice. The final provider check must still report Paused.
+                                The provider-write rollout is still limited to exactly one recipient. Version 3.27H1 can safely select, review, and record a whole CRM List as a CRM batch, but multi-recipient Mailshake submission is not enabled yet. For an allowed single-recipient provider action, the server still revalidates CRM eligibility, checks whether the recipient already exists in Mailshake, and checks the campaign twice. The final provider check must still report Paused.
                               </p>
 
                               <p className="mt-2 text-xs font-bold leading-5 text-red-950">

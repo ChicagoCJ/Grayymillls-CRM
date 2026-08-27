@@ -34,6 +34,7 @@ type EnrollmentPayload = {
   campaignName?: string;
   campaignStatus?: string;
   selectionMode?: SelectionMode;
+  sourceListId?: string;
   filterSnapshot?: unknown;
   contactIds?: string[];
 };
@@ -42,6 +43,24 @@ type ContactRow = {
   id?: string;
   company_id?: string;
   email?: string | null;
+};
+
+type SourceListRow = {
+  id?: string;
+  project_name?: string | null;
+  project_kind?: string | null;
+  status?: string | null;
+  archived_at?: string | null;
+};
+
+type ContactProjectAssignmentRow = {
+  contact_id?: string | null;
+};
+
+type SourceListSelection = {
+  listId: string;
+  listName: string;
+  memberContactIds: string[];
 };
 
 type ExistingEnrollmentRow = {
@@ -425,6 +444,174 @@ async function readDoNotContactTagId(
   return cleanText(
     rows[0]?.id
   );
+}
+
+async function readActiveListSelection(
+  supabase:
+    ReturnType<
+      typeof getSupabaseAdmin
+    >,
+  sourceListId: string
+): Promise<
+  SourceListSelection | null
+> {
+  const {
+    data:
+      listData,
+    error:
+      listError,
+  } =
+    await supabase
+      .from("crm_projects")
+      .select(
+        "id, project_name, project_kind, status, archived_at"
+      )
+      .eq(
+        "id",
+        sourceListId
+      )
+      .limit(1);
+
+  if (listError) {
+    throw listError;
+  }
+
+  const listRows =
+    Array.isArray(listData)
+      ? (
+          listData as
+            SourceListRow[]
+        )
+      : [];
+
+  const listRow =
+    listRows[0];
+
+  if (
+    !listRow ||
+    cleanText(
+      listRow.project_kind
+    ).toLowerCase() !==
+      "list" ||
+    cleanText(
+      listRow.status
+    ).toLowerCase() !==
+      "active" ||
+    Boolean(
+      cleanText(
+        listRow.archived_at
+      )
+    )
+  ) {
+    return null;
+  }
+
+  const memberIds =
+    new Set<string>();
+
+  let complete =
+    false;
+
+  for (
+    let pageIndex = 0;
+    pageIndex < MAX_PAGES;
+    pageIndex += 1
+  ) {
+    const from =
+      pageIndex *
+      PAGE_SIZE;
+
+    const to =
+      from +
+      PAGE_SIZE -
+      1;
+
+    const {
+      data,
+      error,
+    } =
+      await supabase
+        .from(
+          "contact_project_assignments"
+        )
+        .select(
+          "contact_id"
+        )
+        .eq(
+          "project_id",
+          sourceListId
+        )
+        .range(
+          from,
+          to
+        );
+
+    if (error) {
+      throw error;
+    }
+
+    const rows =
+      Array.isArray(data)
+        ? (
+            data as
+              ContactProjectAssignmentRow[]
+          )
+        : [];
+
+    rows.forEach(
+      (row) => {
+        const contactId =
+          cleanText(
+            row.contact_id
+          );
+
+        if (
+          contactId &&
+          UUID_PATTERN.test(
+            contactId
+          )
+        ) {
+          memberIds.add(
+            contactId
+          );
+        }
+      }
+    );
+
+    if (
+      rows.length <
+      PAGE_SIZE
+    ) {
+      complete =
+        true;
+
+      break;
+    }
+  }
+
+  if (!complete) {
+    throw new Error(
+      `CRM List membership exceeded the safety limit of ${PAGE_SIZE * MAX_PAGES} assignment rows. The List batch was stopped rather than use incomplete membership data.`
+    );
+  }
+
+  return {
+    listId:
+      cleanText(
+        listRow.id
+      ),
+
+    listName:
+      cleanText(
+        listRow.project_name
+      ) ||
+      "Unnamed CRM List",
+
+    memberContactIds:
+      Array.from(
+        memberIds
+      ),
+  };
 }
 
 async function readRequestedContacts(
@@ -1164,20 +1351,250 @@ export async function POST(
       );
     }
 
+    const sourceListId =
+      cleanText(
+        payload.sourceListId
+      );
+
+    if (
+      sourceListId &&
+      selectionMode !==
+        "select_all_filtered"
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "A protected CRM List batch must use select_all_filtered selection mode.",
+        },
+        {
+          status:
+            400,
+        }
+      );
+    }
+
+    if (
+      sourceListId &&
+      !UUID_PATTERN.test(
+        sourceListId
+      )
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "The CRM List ID supplied for this batch is invalid.",
+        },
+        {
+          status:
+            400,
+        }
+      );
+    }
+
     const filterSnapshot =
       cleanFilterSnapshot(
         payload.filterSnapshot
       );
 
+    if (
+      sourceListId &&
+      cleanText(
+        filterSnapshot.projectOrListId
+      ) !==
+        sourceListId
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "The CRM List filter changed after the protected List batch was selected. Select the List again before continuing.",
+        },
+        {
+          status:
+            409,
+        }
+      );
+    }
+
     const supabase =
       getSupabaseAdmin();
 
-    const review =
-      await prepareEnrollmentReview(
-        supabase,
-        providerCampaignId,
-        contactIds
-      );
+    let review:
+      Awaited<
+        ReturnType<
+          typeof prepareEnrollmentReview
+        >
+      >;
+
+    let sourceListName =
+      "";
+
+    let sourceListMemberCount:
+      number | null =
+        null;
+
+    let sourceListEligibleCount:
+      number | null =
+        null;
+
+    let sourceListBlockedCount:
+      number | null =
+        null;
+
+    if (sourceListId) {
+      const sourceList =
+        await readActiveListSelection(
+          supabase,
+          sourceListId
+        );
+
+      if (!sourceList) {
+        return NextResponse.json(
+          {
+            error:
+              "The selected CRM List is missing, archived, inactive, or is no longer a List. Nothing was recorded.",
+          },
+          {
+            status:
+              409,
+          }
+        );
+      }
+
+      if (
+        sourceList.memberContactIds.length ===
+        0
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              `CRM List "${sourceList.listName}" currently has no contact members. Nothing was recorded.`,
+          },
+          {
+            status:
+              409,
+          }
+        );
+      }
+
+      const listReview =
+        await prepareEnrollmentReview(
+          supabase,
+          providerCampaignId,
+          sourceList.memberContactIds
+        );
+
+      const expectedEligibleIds =
+        listReview.eligible.map(
+          (contact) =>
+            contact.contactId
+        );
+
+      if (
+        expectedEligibleIds.length >
+        MAX_SELECTED_CONTACTS
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              `CRM List "${sourceList.listName}" currently has ${expectedEligibleIds.length} eligible contacts, which exceeds the ${MAX_SELECTED_CONTACTS} contact safety limit for one CRM enrollment action.`,
+          },
+          {
+            status:
+              409,
+          }
+        );
+      }
+
+      const expectedEligibleSet =
+        new Set(
+          expectedEligibleIds
+        );
+
+      const selectedSet =
+        new Set(
+          contactIds
+        );
+
+      const missingFromSelection =
+        expectedEligibleIds.filter(
+          (contactId) =>
+            !selectedSet.has(
+              contactId
+            )
+        );
+
+      const unexpectedSelection =
+        contactIds.filter(
+          (contactId) =>
+            !expectedEligibleSet.has(
+              contactId
+            )
+        );
+
+      if (
+        missingFromSelection.length >
+          0 ||
+        unexpectedSelection.length >
+          0
+      ) {
+        return NextResponse.json(
+          {
+            status:
+              "list_changed",
+
+            error:
+              `CRM List "${sourceList.listName}" changed after it was selected. The server now finds ${expectedEligibleIds.length} eligible contact${expectedEligibleIds.length === 1 ? "" : "s"}, while the browser submitted ${contactIds.length}. Nothing was recorded. Refresh the List selection and review again.`,
+
+            sourceListId:
+              sourceList.listId,
+
+            sourceListName:
+              sourceList.listName,
+
+            listMemberCount:
+              sourceList.memberContactIds.length,
+
+            listEligibleCount:
+              expectedEligibleIds.length,
+
+            listBlockedCount:
+              listReview.blocked.length,
+
+            missingEligibleCount:
+              missingFromSelection.length,
+
+            unexpectedSelectedCount:
+              unexpectedSelection.length,
+          },
+          {
+            status:
+              409,
+          }
+        );
+      }
+
+      review =
+        listReview;
+
+      sourceListName =
+        sourceList.listName;
+
+      sourceListMemberCount =
+        sourceList.memberContactIds.length;
+
+      sourceListEligibleCount =
+        expectedEligibleIds.length;
+
+      sourceListBlockedCount =
+        listReview.blocked.length;
+    } else {
+      review =
+        await prepareEnrollmentReview(
+          supabase,
+          providerCampaignId,
+          contactIds
+        );
+    }
 
     const baseResponse = {
       provider:
@@ -1190,6 +1607,23 @@ export async function POST(
       campaignStatus,
 
       selectionMode,
+
+      sourceListId:
+        sourceListId ||
+        null,
+
+      sourceListName:
+        sourceListName ||
+        null,
+
+      listMemberCount:
+        sourceListMemberCount,
+
+      listEligibleCount:
+        sourceListEligibleCount,
+
+      listBlockedCount:
+        sourceListBlockedCount,
 
       requestedCount:
         contactIds.length,
@@ -1713,6 +2147,29 @@ export async function POST(
 
     const auditSnapshot = {
       ...filterSnapshot,
+
+      listBatchSource:
+        sourceListId
+          ? {
+              listId:
+                sourceListId,
+
+              listName:
+                sourceListName,
+
+              memberCount:
+                sourceListMemberCount,
+
+              eligibleCount:
+                sourceListEligibleCount,
+
+              blockedCount:
+                sourceListBlockedCount,
+
+              serverVerified:
+                true,
+            }
+          : null,
 
       crmEnrollmentReview: {
         reviewedAt:
