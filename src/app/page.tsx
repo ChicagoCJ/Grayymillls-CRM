@@ -207,10 +207,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.27H3B1 - Production Run Authorization Schema";
+  "Version 3.27H3B2A - Atomic Authorization Safety Guard";
 
 const REVISION_NOTE =
-  "Current revision 3.27H3B1: CRM now has server-controlled schema for auditable Production run authorizations and exact authorized enrollment items. No authorization records are created automatically, and Production Mailshake provider writes remain explicitly locked.";
+  "Current revision 3.27H3B2A: Production run authorizations now have database-enforced atomic creation, exact provider/campaign enrollment validation, one-active-run protection, and auditable cancellation. No authorization UI is enabled yet, and Production Mailshake provider writes remain explicitly locked.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean
