@@ -162,6 +162,39 @@ type EnrollmentRequestResponse = {
   error?: string;
 };
 
+type ProductionAuthorizationReviewResponse = {
+  status?: string;
+  mode?: string;
+  reviewedAt?: string;
+  environment?: string;
+  providerCampaignId?: string;
+  providerCampaignTitle?: string;
+  providerCampaignState?: string;
+  serverReadyCount?: number;
+  proposedCount?: number;
+  verifiedProposedCount?: number;
+  blockedProposedCount?: number;
+  maxControlledAuthorizationCount?: number;
+  authorizationDurationMinutes?: number;
+  authorizationCreated?: boolean;
+  safetyChecksPassedForProposedSet?: boolean;
+  eligibleForLaterProductionAuthorization?: boolean;
+  activeProviderOperationCount?: number;
+  existingProviderRecipientCount?: number;
+  activeAuthorization?: {
+    status?: string;
+    authorizedCount?: number;
+    authorizedAt?: string | null;
+    expiresAt?: string | null;
+    expiredByClock?: boolean;
+  } | null;
+  blockedReasons?: string[];
+  providerWritePolicyAllowed?: boolean;
+  providerWritePolicyMode?: string;
+  providerWritePolicyReason?: string;
+  message?: string;
+  error?: string;
+};
 type ProviderSubmissionResponse = {
   status?: string;
   mode?: string;
@@ -711,6 +744,31 @@ export default function OutreachMailshakeSection({
   ] =
     useState("");
 
+  const [
+    authorizationReview,
+    setAuthorizationReview,
+  ] =
+    useState<
+      ProductionAuthorizationReviewResponse | null
+    >(null);
+
+  const [
+    authorizationReviewFingerprint,
+    setAuthorizationReviewFingerprint,
+  ] =
+    useState("");
+
+  const [
+    isReviewingAuthorization,
+    setIsReviewingAuthorization,
+  ] =
+    useState(false);
+
+  const [
+    authorizationReviewError,
+    setAuthorizationReviewError,
+  ] =
+    useState("");
   const [
     providerSubmissionResult,
     setProviderSubmissionResult,
@@ -1778,6 +1836,18 @@ export default function OutreachMailshakeSection({
       ""
     );
 
+    setAuthorizationReview(
+      null
+    );
+
+    setAuthorizationReviewFingerprint(
+      ""
+    );
+
+    setAuthorizationReviewError(
+      ""
+    );
+
     try {
       const response =
         await fetch(
@@ -2154,6 +2224,148 @@ export default function OutreachMailshakeSection({
     }
   }
 
+  async function reviewProductionAuthorization() {
+    if (
+      !selectedCampaign ||
+      !providerExecutionReview?.providerReview
+    ) {
+      setAuthorizationReviewError(
+        "Run Step 3 — Check Recorded Enrollment & Mailshake Readiness first."
+      );
+
+      return;
+    }
+
+    if (
+      providerExecutionReviewFingerprint !==
+      enrollmentSelectionFingerprint
+    ) {
+      setAuthorizationReviewError(
+        "The campaign, contact selection, or filters changed after Step 3. Run Step 3 again before reviewing a Production authorization."
+      );
+
+      return;
+    }
+
+    setIsReviewingAuthorization(
+      true
+    );
+
+    setAuthorizationReviewError(
+      ""
+    );
+
+    setAuthorizationReview(
+      null
+    );
+
+    setAuthorizationReviewFingerprint(
+      ""
+    );
+
+    try {
+      const response =
+        await fetch(
+          "/api/outreach-mailshake/run-authorization",
+          {
+            method:
+              "POST",
+
+            headers: {
+              ...(await getBearerHeaders()),
+
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify({
+                action:
+                  "review",
+
+                providerCampaignId:
+                  selectedCampaign.providerCampaignId,
+
+                campaignName:
+                  selectedCampaign.title,
+
+                campaignStatus:
+                  selectedCampaignStatus(),
+
+                selectionMode:
+                  selectionUsedSelectAll
+                    ? "select_all_filtered"
+                    : "individual",
+
+                sourceListId:
+                  listBatchSourceListId ||
+                  undefined,
+
+                filterSnapshot:
+                  enrollmentFilterSnapshot,
+
+                contactIds:
+                  selectedContactIds,
+              }),
+
+            cache:
+              "no-store",
+          }
+        );
+
+      const rawText =
+        await response.text();
+
+      let data:
+        ProductionAuthorizationReviewResponse;
+
+      try {
+        data =
+          rawText
+            ? JSON.parse(
+                rawText
+              )
+            : {};
+      } catch {
+        throw new Error(
+          `CRM Production authorization review returned an unreadable response with HTTP status ${response.status}.`
+        );
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            "Could not complete the read-only Production authorization review."
+        );
+      }
+
+      setAuthorizationReview(
+        data
+      );
+
+      setAuthorizationReviewFingerprint(
+        enrollmentSelectionFingerprint
+      );
+    } catch (error) {
+      setAuthorizationReview(
+        null
+      );
+
+      setAuthorizationReviewFingerprint(
+        ""
+      );
+
+      setAuthorizationReviewError(
+        error instanceof Error
+          ? error.message
+          : "Could not complete the read-only Production authorization review."
+      );
+    } finally {
+      setIsReviewingAuthorization(
+        false
+      );
+    }
+  }
   async function submitRecordedEnrollmentToMailshake() {
     const providerReview =
       providerExecutionReview?.providerReview;
@@ -2802,7 +3014,7 @@ export default function OutreachMailshakeSection({
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-wide text-blue-700">
-              Version 3.27H3B2A - Atomic Authorization Safety Guard
+              Version 3.27H3B2B1 - Admin Production Authorization Review
             </p>
 
             <h2 className="mt-1 text-2xl font-bold text-slate-950">
@@ -4777,6 +4989,189 @@ export default function OutreachMailshakeSection({
                           </div>
                         )}
 
+                        <div className="mt-4 rounded-xl border border-indigo-300 bg-indigo-50 p-4">
+                          <p className="text-xs font-black uppercase tracking-wide text-indigo-700">
+                            H3B2B1 — Admin Production Authorization Review
+                          </p>
+
+                          <h6 className="mt-1 font-bold text-indigo-950">
+                            Read-only controlled-run authorization review
+                          </h6>
+
+                          <p className="mt-2 text-xs leading-5 text-indigo-900">
+                            Admin only. The server independently reruns the current CRM and Mailshake readiness review, then checks the first proposed controlled set for unresolved provider operations, existing Mailshake recipients, and an existing run authorization.
+                          </p>
+
+                          <p className="mt-2 text-xs font-black text-indigo-950">
+                            This action does not create an authorization, add a Mailshake recipient, or send email.
+                          </p>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void reviewProductionAuthorization()
+                            }
+                            disabled={
+                              isReviewingAuthorization ||
+                              isReviewingProviderExecution ||
+                              providerExecutionReviewFingerprint !==
+                                enrollmentSelectionFingerprint
+                            }
+                            className="mt-4 rounded-xl bg-indigo-700 px-5 py-3 text-sm font-black text-white hover:bg-indigo-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                          >
+                            {isReviewingAuthorization
+                              ? "Reviewing Production Authorization..."
+                              : "Review Production Authorization — Read Only"}
+                          </button>
+
+                          {authorizationReviewError && (
+                            <div className="mt-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm font-semibold text-red-950">
+                              {authorizationReviewError}
+                            </div>
+                          )}
+
+                          {authorizationReviewFingerprint &&
+                            authorizationReviewFingerprint !==
+                              enrollmentSelectionFingerprint && (
+                              <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs font-bold text-amber-950">
+                                This review is stale because the CRM selection changed. Run Step 3 again.
+                              </div>
+                            )}
+
+                          {authorizationReview && (
+                            <div className="mt-4 rounded-xl border border-indigo-200 bg-white p-4">
+                              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                                <div className="rounded-lg bg-slate-50 p-3 ring-1 ring-slate-200">
+                                  <p className="text-xs font-bold uppercase text-slate-500">
+                                    Environment
+                                  </p>
+                                  <p className="mt-1 font-black text-slate-950">
+                                    {authorizationReview.environment ||
+                                      "Unknown"}
+                                  </p>
+                                </div>
+
+                                <div className="rounded-lg bg-emerald-50 p-3 ring-1 ring-emerald-200">
+                                  <p className="text-xs font-bold uppercase text-emerald-700">
+                                    Server Ready
+                                  </p>
+                                  <p className="mt-1 text-xl font-black text-emerald-950">
+                                    {authorizationReview.serverReadyCount ??
+                                      0}
+                                  </p>
+                                </div>
+
+                                <div className="rounded-lg bg-indigo-50 p-3 ring-1 ring-indigo-200">
+                                  <p className="text-xs font-bold uppercase text-indigo-700">
+                                    Proposed Now
+                                  </p>
+                                  <p className="mt-1 text-xl font-black text-indigo-950">
+                                    {authorizationReview.proposedCount ??
+                                      0}
+                                  </p>
+                                  <p className="mt-1 text-xs text-indigo-800">
+                                    Initial cap:{" "}
+                                    {authorizationReview.maxControlledAuthorizationCount ??
+                                      2}
+                                  </p>
+                                </div>
+
+                                <div className="rounded-lg bg-amber-50 p-3 ring-1 ring-amber-200">
+                                  <p className="text-xs font-bold uppercase text-amber-700">
+                                    Authorization
+                                  </p>
+                                  <p className="mt-1 font-black text-amber-950">
+                                    {authorizationReview.authorizationCreated
+                                      ? "CREATED"
+                                      : "NOT CREATED"}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <p className="mt-4 text-sm font-semibold leading-6 text-slate-900">
+                                {authorizationReview.message}
+                              </p>
+
+                              <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-700">
+                                <p>
+                                  Verified proposed:{" "}
+                                  <span className="font-black">
+                                    {authorizationReview.verifiedProposedCount ??
+                                      0}
+                                  </span>
+                                </p>
+
+                                <p>
+                                  Active/unresolved provider operations:{" "}
+                                  <span className="font-black">
+                                    {authorizationReview.activeProviderOperationCount ??
+                                      0}
+                                  </span>
+                                </p>
+
+                                <p>
+                                  Existing Mailshake recipients:{" "}
+                                  <span className="font-black">
+                                    {authorizationReview.existingProviderRecipientCount ??
+                                      0}
+                                  </span>
+                                </p>
+
+                                <p>
+                                  Planned authorization lifetime:{" "}
+                                  <span className="font-black">
+                                    {authorizationReview.authorizationDurationMinutes ??
+                                      15}{" "}
+                                    minutes
+                                  </span>
+                                </p>
+
+                                <p>
+                                  Eligible for later Production authorization creation:{" "}
+                                  <span className="font-black">
+                                    {authorizationReview.eligibleForLaterProductionAuthorization
+                                      ? "YES"
+                                      : "NO"}
+                                  </span>
+                                </p>
+                              </div>
+
+                              {(authorizationReview.blockedReasons?.length ??
+                                0) > 0 && (
+                                <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3">
+                                  <p className="text-xs font-black uppercase text-amber-800">
+                                    Safety Findings
+                                  </p>
+
+                                  {(authorizationReview.blockedReasons ??
+                                    []).map(
+                                    (
+                                      reason,
+                                      index
+                                    ) => (
+                                      <p
+                                        key={`${reason}-${index}`}
+                                        className="mt-1 text-xs leading-5 text-amber-950"
+                                      >
+                                        {reason}
+                                      </p>
+                                    )
+                                  )}
+                                </div>
+                              )}
+
+                              <div className="mt-3 rounded-lg border border-violet-200 bg-violet-50 p-3 text-xs font-semibold leading-5 text-violet-950">
+                                Provider-write policy:{" "}
+                                {authorizationReview.providerWritePolicyAllowed
+                                  ? "allowed by the existing deployment policy"
+                                  : "blocked"}
+                                .{" "}
+                                {authorizationReview.providerWritePolicyReason}
+                                {" "}H3B2B1 never invokes the provider-write endpoint.
+                              </div>
+                            </div>
+                          )}
+                        </div>
                         {providerExecutionReview.providerReview
                           .providerExecutionAllowed ? (
                           <div className="mt-4 grid gap-4">
@@ -4794,7 +5189,7 @@ export default function OutreachMailshakeSection({
                               </h6>
 
                               <p className="mt-2 text-xs leading-5 text-red-900">
-                                Version 3.27H3B2A preserves CRM/List batches containing 100+ recipients. A controlled run processes up to {MAX_CONTROLLED_PROVIDER_RUN_SIZE} server-verified ready recipients sequentially. Each recipient still receives a separate CRM provider operation and a separate one-recipient Mailshake request. The run stops immediately on the first abnormal or uncertain result.
+                                Version 3.27H3B2B1 preserves CRM/List batches containing 100+ recipients. A controlled run processes up to {MAX_CONTROLLED_PROVIDER_RUN_SIZE} server-verified ready recipients sequentially. Each recipient still receives a separate CRM provider operation and a separate one-recipient Mailshake request. The run stops immediately on the first abnormal or uncertain result.
                               </p>
 
                               <p className="mt-2 text-xs font-black text-red-950">
