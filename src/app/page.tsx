@@ -207,10 +207,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.27H3C4 - Controlled Multi-Recipient Runs";
+  "Version 3.27H3C5 - Automatic Reconciliation";
 
 const REVISION_NOTE =
-  "Current revision 3.27H3C4: controlled Mailshake runs may authorize up to 10 exact recipients at a time and process them sequentially through separate one-recipient provider operations. The controller stops on the first blocked, failed, unreadable, or uncertain result. Campaign size is not limited to 10. Preview still requires its allowlist, and Production still requires an exact Admin-created Production authorization.";
+  "Current revision 3.27H3C5: after a successful controlled Mailshake run, CRM automatically polls only the exact provider operations created by that run for up to 60 seconds and synchronizes terminal outcomes back into CRM. Automatic reconciliation never re-submits recipients. Manual reconciliation remains available for operations that are still processing or require attention. The controlled-run cap remains 10, Preview still requires its allowlist, and Production still requires an exact Admin-created Production authorization.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean

@@ -255,6 +255,14 @@ type ProviderSubmissionResponse = {
   error?: string;
 };
 
+type AutoReconciliationState =
+  | "waiting"
+  | "checking"
+  | "processing"
+  | "terminal"
+  | "attention"
+  | "timed_out";
+
 type ProviderBatchSubmissionItem = {
   sequence: number;
   contactId: string;
@@ -264,9 +272,19 @@ type ProviderBatchSubmissionItem = {
   providerCheckStatusId?: string | null;
   message?: string;
   error?: string;
+  reconciliationState?: AutoReconciliationState;
+  reconciliationStatus?: string;
+  reconciliationOperationStatus?: string;
+  reconciliationEnrollmentStatus?: string;
+  reconciliationProviderRecipientId?: string | null;
+  reconciliationRunAuthorizationStatus?: string | null;
+  reconciliationMessage?: string;
+  reconciliationError?: string;
 };
 
 const MAX_CONTROLLED_PROVIDER_RUN_SIZE = 10;
+const AUTO_RECONCILE_INTERVAL_MS = 4000;
+const AUTO_RECONCILE_TIMEOUT_MS = 60000;
 
 type ProviderStatusResponse = {
   status?: string;
@@ -894,6 +912,25 @@ export default function OutreachMailshakeSection({
     setProviderBatchMessage,
   ] =
     useState("");
+
+  const [
+    isAutoReconciling,
+    setIsAutoReconciling,
+  ] =
+    useState(false);
+
+  const [
+    autoReconcileMessage,
+    setAutoReconcileMessage,
+  ] =
+    useState("");
+
+  const [
+    autoReconcileError,
+    setAutoReconcileError,
+  ] =
+    useState("");
+
   const [
     providerStatusResult,
     setProviderStatusResult,
@@ -3113,6 +3150,14 @@ export default function OutreachMailshakeSection({
       ""
     );
 
+    setAutoReconcileMessage(
+      ""
+    );
+
+    setAutoReconcileError(
+      ""
+    );
+
     setProviderStatusResult(
       null
     );
@@ -3439,9 +3484,51 @@ export default function OutreachMailshakeSection({
 
         setProviderBatchMessage(
           remainingAfterRun > 0
-            ? `${submittedCount} recipient${submittedCount === 1 ? "" : "s"} in this controlled run were accepted asynchronously by Mailshake. ${remainingAfterRun} recipient${remainingAfterRun === 1 ? "" : "s"} from the prior server-ready set were not part of this run. Reconcile every provider operation from this run, then run Step 3 again for the next controlled group.`
-            : `${submittedCount} recipient${submittedCount === 1 ? "" : "s"} in this controlled run were accepted asynchronously by Mailshake. Reconcile every provider operation from this run before considering the authorization complete.`
+            ? `${submittedCount} recipient${submittedCount === 1 ? "" : "s"} in this controlled run were accepted asynchronously by Mailshake. ${remainingAfterRun} recipient${remainingAfterRun === 1 ? "" : "s"} from the prior server-ready set were not part of this run. Automatic reconciliation is starting for the exact provider operations created by this run.`
+            : `${submittedCount} recipient${submittedCount === 1 ? "" : "s"} in this controlled run were accepted asynchronously by Mailshake. Automatic reconciliation is starting for the exact provider operations created by this run.`
         );
+
+        const submittedOperationIds =
+          batchResults
+            .filter(
+              (item) =>
+                item.status ===
+                  "submitted" &&
+                Boolean(
+                  item.operationId
+                )
+            )
+            .map(
+              (item) =>
+                String(
+                  item.operationId ||
+                    ""
+                ).trim()
+            )
+            .filter(Boolean);
+
+        if (
+          submittedOperationIds.length !==
+          submittedCount
+        ) {
+          setAutoReconcileError(
+            "Automatic reconciliation did not start because CRM could not identify every exact provider operation from the completed controlled run. Use the existing operation history and manual reconciliation controls; do not resubmit any recipient."
+          );
+        } else {
+          /*
+           * Submission is complete before reconciliation begins.
+           * From this point forward H3C5 performs STATUS / CRM SYNC
+           * only. No provider-execution request is made by the
+           * automatic reconciliation loop.
+           */
+          setIsSubmittingProvider(
+            false
+          );
+
+          await automaticallyReconcileProviderOperations(
+            submittedOperationIds
+          );
+        }
       } else if (
         stopped &&
         submittedCount >
@@ -3528,6 +3615,610 @@ export default function OutreachMailshakeSection({
       );
     }
   }
+  function updateBatchReconciliation(
+    providerOperationId: string,
+    patch: Partial<ProviderBatchSubmissionItem>
+  ) {
+    setProviderBatchSubmissionResults(
+      (current) =>
+        current.map(
+          (item) =>
+            item.operationId ===
+            providerOperationId
+              ? {
+                  ...item,
+                  ...patch,
+                }
+              : item
+        )
+    );
+  }
+
+  function isTerminalProviderStatus(
+    data: ProviderStatusResponse
+  ) {
+    const status =
+      String(
+        data.status ||
+          ""
+      ).toLowerCase();
+
+    const operationStatus =
+      String(
+        data.operationStatus ||
+          ""
+      ).toLowerCase();
+
+    return (
+      [
+        "confirmed",
+        "already_present",
+        "unsubscribed",
+        "failed",
+        "cancelled",
+      ].includes(
+        status
+      ) ||
+      [
+        "completed",
+        "failed",
+        "cancelled",
+      ].includes(
+        operationStatus
+      )
+    );
+  }
+
+  function requiresManualProviderAttention(
+    data: ProviderStatusResponse
+  ) {
+    const status =
+      String(
+        data.status ||
+          ""
+      ).toLowerCase();
+
+    const operationStatus =
+      String(
+        data.operationStatus ||
+          ""
+      ).toLowerCase();
+
+    return (
+      status ===
+        "reconciliation_required" ||
+      operationStatus ===
+        "partial"
+    );
+  }
+
+  async function requestProviderStatus(
+    providerOperationId: string
+  ) {
+    const response =
+      await fetch(
+        "/api/outreach-mailshake/provider-status",
+        {
+          method:
+            "POST",
+
+          headers: {
+            ...(await getBearerHeaders()),
+
+            "Content-Type":
+              "application/json",
+          },
+
+          body:
+            JSON.stringify({
+              providerOperationId,
+            }),
+
+          cache:
+            "no-store",
+        }
+      );
+
+    const rawText =
+      await response.text();
+
+    let data:
+      ProviderStatusResponse;
+
+    try {
+      data =
+        rawText
+          ? JSON.parse(
+              rawText
+            )
+          : {};
+    } catch {
+      throw new Error(
+        `CRM provider-status endpoint returned an unreadable response with HTTP status ${response.status}.`
+      );
+    }
+
+    /*
+     * Final attention outcomes intentionally may use HTTP 409.
+     * Preserve a structured provider result rather than converting
+     * it into a generic transport error.
+     */
+    if (
+      !response.ok &&
+      !data.status &&
+      !data.operationStatus
+    ) {
+      throw new Error(
+        data.error ||
+          data.message ||
+          `Could not reconcile the Mailshake recipient import. HTTP status ${response.status}.`
+      );
+    }
+
+    return data;
+  }
+
+  async function automaticallyReconcileProviderOperations(
+    providerOperationIds: string[]
+  ) {
+    const operationIds =
+      Array.from(
+        new Set(
+          providerOperationIds
+            .map(
+              (operationId) =>
+                String(
+                  operationId ||
+                    ""
+                ).trim()
+            )
+            .filter(Boolean)
+        )
+      );
+
+    if (
+      operationIds.length ===
+      0
+    ) {
+      setAutoReconcileError(
+        "Automatic reconciliation could not start because no exact provider operation IDs were available."
+      );
+
+      return;
+    }
+
+    const pending =
+      new Set(
+        operationIds
+      );
+
+    let terminalCount =
+      0;
+
+    let attentionCount =
+      0;
+
+    setIsAutoReconciling(
+      true
+    );
+
+    setAutoReconcileError(
+      ""
+    );
+
+    setAutoReconcileMessage(
+      `Automatic reconciliation started for ${operationIds.length} exact provider operation${operationIds.length === 1 ? "" : "s"}. CRM will check status only; it will not submit or re-add recipients.`
+    );
+
+    operationIds.forEach(
+      (operationId) => {
+        updateBatchReconciliation(
+          operationId,
+          {
+            reconciliationState:
+              "waiting",
+
+            reconciliationMessage:
+              "Waiting for automatic status check.",
+
+            reconciliationError:
+              "",
+          }
+        );
+      }
+    );
+
+    const deadline =
+      Date.now() +
+      AUTO_RECONCILE_TIMEOUT_MS;
+
+    try {
+      while (
+        pending.size >
+          0 &&
+        Date.now() <
+          deadline
+      ) {
+        const roundOperationIds =
+          Array.from(
+            pending
+          );
+
+        for (
+          const operationId of
+          roundOperationIds
+        ) {
+          updateBatchReconciliation(
+            operationId,
+            {
+              reconciliationState:
+                "checking",
+
+              reconciliationMessage:
+                "Checking the exact existing provider operation...",
+            }
+          );
+
+          let data:
+            ProviderStatusResponse;
+
+          try {
+            data =
+              await requestProviderStatus(
+                operationId
+              );
+          } catch (error) {
+            const message =
+              error instanceof Error
+                ? error.message
+                : "Automatic provider-status reconciliation failed.";
+
+            updateBatchReconciliation(
+              operationId,
+              {
+                reconciliationState:
+                  "attention",
+
+                reconciliationError:
+                  message,
+
+                reconciliationMessage:
+                  "Automatic checking stopped for this operation. Use the manual reconciliation control; do not resubmit the recipient.",
+              }
+            );
+
+            pending.delete(
+              operationId
+            );
+
+            attentionCount +=
+              1;
+
+            continue;
+          }
+
+          setProviderStatusTargetOperationId(
+            operationId
+          );
+
+          setProviderStatusResult(
+            data
+          );
+
+          if (
+            requiresManualProviderAttention(
+              data
+            )
+          ) {
+            updateBatchReconciliation(
+              operationId,
+              {
+                reconciliationState:
+                  "attention",
+
+                reconciliationStatus:
+                  data.status,
+
+                reconciliationOperationStatus:
+                  data.operationStatus,
+
+                reconciliationEnrollmentStatus:
+                  data.enrollmentStatus,
+
+                reconciliationProviderRecipientId:
+                  data.providerRecipientId,
+
+                reconciliationRunAuthorizationStatus:
+                  data.runAuthorizationStatus,
+
+                reconciliationMessage:
+                  data.message ||
+                  "Manual reconciliation review is required.",
+
+                reconciliationError:
+                  data.error,
+              }
+            );
+
+            pending.delete(
+              operationId
+            );
+
+            attentionCount +=
+              1;
+
+            continue;
+          }
+
+          if (
+            isTerminalProviderStatus(
+              data
+            )
+          ) {
+            updateBatchReconciliation(
+              operationId,
+              {
+                reconciliationState:
+                  "terminal",
+
+                reconciliationStatus:
+                  data.status,
+
+                reconciliationOperationStatus:
+                  data.operationStatus,
+
+                reconciliationEnrollmentStatus:
+                  data.enrollmentStatus,
+
+                reconciliationProviderRecipientId:
+                  data.providerRecipientId,
+
+                reconciliationRunAuthorizationStatus:
+                  data.runAuthorizationStatus,
+
+                reconciliationMessage:
+                  data.message ||
+                  "Provider operation reached a terminal CRM outcome.",
+
+                reconciliationError:
+                  data.error,
+              }
+            );
+
+            pending.delete(
+              operationId
+            );
+
+            terminalCount +=
+              1;
+
+            continue;
+          }
+
+          const status =
+            String(
+              data.status ||
+                ""
+            ).toLowerCase();
+
+          const operationStatus =
+            String(
+              data.operationStatus ||
+                ""
+            ).toLowerCase();
+
+          if (
+            status ===
+              "processing" ||
+            status ===
+              "submitted" ||
+            operationStatus ===
+              "checking" ||
+            operationStatus ===
+              "submitted" ||
+            operationStatus ===
+              "submission_unknown"
+          ) {
+            updateBatchReconciliation(
+              operationId,
+              {
+                reconciliationState:
+                  "processing",
+
+                reconciliationStatus:
+                  data.status,
+
+                reconciliationOperationStatus:
+                  data.operationStatus,
+
+                reconciliationEnrollmentStatus:
+                  data.enrollmentStatus,
+
+                reconciliationProviderRecipientId:
+                  data.providerRecipientId,
+
+                reconciliationRunAuthorizationStatus:
+                  data.runAuthorizationStatus,
+
+                reconciliationMessage:
+                  data.message ||
+                  "Mailshake is still processing this exact provider operation.",
+
+                reconciliationError:
+                  data.error,
+              }
+            );
+
+            continue;
+          }
+
+          updateBatchReconciliation(
+            operationId,
+            {
+              reconciliationState:
+                "attention",
+
+              reconciliationStatus:
+                data.status,
+
+              reconciliationOperationStatus:
+                data.operationStatus,
+
+              reconciliationEnrollmentStatus:
+                data.enrollmentStatus,
+
+              reconciliationProviderRecipientId:
+                data.providerRecipientId,
+
+              reconciliationRunAuthorizationStatus:
+                data.runAuthorizationStatus,
+
+              reconciliationMessage:
+                data.message ||
+                "CRM received an unexpected provider-status state. Manual reconciliation is required.",
+
+              reconciliationError:
+                data.error,
+            }
+          );
+
+          pending.delete(
+            operationId
+          );
+
+          attentionCount +=
+            1;
+        }
+
+        if (
+          pending.size >
+            0 &&
+          Date.now() <
+            deadline
+        ) {
+          const remainingMilliseconds =
+            Math.max(
+              0,
+              deadline -
+                Date.now()
+            );
+
+          await new Promise<void>(
+            (resolve) =>
+              window.setTimeout(
+                resolve,
+                Math.min(
+                  AUTO_RECONCILE_INTERVAL_MS,
+                  remainingMilliseconds
+                )
+              )
+          );
+        }
+      }
+
+      const timedOutOperationIds =
+        Array.from(
+          pending
+        );
+
+      timedOutOperationIds.forEach(
+        (operationId) => {
+          updateBatchReconciliation(
+            operationId,
+            {
+              reconciliationState:
+                "timed_out",
+
+              reconciliationMessage:
+                "Automatic reconciliation reached its 60-second safety window while Mailshake was still processing. Use Reconcile This Operation later; do not resubmit the recipient.",
+            }
+          );
+        }
+      );
+
+      /*
+       * If all exact operations reached classified terminal
+       * outcomes, re-read the final one once. Its terminal,
+       * idempotent provider-status path performs CRM-only rollup
+       * and does not call Mailshake again.
+       */
+      let finalRunAuthorizationStatus =
+        "";
+
+      if (
+        timedOutOperationIds.length ===
+          0 &&
+        attentionCount ===
+          0 &&
+        terminalCount ===
+          operationIds.length
+      ) {
+        const finalOperationId =
+          operationIds[
+            operationIds.length -
+              1
+          ];
+
+        try {
+          const finalData =
+            await requestProviderStatus(
+              finalOperationId
+            );
+
+          finalRunAuthorizationStatus =
+            String(
+              finalData.runAuthorizationStatus ||
+                ""
+            );
+
+          updateBatchReconciliation(
+            finalOperationId,
+            {
+              reconciliationRunAuthorizationStatus:
+                finalData.runAuthorizationStatus,
+
+              reconciliationMessage:
+                finalData.message ||
+                "Final CRM authorization rollup was re-evaluated.",
+            }
+          );
+
+          setProviderStatusTargetOperationId(
+            finalOperationId
+          );
+
+          setProviderStatusResult(
+            finalData
+          );
+        } catch (error) {
+          setAutoReconcileError(
+            error instanceof Error
+              ? `Automatic reconciliation reached terminal outcomes, but the final authorization-summary refresh failed: ${error.message}`
+              : "Automatic reconciliation reached terminal outcomes, but the final authorization-summary refresh failed."
+          );
+        }
+      }
+
+      const timedOutCount =
+        timedOutOperationIds.length;
+
+      setAutoReconcileMessage(
+        timedOutCount >
+          0 ||
+        attentionCount >
+          0
+          ? `Automatic reconciliation stopped safely. Terminal outcomes: ${terminalCount}. Manual attention: ${attentionCount}. Still processing after 60 seconds: ${timedOutCount}. Use the individual Reconcile This Operation controls later; do not resubmit recipients.`
+          : `Automatic reconciliation completed for all ${terminalCount} provider operation${terminalCount === 1 ? "" : "s"}.${finalRunAuthorizationStatus ? ` Run authorization status: ${finalRunAuthorizationStatus}.` : ""}`
+      );
+
+      await loadProviderHistory();
+    } finally {
+      setIsAutoReconciling(
+        false
+      );
+    }
+  }
+
   async function checkMailshakeImportStatus(
     providerOperationId: string
   ) {
@@ -3564,78 +4255,15 @@ export default function OutreachMailshakeSection({
     );
 
     try {
-      const response =
-        await fetch(
-          "/api/outreach-mailshake/provider-status",
-          {
-            method:
-              "POST",
-
-            headers: {
-              ...(await getBearerHeaders()),
-
-              "Content-Type":
-                "application/json",
-            },
-
-            body:
-              JSON.stringify({
-                providerOperationId:
-                  normalizedProviderOperationId,
-              }),
-
-            cache:
-              "no-store",
-          }
+      const data =
+        await requestProviderStatus(
+          normalizedProviderOperationId
         );
-
-      const rawText =
-        await response.text();
-
-      let data:
-        ProviderStatusResponse;
-
-      try {
-        data =
-          rawText
-            ? JSON.parse(
-                rawText
-              )
-            : {};
-      } catch {
-        throw new Error(
-          `CRM provider-status endpoint returned an unreadable response with HTTP status ${response.status}.`
-        );
-      }
-
-      /*
-       * Some final reconciliation outcomes intentionally use
-       * HTTP 409 because they require attention rather than
-       * representing a successful import. If the endpoint
-       * returned a structured provider status, show it instead
-       * of discarding the useful reconciliation result.
-       */
-      if (
-        !response.ok &&
-        !data.status &&
-        !data.operationStatus
-      ) {
-        throw new Error(
-          data.error ||
-            data.message ||
-            "Could not reconcile the Mailshake recipient import."
-        );
-      }
 
       setProviderStatusResult(
         data
       );
 
-      /*
-       * Any provider-status check can change CRM operation
-       * state. A previous provider execution review must no
-       * longer be relied upon for a submission action.
-       */
       setProviderExecutionReview(
         null
       );
@@ -3651,6 +4279,8 @@ export default function OutreachMailshakeSection({
       setProviderSubmissionError(
         ""
       );
+
+      await loadProviderHistory();
     } catch (error) {
       setProviderStatusError(
         error instanceof Error
@@ -3663,7 +4293,6 @@ export default function OutreachMailshakeSection({
       );
     }
   }
-
   async function loadProviderHistory() {
     if (
       isLoadingProviderHistory
@@ -3775,7 +4404,7 @@ export default function OutreachMailshakeSection({
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-wide text-blue-700">
-              Version 3.27H3C4 - Controlled Multi-Recipient Runs
+              Version 3.27H3C5 - Automatic Reconciliation
             </p>
 
             <h2 className="mt-1 text-2xl font-bold text-slate-950">
@@ -3793,7 +4422,7 @@ export default function OutreachMailshakeSection({
             </p>
 
             <p className="mt-1 text-xs leading-5">
-              A controlled run may submit up to 10 exactly authorized recipients sequentially to a paused Mailshake campaign. Each recipient still uses one exact authorization item, one CRM provider operation, and one one-recipient Mailshake request. Preview continues to require the server-side test-recipient allowlist. Production remains globally locked except for the Admin-only exact Production run-authorization path. Provider-status reconciliation remains available for every exact CRM-tracked operation.
+              A controlled run may submit up to 10 exactly authorized recipients sequentially to a paused Mailshake campaign. Each recipient still uses one exact authorization item, one CRM provider operation, and one one-recipient Mailshake request. After successful submission, CRM automatically polls only those exact provider operations for up to 60 seconds; it never re-submits a recipient. Preview continues to require the server-side test-recipient allowlist, and Production still requires the exact Admin-created Production authorization path.
             </p>
 
             <details className="mt-4 rounded-xl border border-blue-200 bg-white/80 p-4">
@@ -3813,7 +4442,7 @@ export default function OutreachMailshakeSection({
                     <li><span className="font-black text-violet-800">2. Record Enrollment in CRM — CRM WRITE.</span>{" "}Creates CRM enrollment and batch tracking records. It does not add a recipient to Mailshake and does not send email.</li>
                     <li><span className="font-black text-rose-800">3. Check Recorded Enrollment and Mailshake Readiness — CHECK ONLY.</span>{" "}Re-checks CRM eligibility and reads the current Mailshake campaign state immediately before any provider action.</li>
                     <li><span className="font-black text-red-800">4. Submit to Mailshake — MAILSHAKE WRITE.</span>{" "}This is the first step that can actually add a recipient to Mailshake. Current rollout permits up to 10 exactly authorized recipients per controlled run, processed one at a time. Preview requires the server allowlist; Production requires an exact Admin-created Production run authorization. The campaign must remain paused.</li>
-                    <li><span className="font-black text-sky-800">5. Reconcile the Mailshake Result — STATUS / CRM SYNC.</span>{" "}Checks the exact existing CRM-tracked provider operation and records the provider result. Reconcile never means submit again.</li>
+                    <li><span className="font-black text-sky-800">5. Reconcile the Mailshake Result — STATUS / CRM SYNC.</span>{" "}After a successful controlled run, CRM automatically checks the exact provider operations for up to 60 seconds. Manual reconciliation remains available if Mailshake is still processing or a status check needs attention. Reconcile never means submit again.</li>
                     <li><span className="font-black text-emerald-800">6. Understand the Final CRM Outcome.</span>{" "}Review the final enrollment, provider-operation, and batch statuses before considering the outreach action complete.</li>
                   </ol>
                 </div>
@@ -6204,6 +6833,7 @@ export default function OutreachMailshakeSection({
                                 }
                                 disabled={
                                   isSubmittingProvider ||
+                                  isAutoReconciling ||
                                   authorizationLifecycle
                                     ?.authorizationCreated !==
                                     true ||
@@ -6293,6 +6923,30 @@ export default function OutreachMailshakeSection({
                                     }
                                   </p>
 
+                                  {(isAutoReconciling ||
+                                    autoReconcileMessage ||
+                                    autoReconcileError) && (
+                                    <div className="mt-3 rounded-lg border border-sky-200 bg-sky-50 p-3 text-xs text-sky-950">
+                                      <p className="font-black">
+                                        {isAutoReconciling
+                                          ? "Automatic reconciliation is running..."
+                                          : "Automatic reconciliation"}
+                                      </p>
+
+                                      {autoReconcileMessage && (
+                                        <p className="mt-1 leading-5">
+                                          {autoReconcileMessage}
+                                        </p>
+                                      )}
+
+                                      {autoReconcileError && (
+                                        <p className="mt-2 font-bold leading-5 text-red-800">
+                                          {autoReconcileError}
+                                        </p>
+                                      )}
+                                    </div>
+                                  )}
+
                                   {providerBatchSubmissionResults.length >
                                     0 && (
                                     <div className="mt-3 grid gap-2">
@@ -6328,12 +6982,60 @@ export default function OutreachMailshakeSection({
                                                   }
                                                   disabled={
                                                     isSubmittingProvider ||
+                                                    isAutoReconciling ||
                                                     isCheckingProviderStatus
                                                   }
                                                   className="mt-2 rounded-lg bg-sky-700 px-3 py-2 font-black text-white hover:bg-sky-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                                                 >
                                                   Reconcile This Operation
                                                 </button>
+                                              </div>
+                                            )}
+
+                                            {item.reconciliationState && (
+                                              <div className="mt-2 rounded-lg border border-sky-200 bg-white p-2 text-slate-700">
+                                                <p className="font-black text-sky-900">
+                                                  Reconciliation:{" "}
+                                                  {item.reconciliationState.replace(
+                                                    "_",
+                                                    " "
+                                                  )}
+                                                </p>
+
+                                                {(item.reconciliationEnrollmentStatus ||
+                                                  item.reconciliationOperationStatus) && (
+                                                  <p className="mt-1">
+                                                    CRM enrollment:{" "}
+                                                    {item.reconciliationEnrollmentStatus ||
+                                                      "—"}
+                                                    {" · "}
+                                                    Provider operation:{" "}
+                                                    {item.reconciliationOperationStatus ||
+                                                      "—"}
+                                                  </p>
+                                                )}
+
+                                                {item.reconciliationProviderRecipientId && (
+                                                  <p className="mt-1 break-all">
+                                                    Mailshake recipient ID:{" "}
+                                                    {item.reconciliationProviderRecipientId}
+                                                  </p>
+                                                )}
+
+                                                {item.reconciliationRunAuthorizationStatus && (
+                                                  <p className="mt-1 font-bold">
+                                                    Run authorization:{" "}
+                                                    {item.reconciliationRunAuthorizationStatus}
+                                                  </p>
+                                                )}
+
+                                                {(item.reconciliationError ||
+                                                  item.reconciliationMessage) && (
+                                                  <p className="mt-1 leading-5">
+                                                    {item.reconciliationError ||
+                                                      item.reconciliationMessage}
+                                                  </p>
+                                                )}
                                               </div>
                                             )}
 
@@ -6450,11 +7152,11 @@ export default function OutreachMailshakeSection({
                       </p>
 
                       <h5 className="mt-1 text-lg font-bold">
-                        Step 5 — Reconcile the Mailshake Result
+                        Step 5 — Automatic Reconciliation / Manual Fallback
                       </h5>
 
                       <p className="mt-2 max-w-4xl text-xs leading-5">
-                        STATUS / CRM SYNC — Step 5 checks the exact existing CRM-tracked Mailshake provider operation and synchronizes its result into CRM. When the operation is terminal, CRM also re-evaluates the exact linked run authorization and closes it only when every authorized item has a terminal outcome. It does not submit or re-add the recipient, unpause the campaign, or send email. If processing is not final, check this same operation again later; do not resubmit. A final reconciliation result is Step 6 — the final CRM outcome.
+                        STATUS / CRM SYNC — H3C5 automatically performs this check after a successful controlled run, polling only the exact CRM-tracked provider operations for up to 60 seconds. When an operation is terminal, CRM re-evaluates the linked run authorization and closes it only when every authorized item has a terminal outcome. Automatic or manual reconciliation never submits or re-adds a recipient, unpauses the campaign, or sends email. If automatic polling times out or needs attention, use this manual control later; do not resubmit.
                       </p>
 
                       <button
@@ -6466,6 +7168,7 @@ export default function OutreachMailshakeSection({
                           )
                         }
                         disabled={
+                          isAutoReconciling ||
                           isCheckingProviderStatus ||
                           !providerSubmissionResult?.operationId
                         }
