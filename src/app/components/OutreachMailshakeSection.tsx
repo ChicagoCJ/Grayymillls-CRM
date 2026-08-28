@@ -3358,7 +3358,7 @@ export default function OutreachMailshakeSection({
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-wide text-blue-700">
-              Version 3.27H3C1A - Atomic Authorization Consumption Guard
+              Version 3.27H3C1B - Authorized Operation Preparation
             </p>
 
             <h2 className="mt-1 text-2xl font-bold text-slate-950">

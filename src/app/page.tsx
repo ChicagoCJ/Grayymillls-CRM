@@ -207,10 +207,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.27H3C1A - Atomic Authorization Consumption Guard";
+  "Version 3.27H3C1B - Authorized Operation Preparation";
 
 const REVISION_NOTE =
-  "Current revision 3.27H3C1A: adds a service-role-only atomic database guard for consuming one exact authorization item into one prepared provider operation and enrollment mapping. The guard revalidates authorization, enrollment, campaign, contact, email, environment, expiry, and duplicate-operation state in one transaction. No route invokes this guard yet, and Production Mailshake provider writes remain explicitly locked.";
+  "Current revision 3.27H3C1B: adds an Admin-only prepare-only provider execution path that atomically consumes one exact valid authorization item into one prepared CRM provider operation and enrollment mapping, then returns before Mailshake recipients/add. Production Mailshake provider writes remain explicitly locked.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean
