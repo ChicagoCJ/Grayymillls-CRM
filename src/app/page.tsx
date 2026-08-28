@@ -207,10 +207,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.27H3B2B2 - Create / Cancel Production Authorization";
+  "Version 3.27H3C1A - Atomic Authorization Consumption Guard";
 
 const REVISION_NOTE =
-  "Current revision 3.27H3B2B2: adds the Admin-only create/cancel lifecycle for short-lived controlled run authorizations, including exact typed confirmation, atomic authorization creation, and auditable unused-run cancellation. Creating an authorization still does not add a Mailshake recipient or unlock Production provider execution.";
+  "Current revision 3.27H3C1A: adds a service-role-only atomic database guard for consuming one exact authorization item into one prepared provider operation and enrollment mapping. The guard revalidates authorization, enrollment, campaign, contact, email, environment, expiry, and duplicate-operation state in one transaction. No route invokes this guard yet, and Production Mailshake provider writes remain explicitly locked.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean
