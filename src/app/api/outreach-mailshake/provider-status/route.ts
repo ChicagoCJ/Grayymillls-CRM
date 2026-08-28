@@ -682,6 +682,37 @@ async function refreshEnrollmentBatchStatus(
   }
 }
 
+async function completeRunAuthorizationIfTerminal(
+  supabase:
+    ReturnType<
+      typeof getSupabaseAdmin
+    >,
+  operationId: string
+) {
+  const {
+    data,
+    error,
+  } =
+    await supabase.rpc(
+      "complete_outreach_provider_run_authorization_if_terminal",
+      {
+        p_provider_operation_id:
+          operationId,
+      }
+    );
+
+  if (error) {
+    throw error;
+  }
+
+  return (
+    cleanText(
+      data
+    ) ||
+    null
+  );
+}
+
 async function markTerminalOutcome(
   supabase:
     ReturnType<
@@ -952,7 +983,18 @@ async function markTerminalOutcome(
     );
   }
 
-  return now;
+  const runAuthorizationStatus =
+    await completeRunAuthorizationIfTerminal(
+      supabase,
+      params.operationId
+    );
+
+  return {
+    reconciledAt:
+      now,
+
+    runAuthorizationStatus,
+  };
 }
 
 export async function POST(
@@ -1321,6 +1363,12 @@ export async function POST(
         );
       }
 
+      const runAuthorizationStatus =
+        await completeRunAuthorizationIfTerminal(
+          supabase,
+          operationId
+        );
+
       return NextResponse.json(
         {
           mode:
@@ -1353,11 +1401,13 @@ export async function POST(
             ) ||
             null,
 
+          runAuthorizationStatus,
+
           isFinished:
             true,
 
           message:
-            "This provider operation has already been reconciled in CRM. The related CRM enrollment batch was also re-evaluated.",
+            "This provider operation has already been reconciled in CRM. The related CRM enrollment batch and linked run authorization were also re-evaluated.",
         }
       );
     }

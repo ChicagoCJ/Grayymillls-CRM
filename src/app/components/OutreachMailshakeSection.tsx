@@ -265,6 +265,7 @@ type ProviderStatusResponse = {
   isFinished?: boolean;
   enrollmentStatus?: string;
   providerRecipientId?: string | null;
+  runAuthorizationStatus?: string | null;
   message?: string;
   error?: string;
 };
@@ -3481,7 +3482,7 @@ export default function OutreachMailshakeSection({
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-wide text-blue-700">
-              Version 3.27H3C3 - First Authorization-Gated Production Send
+              Version 3.27H3C3A - Complete Authorization After Reconciliation
             </p>
 
             <h2 className="mt-1 text-2xl font-bold text-slate-950">
@@ -3893,6 +3894,15 @@ export default function OutreachMailshakeSection({
                               providerStatusResult.status ||
                               "checked"}
                           </p>
+
+                          {providerStatusResult.runAuthorizationStatus && (
+                            <p className="mt-1">
+                              <span className="font-black">
+                                Run authorization status:
+                              </span>{" "}
+                              {providerStatusResult.runAuthorizationStatus}
+                            </p>
+                          )}
 
                           {providerStatusResult.providerCheckStatusId && (
                             <p className="mt-1 break-all">
@@ -5850,7 +5860,7 @@ export default function OutreachMailshakeSection({
                               </h6>
 
                               <p className="mt-2 text-xs leading-5 text-red-900">
-                                Version 3.27H3C3 keeps this first Production boundary limited to exactly {MAX_CONTROLLED_PROVIDER_RUN_SIZE} server-verified recipient. Preview still requires its allowlist. Production requires an exact Admin-created Production authorization whose exact item must be atomically consumed before the Mailshake request.
+                                Version 3.27H3C3A keeps this Production boundary limited to exactly {MAX_CONTROLLED_PROVIDER_RUN_SIZE} server-verified recipient. Preview still requires its allowlist. Production requires an exact Admin-created Production authorization whose exact item must be atomically consumed before the Mailshake request. Terminal reconciliation now also closes the parent authorization when every exact authorization item has reached a terminal provider outcome.
                               </p>
 
                               <p className="mt-2 text-xs font-black text-red-950">
@@ -6103,7 +6113,7 @@ export default function OutreachMailshakeSection({
                       </h5>
 
                       <p className="mt-2 max-w-4xl text-xs leading-5">
-                        STATUS / CRM SYNC — Step 5 checks the exact existing CRM-tracked Mailshake provider operation and synchronizes its result into CRM. It does not submit or re-add the recipient, unpause the campaign, or send email. If processing is not final, check this same operation again later; do not resubmit. A final reconciliation result is Step 6 — the final CRM outcome.
+                        STATUS / CRM SYNC — Step 5 checks the exact existing CRM-tracked Mailshake provider operation and synchronizes its result into CRM. When the operation is terminal, CRM also re-evaluates the exact linked run authorization and closes it only when every authorized item has a terminal outcome. It does not submit or re-add the recipient, unpause the campaign, or send email. If processing is not final, check this same operation again later; do not resubmit. A final reconciliation result is Step 6 — the final CRM outcome.
                       </p>
 
                       <button

@@ -207,10 +207,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.27H3C3 - First Authorization-Gated Production Send";
+  "Version 3.27H3C3A - Complete Authorization After Reconciliation";
 
 const REVISION_NOTE =
-  "Current revision 3.27H3C3: keeps the global Production Mailshake policy locked while allowing one narrow Admin-only Production submission path backed by one exact short-lived Production authorization item. The item must be atomically consumed into the exact provider operation before the paused-campaign Mailshake recipient add can occur. Preview continues to require its recipient allowlist.";
+  "Current revision 3.27H3C3A: terminal Mailshake reconciliation now re-evaluates the exact linked run authorization and marks the parent authorization completed only after every authorized item has reached a terminal outcome. The existing one-recipient Production authorization boundary and Preview allowlist remain unchanged.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean
