@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
@@ -22,6 +24,8 @@ const MAX_PROPOSED_AUTHORIZATION_COUNT =
 const AUTHORIZATION_DURATION_MINUTES =
   15;
 
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 type AuthorizationReviewPayload = {
   action?: string;
   providerCampaignId?: string;
@@ -31,8 +35,11 @@ type AuthorizationReviewPayload = {
   sourceListId?: string;
   filterSnapshot?: unknown;
   contactIds?: string[];
-};
 
+  confirmationPhrase?: string;
+  authorizationId?: string;
+  cancellationReason?: string;
+};
 type ProviderReviewResult = {
   error?: string;
   message?: string;
@@ -267,7 +274,7 @@ export async function POST(
     return NextResponse.json(
       {
         error:
-          "Only a signed-in CRM Admin can review a Production Mailshake run authorization.",
+          "Only a signed-in CRM Admin can review or manage a Mailshake run authorization.",
       },
       {
         status: 403,
@@ -282,16 +289,24 @@ export async function POST(
       ) as
         AuthorizationReviewPayload;
 
-    if (
+    const action =
       cleanText(
         payload.action
-      ).toLowerCase() !==
-      "review"
+      ).toLowerCase();
+
+    if (
+      ![
+        "review",
+        "create",
+        "cancel",
+      ].includes(
+        action
+      )
     ) {
       return NextResponse.json(
         {
           error:
-            'H3B2B1 supports only action "review". It cannot create an authorization.',
+            'The run-authorization endpoint supports only action "review", "create", or "cancel".',
         },
         {
           status: 400,
@@ -299,6 +314,299 @@ export async function POST(
       );
     }
 
+    /*
+     * Cancellation only removes permission.
+     * It does not require another provider-readiness pass.
+     *
+     * The database function independently refuses cancellation
+     * once any provider operation has been linked.
+     */
+    if (
+      action ===
+      "cancel"
+    ) {
+      const environment =
+        deploymentEnvironment();
+
+      if (
+        environment !==
+          "preview" &&
+        environment !==
+          "production"
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              `Run authorizations can be cancelled only from Vercel Preview or Production. Current environment: ${environment}.`,
+          },
+          {
+            status: 409,
+          }
+        );
+      }
+
+      const authorizationId =
+        cleanText(
+          payload.authorizationId
+        );
+
+      if (
+        !UUID_PATTERN.test(
+          authorizationId
+        )
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "A valid run authorization ID is required for cancellation.",
+          },
+          {
+            status: 400,
+          }
+        );
+      }
+
+      const cancellationReason =
+        cleanText(
+          payload.cancellationReason
+        );
+
+      if (
+        cancellationReason.length <
+          8 ||
+        cancellationReason.length >
+          500
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "Enter a cancellation reason between 8 and 500 characters.",
+          },
+          {
+            status: 400,
+          }
+        );
+      }
+
+      const expectedConfirmation =
+        `CANCEL ${authorizationId
+          .slice(
+            0,
+            8
+          )
+          .toUpperCase()}`;
+
+      if (
+        cleanText(
+          payload.confirmationPhrase
+        ).toUpperCase() !==
+        expectedConfirmation
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              `Cancellation confirmation did not match. Type exactly: ${expectedConfirmation}`,
+          },
+          {
+            status: 409,
+          }
+        );
+      }
+
+      const supabase =
+        getSupabaseAdmin();
+
+      const {
+        data:
+          existingAuthorization,
+        error:
+          existingAuthorizationError,
+      } =
+        await supabase
+          .from(
+            "outreach_provider_run_authorizations"
+          )
+          .select(
+            `
+            id,
+            provider,
+            provider_campaign_id,
+            environment,
+            status,
+            authorized_count,
+            expires_at
+            `
+          )
+          .eq(
+            "id",
+            authorizationId
+          )
+          .maybeSingle();
+
+      if (
+        existingAuthorizationError
+      ) {
+        throw existingAuthorizationError;
+      }
+
+      if (
+        !existingAuthorization
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "The requested run authorization could not be found.",
+          },
+          {
+            status: 404,
+          }
+        );
+      }
+
+      if (
+        cleanText(
+          existingAuthorization.provider
+        ).toLowerCase() !==
+          "mailshake" ||
+        cleanText(
+          existingAuthorization.environment
+        ).toLowerCase() !==
+          environment
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "The run authorization does not belong to this Mailshake deployment environment.",
+          },
+          {
+            status: 409,
+          }
+        );
+      }
+
+      const existingStatus =
+        cleanText(
+          existingAuthorization.status
+        ).toLowerCase();
+
+      if (
+        ![
+          "draft",
+          "authorized",
+        ].includes(
+          existingStatus
+        )
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              `The run authorization cannot be cancelled because its current status is "${existingStatus || "unknown"}".`,
+          },
+          {
+            status: 409,
+          }
+        );
+      }
+
+      const {
+        data:
+          cancelled,
+        error:
+          cancelError,
+      } =
+        await supabase.rpc(
+          "cancel_outreach_provider_run_authorization",
+          {
+            p_authorization_id:
+              authorizationId,
+
+            p_cancelled_by_crm_user_id:
+              verification.context.crmUserId,
+
+            p_cancelled_by_display_name:
+              verification.context.crmDisplayName,
+
+            p_reason:
+              cancellationReason,
+          }
+        );
+
+      if (
+        cancelError
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              cancelError.message ||
+              "The run authorization could not be cancelled.",
+          },
+          {
+            status: 409,
+          }
+        );
+      }
+
+      if (
+        cancelled !==
+        true
+      ) {
+        throw new Error(
+          "The cancellation database function did not confirm success."
+        );
+      }
+
+      const {
+        data:
+          cancelledAuthorization,
+        error:
+          cancelledAuthorizationError,
+      } =
+        await supabase
+          .from(
+            "outreach_provider_run_authorizations"
+          )
+          .select(
+            `
+            id,
+            provider_campaign_id,
+            environment,
+            status,
+            authorized_count,
+            cancelled_at,
+            cancelled_by_crm_user_id,
+            cancelled_by_display_name,
+            stop_reason
+            `
+          )
+          .eq(
+            "id",
+            authorizationId
+          )
+          .single();
+
+      if (
+        cancelledAuthorizationError
+      ) {
+        throw cancelledAuthorizationError;
+      }
+
+      return NextResponse.json({
+        status:
+          "run_authorization_cancelled",
+
+        authorizationCancelled:
+          true,
+
+        providerExecutionUnlocked:
+          false,
+
+        authorization:
+          cancelledAuthorization,
+
+        message:
+          "The unused run authorization was cancelled and retained for audit. No Mailshake provider operation was created or executed.",
+      });
+    }
     const providerCampaignId =
       cleanText(
         payload.providerCampaignId
@@ -997,6 +1305,455 @@ export async function POST(
         "production" &&
       safetyChecksPassedForProposedSet;
 
+    /*
+     * H3B2B2A CREATE
+     *
+     * The complete authoritative H3B2B1 review above has
+     * just run again on the server.
+     *
+     * Only now can an Admin create the short-lived exact
+     * authorization through the atomic database function.
+     *
+     * This still does not unlock provider execution.
+     */
+    if (
+      action ===
+      "create"
+    ) {
+      if (
+        !authorizationEnvironment
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              `Run authorizations can be created only from Vercel Preview or Production. Current environment: ${environment}.`,
+          },
+          {
+            status: 409,
+          }
+        );
+      }
+
+      if (
+        proposedContactIds.length ===
+        0
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "There are no currently ready CRM enrollments to authorize.",
+          },
+          {
+            status: 409,
+          }
+        );
+      }
+
+      if (
+        !safetyChecksPassedForProposedSet
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "The proposed controlled authorization did not pass every current safety check. Run the review again and resolve all findings before creating an authorization.",
+
+            blockedReasons:
+              Array.from(
+                new Set(
+                  blockedReasons
+                )
+              ),
+          },
+          {
+            status: 409,
+          }
+        );
+      }
+
+      if (
+        !outreachCampaignId
+      ) {
+        throw new Error(
+          "The CRM outreach campaign identity is missing."
+        );
+      }
+
+      const expectedConfirmation =
+        `AUTHORIZE ${authorizationEnvironment.toUpperCase()} ${proposedContactIds.length} FOR ${providerCampaignId}`;
+
+      if (
+        cleanText(
+          payload.confirmationPhrase
+        ).toUpperCase() !==
+        expectedConfirmation
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              `Authorization confirmation did not match. Type exactly: ${expectedConfirmation}`,
+          },
+          {
+            status: 409,
+          }
+        );
+      }
+
+      const authorizationItems =
+        proposedContactIds.map(
+          (
+            contactId,
+            index
+          ) => {
+            const enrollment =
+              enrollmentByContactId.get(
+                contactId
+              );
+
+            if (
+              !enrollment
+            ) {
+              throw new Error(
+                "A proposed authorization enrollment disappeared before the atomic create call."
+              );
+            }
+
+            const enrollmentId =
+              cleanText(
+                enrollment.id
+              );
+
+            const normalizedEmail =
+              cleanText(
+                enrollment.normalized_email
+              ).toLowerCase();
+
+            if (
+              !UUID_PATTERN.test(
+                enrollmentId
+              ) ||
+              !UUID_PATTERN.test(
+                contactId
+              ) ||
+              !normalizedEmail
+            ) {
+              throw new Error(
+                "A proposed authorization item has an invalid enrollment, contact, or normalized-email identity."
+              );
+            }
+
+            return {
+              enrollment_id:
+                enrollmentId,
+
+              contact_id:
+                contactId,
+
+              normalized_email:
+                normalizedEmail,
+
+              sequence_number:
+                index + 1,
+            };
+          }
+        );
+
+      const fingerprintPayload = {
+        environment:
+          authorizationEnvironment,
+
+        provider:
+          "mailshake",
+
+        outreachCampaignId,
+
+        providerCampaignId,
+
+        items:
+          authorizationItems,
+      };
+
+      const selectionFingerprint =
+        createHash(
+          "sha256"
+        )
+          .update(
+            JSON.stringify(
+              fingerprintPayload
+            ),
+            "utf8"
+          )
+          .digest(
+            "hex"
+          );
+
+      const expiresAt =
+        new Date(
+          Date.now() +
+            AUTHORIZATION_DURATION_MINUTES *
+              60 *
+              1000
+        ).toISOString();
+
+      const authorizationSnapshot = {
+        revision:
+          "3.27H3B2B2A",
+
+        createdAt:
+          new Date().toISOString(),
+
+        environment:
+          authorizationEnvironment,
+
+        provider:
+          "mailshake",
+
+        outreachCampaignId,
+
+        providerCampaignId,
+
+        providerCampaignTitle:
+          cleanText(
+            providerReview.providerCampaignTitle
+          ),
+
+        providerCampaignState,
+
+        selectionMode:
+          cleanText(
+            payload.selectionMode
+          ) ||
+          null,
+
+        sourceListId:
+          cleanText(
+            payload.sourceListId
+          ) ||
+          null,
+
+        selectedContactCount:
+          contactIds.length,
+
+        serverReadyCount:
+          readyContactIds.length,
+
+        authorizedCount:
+          authorizationItems.length,
+
+        authorizedContactIds:
+          authorizationItems.map(
+            (item) =>
+              item.contact_id
+          ),
+
+        providerWritePolicyAllowed:
+          providerReview.providerWritePolicyAllowed ===
+          true,
+
+        providerWritePolicyMode:
+          cleanText(
+            providerReview.providerWritePolicyMode
+          ),
+
+        providerExecutionUnlocked:
+          false,
+      };
+
+      const {
+        data:
+          createdAuthorizationIdRaw,
+        error:
+          createAuthorizationError,
+      } =
+        await supabase.rpc(
+          "create_outreach_provider_run_authorization",
+          {
+            p_provider:
+              "mailshake",
+
+            p_outreach_campaign_id:
+              outreachCampaignId,
+
+            p_provider_campaign_id:
+              providerCampaignId,
+
+            p_environment:
+              authorizationEnvironment,
+
+            p_authorized_by_crm_user_id:
+              verification.context.crmUserId,
+
+            p_authorized_by_display_name:
+              verification.context.crmDisplayName,
+
+            p_selection_fingerprint:
+              selectionFingerprint,
+
+            p_authorization_snapshot:
+              authorizationSnapshot,
+
+            p_expires_at:
+              expiresAt,
+
+            p_items:
+              authorizationItems,
+          }
+        );
+
+      if (
+        createAuthorizationError
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              createAuthorizationError.message ||
+              "The atomic run authorization could not be created.",
+          },
+          {
+            status: 409,
+          }
+        );
+      }
+
+      const createdAuthorizationId =
+        cleanText(
+          createdAuthorizationIdRaw
+        );
+
+      if (
+        !UUID_PATTERN.test(
+          createdAuthorizationId
+        )
+      ) {
+        throw new Error(
+          "The atomic database function did not return a valid authorization ID."
+        );
+      }
+
+      const {
+        data:
+          createdAuthorization,
+        error:
+          createdAuthorizationError,
+      } =
+        await supabase
+          .from(
+            "outreach_provider_run_authorizations"
+          )
+          .select(
+            `
+            id,
+            provider,
+            outreach_campaign_id,
+            provider_campaign_id,
+            environment,
+            status,
+            authorized_by_crm_user_id,
+            authorized_by_display_name,
+            authorized_count,
+            selection_fingerprint,
+            authorized_at,
+            expires_at
+            `
+          )
+          .eq(
+            "id",
+            createdAuthorizationId
+          )
+          .single();
+
+      if (
+        createdAuthorizationError
+      ) {
+        throw createdAuthorizationError;
+      }
+
+      const {
+        data:
+          createdItems,
+        error:
+          createdItemsError,
+      } =
+        await supabase
+          .from(
+            "outreach_provider_run_authorization_enrollments"
+          )
+          .select(
+            `
+            id,
+            authorization_id,
+            enrollment_id,
+            contact_id,
+            normalized_email,
+            sequence_number,
+            status
+            `
+          )
+          .eq(
+            "authorization_id",
+            createdAuthorizationId
+          )
+          .order(
+            "sequence_number",
+            {
+              ascending:
+                true,
+            }
+          );
+
+      if (
+        createdItemsError
+      ) {
+        throw createdItemsError;
+      }
+
+      const createdItemRows =
+        Array.isArray(
+          createdItems
+        )
+          ? createdItems
+          : [];
+
+      if (
+        createdItemRows.length !==
+        authorizationItems.length
+      ) {
+        throw new Error(
+          "The authorization was created, but its item-count verification did not match. Provider execution remains locked; reconcile the authorization before continuing."
+        );
+      }
+
+      const cancelConfirmationPhrase =
+        `CANCEL ${createdAuthorizationId
+          .slice(
+            0,
+            8
+          )
+          .toUpperCase()}`;
+
+      return NextResponse.json({
+        status:
+          "run_authorization_created",
+
+        authorizationCreated:
+          true,
+
+        providerExecutionUnlocked:
+          false,
+
+        authorization:
+          createdAuthorization,
+
+        authorizationItems:
+          createdItemRows,
+
+        selectionFingerprint,
+
+        cancelConfirmationPhrase,
+
+        message:
+          `${authorizationItems.length} recipient${authorizationItems.length === 1 ? "" : "s"} were atomically authorized for this controlled ${authorizationEnvironment} run. No Mailshake recipient was added and provider execution remains locked.`,
+      });
+    }
     let message:
       string;
 
@@ -1070,6 +1827,12 @@ export async function POST(
       authorizationDurationMinutes:
         AUTHORIZATION_DURATION_MINUTES,
 
+      createConfirmationPhrase:
+        proposedContactIds.length >
+          0 &&
+        authorizationEnvironment
+          ? `AUTHORIZE ${authorizationEnvironment.toUpperCase()} ${proposedContactIds.length} FOR ${providerCampaignId}`
+          : null,
       authorizationCreated:
         false,
 
@@ -1108,7 +1871,7 @@ export async function POST(
     });
   } catch (error) {
     console.error(
-      "[mailshake-run-authorization-review]",
+      "[mailshake-run-authorization-lifecycle]",
       error
     );
 
@@ -1117,7 +1880,7 @@ export async function POST(
         error:
           error instanceof Error
             ? error.message
-            : "Could not complete the read-only Production authorization review.",
+            : "Could not complete the Mailshake run-authorization lifecycle request.",
       },
       {
         status: 500,

@@ -176,6 +176,7 @@ type ProductionAuthorizationReviewResponse = {
   blockedProposedCount?: number;
   maxControlledAuthorizationCount?: number;
   authorizationDurationMinutes?: number;
+  createConfirmationPhrase?: string | null;
   authorizationCreated?: boolean;
   safetyChecksPassedForProposedSet?: boolean;
   eligibleForLaterProductionAuthorization?: boolean;
@@ -192,6 +193,25 @@ type ProductionAuthorizationReviewResponse = {
   providerWritePolicyAllowed?: boolean;
   providerWritePolicyMode?: string;
   providerWritePolicyReason?: string;
+  message?: string;
+  error?: string;
+};
+type ProductionAuthorizationLifecycleResponse = {
+  status?: string;
+  authorizationCreated?: boolean;
+  authorizationCancelled?: boolean;
+  providerExecutionUnlocked?: boolean;
+
+  authorization?: {
+    id?: string;
+    status?: string;
+    authorized_count?: number;
+    expires_at?: string | null;
+    cancelled_at?: string | null;
+    stop_reason?: string | null;
+  } | null;
+
+  cancelConfirmationPhrase?: string | null;
   message?: string;
   error?: string;
 };
@@ -769,6 +789,49 @@ export default function OutreachMailshakeSection({
     setAuthorizationReviewError,
   ] =
     useState("");
+  const [
+    authorizationLifecycle,
+    setAuthorizationLifecycle,
+  ] =
+    useState<
+      ProductionAuthorizationLifecycleResponse | null
+    >(null);
+
+  const [
+    authorizationCreateConfirmation,
+    setAuthorizationCreateConfirmation,
+  ] =
+    useState("");
+
+  const [
+    authorizationCancelConfirmation,
+    setAuthorizationCancelConfirmation,
+  ] =
+    useState("");
+
+  const [
+    authorizationCancellationReason,
+    setAuthorizationCancellationReason,
+  ] =
+    useState("");
+
+  const [
+    authorizationLifecycleError,
+    setAuthorizationLifecycleError,
+  ] =
+    useState("");
+
+  const [
+    isCreatingAuthorization,
+    setIsCreatingAuthorization,
+  ] =
+    useState(false);
+
+  const [
+    isCancellingAuthorization,
+    setIsCancellingAuthorization,
+  ] =
+    useState(false);
   const [
     providerSubmissionResult,
     setProviderSubmissionResult,
@@ -2225,6 +2288,25 @@ export default function OutreachMailshakeSection({
   }
 
   async function reviewProductionAuthorization() {
+    setAuthorizationLifecycle(
+      null
+    );
+
+    setAuthorizationCreateConfirmation(
+      ""
+    );
+
+    setAuthorizationCancelConfirmation(
+      ""
+    );
+
+    setAuthorizationCancellationReason(
+      ""
+    );
+
+    setAuthorizationLifecycleError(
+      ""
+    );
     if (
       !selectedCampaign ||
       !providerExecutionReview?.providerReview
@@ -2364,6 +2446,268 @@ export default function OutreachMailshakeSection({
       setIsReviewingAuthorization(
         false
       );
+    }
+  }
+  async function createProductionAuthorization() {
+    const requiredPhrase =
+      authorizationReview?.createConfirmationPhrase?.trim() ||
+      "";
+
+    if (
+      !requiredPhrase ||
+      !authorizationReview?.safetyChecksPassedForProposedSet
+    ) {
+      setAuthorizationLifecycleError(
+        "The current review is not eligible to create a controlled run authorization."
+      );
+
+      return;
+    }
+
+    if (
+      authorizationReviewFingerprint !==
+      enrollmentSelectionFingerprint
+    ) {
+      setAuthorizationLifecycleError(
+        "The authorization review is stale. Run Step 3 and the read-only authorization review again."
+      );
+
+      return;
+    }
+
+    if (
+      authorizationCreateConfirmation.trim() !==
+      requiredPhrase
+    ) {
+      setAuthorizationLifecycleError(
+        `Type the confirmation exactly as shown: ${requiredPhrase}`
+      );
+
+      return;
+    }
+
+    if (!selectedCampaign) {
+      setAuthorizationLifecycleError(
+        "No Mailshake campaign is selected."
+      );
+
+      return;
+    }
+
+    setIsCreatingAuthorization(true);
+    setAuthorizationLifecycleError("");
+
+    try {
+      const response =
+        await fetch(
+          "/api/outreach-mailshake/run-authorization",
+          {
+            method: "POST",
+
+            headers: {
+              ...(await getBearerHeaders()),
+              "Content-Type": "application/json",
+            },
+
+            body:
+              JSON.stringify({
+                action: "create",
+
+                providerCampaignId:
+                  selectedCampaign.providerCampaignId,
+
+                campaignName:
+                  selectedCampaign.title,
+
+                campaignStatus:
+                  selectedCampaignStatus(),
+
+                selectionMode:
+                  selectionUsedSelectAll
+                    ? "select_all_filtered"
+                    : "individual",
+
+                sourceListId:
+                  listBatchSourceListId ||
+                  undefined,
+
+                filterSnapshot:
+                  enrollmentFilterSnapshot,
+
+                contactIds:
+                  selectedContactIds,
+
+                confirmationPhrase:
+                  authorizationCreateConfirmation.trim(),
+              }),
+
+            cache: "no-store",
+          }
+        );
+
+      const rawText =
+        await response.text();
+
+      let data:
+        ProductionAuthorizationLifecycleResponse;
+
+      try {
+        data =
+          rawText
+            ? JSON.parse(rawText)
+            : {};
+      } catch {
+        throw new Error(
+          `CRM authorization creation returned an unreadable response with HTTP status ${response.status}.`
+        );
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            "The controlled run authorization could not be created."
+        );
+      }
+
+      if (data.authorizationCreated !== true) {
+        throw new Error(
+          "The server did not confirm authorization creation."
+        );
+      }
+
+      setAuthorizationLifecycle(data);
+
+      setAuthorizationCreateConfirmation("");
+      setAuthorizationCancelConfirmation("");
+      setAuthorizationCancellationReason("");
+    } catch (error) {
+      setAuthorizationLifecycleError(
+        error instanceof Error
+          ? error.message
+          : "The controlled run authorization could not be created."
+      );
+    } finally {
+      setIsCreatingAuthorization(false);
+    }
+  }
+
+  async function cancelProductionAuthorization() {
+    const authorizationId =
+      authorizationLifecycle?.authorization?.id?.trim() ||
+      "";
+
+    const requiredPhrase =
+      authorizationLifecycle?.cancelConfirmationPhrase?.trim() ||
+      "";
+
+    const reason =
+      authorizationCancellationReason.trim();
+
+    if (
+      !authorizationId ||
+      !requiredPhrase
+    ) {
+      setAuthorizationLifecycleError(
+        "There is no cancellable run authorization loaded."
+      );
+
+      return;
+    }
+
+    if (reason.length < 8) {
+      setAuthorizationLifecycleError(
+        "Enter a cancellation reason of at least 8 characters."
+      );
+
+      return;
+    }
+
+    if (
+      authorizationCancelConfirmation.trim() !==
+      requiredPhrase
+    ) {
+      setAuthorizationLifecycleError(
+        `Type the cancellation confirmation exactly as shown: ${requiredPhrase}`
+      );
+
+      return;
+    }
+
+    setIsCancellingAuthorization(true);
+    setAuthorizationLifecycleError("");
+
+    try {
+      const response =
+        await fetch(
+          "/api/outreach-mailshake/run-authorization",
+          {
+            method: "POST",
+
+            headers: {
+              ...(await getBearerHeaders()),
+              "Content-Type": "application/json",
+            },
+
+            body:
+              JSON.stringify({
+                action: "cancel",
+                authorizationId,
+                cancellationReason: reason,
+
+                confirmationPhrase:
+                  authorizationCancelConfirmation.trim(),
+              }),
+
+            cache: "no-store",
+          }
+        );
+
+      const rawText =
+        await response.text();
+
+      let data:
+        ProductionAuthorizationLifecycleResponse;
+
+      try {
+        data =
+          rawText
+            ? JSON.parse(rawText)
+            : {};
+      } catch {
+        throw new Error(
+          `CRM authorization cancellation returned an unreadable response with HTTP status ${response.status}.`
+        );
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            "The run authorization could not be cancelled."
+        );
+      }
+
+      if (data.authorizationCancelled !== true) {
+        throw new Error(
+          "The server did not confirm cancellation."
+        );
+      }
+
+      setAuthorizationLifecycle(data);
+
+      setAuthorizationReview(null);
+      setAuthorizationReviewFingerprint("");
+
+      setAuthorizationCreateConfirmation("");
+      setAuthorizationCancelConfirmation("");
+      setAuthorizationCancellationReason("");
+    } catch (error) {
+      setAuthorizationLifecycleError(
+        error instanceof Error
+          ? error.message
+          : "The run authorization could not be cancelled."
+      );
+    } finally {
+      setIsCancellingAuthorization(false);
     }
   }
   async function submitRecordedEnrollmentToMailshake() {
@@ -3014,7 +3358,7 @@ export default function OutreachMailshakeSection({
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-wide text-blue-700">
-              Version 3.27H3B2B1 - Admin Production Authorization Review
+              Version 3.27H3B2B2 - Create / Cancel Production Authorization
             </p>
 
             <h2 className="mt-1 text-2xl font-bold text-slate-950">
@@ -4991,7 +5335,7 @@ export default function OutreachMailshakeSection({
 
                         <div className="mt-4 rounded-xl border border-indigo-300 bg-indigo-50 p-4">
                           <p className="text-xs font-black uppercase tracking-wide text-indigo-700">
-                            H3B2B1 — Admin Production Authorization Review
+                            H3B2B2 — Admin Production Authorization Lifecycle
                           </p>
 
                           <h6 className="mt-1 font-bold text-indigo-950">
@@ -5167,11 +5511,205 @@ export default function OutreachMailshakeSection({
                                   : "blocked"}
                                 .{" "}
                                 {authorizationReview.providerWritePolicyReason}
-                                {" "}H3B2B1 never invokes the provider-write endpoint.
+                                {" "}H3B2B2 authorization lifecycle still never invokes the provider-write endpoint.
                               </div>
                             </div>
                           )}
                         </div>
+                        {authorizationLifecycleError && (
+                          <div className="mt-4 rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-950">
+                            {authorizationLifecycleError}
+                          </div>
+                        )}
+
+                        {authorizationReview?.createConfirmationPhrase &&
+                          authorizationReview.safetyChecksPassedForProposedSet &&
+                          !authorizationLifecycle?.authorizationCreated && (
+                            <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4">
+                              <p className="text-xs font-black uppercase tracking-wide text-amber-800">
+                                H3B2B2 — Controlled Authorization Creation
+                              </p>
+
+                              <p className="mt-2 text-xs leading-5 text-amber-950">
+                                This creates only the short-lived CRM run authorization and its exact enrollment items. It does not add a Mailshake recipient, send email, or unlock provider execution.
+                              </p>
+
+                              <p className="mt-3 text-xs font-bold text-amber-950">
+                                Type exactly:
+                              </p>
+
+                              <div className="mt-1 rounded-lg border border-amber-300 bg-white px-3 py-2 font-mono text-sm font-black text-slate-950">
+                                {authorizationReview.createConfirmationPhrase}
+                              </div>
+
+                              <input
+                                type="text"
+                                value={authorizationCreateConfirmation}
+                                onChange={(event) =>
+                                  setAuthorizationCreateConfirmation(
+                                    event.target.value
+                                  )
+                                }
+                                autoComplete="off"
+                                spellCheck={false}
+                                className="mt-3 w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-slate-950"
+                                placeholder="Type the authorization confirmation"
+                              />
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  void createProductionAuthorization()
+                                }
+                                disabled={
+                                  isCreatingAuthorization ||
+                                  authorizationCreateConfirmation.trim() !==
+                                    authorizationReview.createConfirmationPhrase
+                                }
+                                className="mt-3 rounded-xl bg-amber-700 px-5 py-3 text-sm font-black text-white hover:bg-amber-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                              >
+                                {isCreatingAuthorization
+                                  ? "Creating Authorization..."
+                                  : "Create Controlled Run Authorization"}
+                              </button>
+                            </div>
+                          )}
+
+                        {authorizationLifecycle?.authorizationCreated &&
+                          authorizationLifecycle.authorization?.id && (
+                            <div className="mt-4 rounded-xl border border-emerald-300 bg-emerald-50 p-4">
+                              <p className="text-xs font-black uppercase tracking-wide text-emerald-800">
+                                Authorization Created — Provider Execution Still Locked
+                              </p>
+
+                              <p className="mt-2 text-sm font-semibold text-emerald-950">
+                                {authorizationLifecycle.message}
+                              </p>
+
+                              <div className="mt-3 rounded-lg border border-emerald-200 bg-white p-3 text-xs leading-5 text-slate-800">
+                                <p>
+                                  Authorization ID:{" "}
+                                  <span className="font-mono font-black">
+                                    {authorizationLifecycle.authorization.id}
+                                  </span>
+                                </p>
+
+                                <p>
+                                  Status:{" "}
+                                  <span className="font-black">
+                                    {authorizationLifecycle.authorization.status ||
+                                      "authorized"}
+                                  </span>
+                                </p>
+
+                                <p>
+                                  Authorized count:{" "}
+                                  <span className="font-black">
+                                    {authorizationLifecycle.authorization
+                                      .authorized_count ?? 0}
+                                  </span>
+                                </p>
+
+                                <p>
+                                  Expires:{" "}
+                                  <span className="font-black">
+                                    {authorizationLifecycle.authorization
+                                      .expires_at || "Unknown"}
+                                  </span>
+                                </p>
+
+                                <p>
+                                  Provider execution unlocked:{" "}
+                                  <span className="font-black">
+                                    {authorizationLifecycle.providerExecutionUnlocked
+                                      ? "YES"
+                                      : "NO"}
+                                  </span>
+                                </p>
+                              </div>
+
+                              {authorizationLifecycle.cancelConfirmationPhrase && (
+                                <div className="mt-4 rounded-lg border border-red-300 bg-red-50 p-3">
+                                  <p className="text-xs font-black uppercase text-red-800">
+                                    Cancel Unused Authorization
+                                  </p>
+
+                                  <p className="mt-2 text-xs text-red-950">
+                                    Cancellation is audit-preserving and is refused after any provider operation has been linked.
+                                  </p>
+
+                                  <input
+                                    type="text"
+                                    value={authorizationCancellationReason}
+                                    onChange={(event) =>
+                                      setAuthorizationCancellationReason(
+                                        event.target.value
+                                      )
+                                    }
+                                    className="mt-3 w-full rounded-lg border border-red-300 bg-white px-3 py-2 text-sm font-semibold text-slate-950"
+                                    placeholder="Cancellation reason — at least 8 characters"
+                                  />
+
+                                  <p className="mt-3 text-xs font-bold text-red-950">
+                                    Type exactly:
+                                  </p>
+
+                                  <div className="mt-1 rounded-lg border border-red-300 bg-white px-3 py-2 font-mono text-sm font-black text-slate-950">
+                                    {authorizationLifecycle.cancelConfirmationPhrase}
+                                  </div>
+
+                                  <input
+                                    type="text"
+                                    value={authorizationCancelConfirmation}
+                                    onChange={(event) =>
+                                      setAuthorizationCancelConfirmation(
+                                        event.target.value
+                                      )
+                                    }
+                                    autoComplete="off"
+                                    spellCheck={false}
+                                    className="mt-3 w-full rounded-lg border border-red-300 bg-white px-3 py-2 text-sm font-semibold text-slate-950"
+                                    placeholder="Type the cancellation confirmation"
+                                  />
+
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      void cancelProductionAuthorization()
+                                    }
+                                    disabled={
+                                      isCancellingAuthorization ||
+                                      authorizationCancellationReason.trim()
+                                        .length < 8 ||
+                                      authorizationCancelConfirmation.trim() !==
+                                        authorizationLifecycle.cancelConfirmationPhrase
+                                    }
+                                    className="mt-3 rounded-xl bg-red-700 px-5 py-3 text-sm font-black text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                                  >
+                                    {isCancellingAuthorization
+                                      ? "Cancelling Authorization..."
+                                      : "Cancel Unused Authorization"}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                        {authorizationLifecycle?.authorizationCancelled && (
+                          <div className="mt-4 rounded-xl border border-slate-300 bg-slate-50 p-4">
+                            <p className="text-xs font-black uppercase text-slate-700">
+                              Authorization Cancelled
+                            </p>
+
+                            <p className="mt-2 text-sm font-semibold text-slate-900">
+                              {authorizationLifecycle.message}
+                            </p>
+
+                            <p className="mt-2 text-xs font-black text-slate-700">
+                              Run Step 3 and the read-only authorization review again before creating another authorization.
+                            </p>
+                          </div>
+                        )}
                         {providerExecutionReview.providerReview
                           .providerExecutionAllowed ? (
                           <div className="mt-4 grid gap-4">
@@ -5189,7 +5727,7 @@ export default function OutreachMailshakeSection({
                               </h6>
 
                               <p className="mt-2 text-xs leading-5 text-red-900">
-                                Version 3.27H3B2B1 preserves CRM/List batches containing 100+ recipients. A controlled run processes up to {MAX_CONTROLLED_PROVIDER_RUN_SIZE} server-verified ready recipients sequentially. Each recipient still receives a separate CRM provider operation and a separate one-recipient Mailshake request. The run stops immediately on the first abnormal or uncertain result.
+                                Version 3.27H3B2B2 preserves CRM/List batches containing 100+ recipients. A controlled run processes up to {MAX_CONTROLLED_PROVIDER_RUN_SIZE} server-verified ready recipients sequentially. Each recipient still receives a separate CRM provider operation and a separate one-recipient Mailshake request. The run stops immediately on the first abnormal or uncertain result.
                               </p>
 
                               <p className="mt-2 text-xs font-black text-red-950">

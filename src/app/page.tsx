@@ -207,10 +207,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.27H3B2B1 - Admin Production Authorization Review";
+  "Version 3.27H3B2B2 - Create / Cancel Production Authorization";
 
 const REVISION_NOTE =
-  "Current revision 3.27H3B2B1: adds an Admin-only, read-only Production authorization review that reruns the authoritative CRM and Mailshake readiness checks and checks the proposed controlled set for existing provider operations, existing Mailshake recipients, and active run authorizations. It does not create an authorization, and Production Mailshake provider writes remain explicitly locked.";
+  "Current revision 3.27H3B2B2: adds the Admin-only create/cancel lifecycle for short-lived controlled run authorizations, including exact typed confirmation, atomic authorization creation, and auditable unused-run cancellation. Creating an authorization still does not add a Mailshake recipient or unlock Production provider execution.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean
