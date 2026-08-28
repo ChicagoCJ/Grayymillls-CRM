@@ -27,8 +27,6 @@ const MAX_PAGES = 50;
  */
 const MAX_RECIPIENTS_PER_OPERATION = 1;
 
-const CONFIRMATION_PHRASE =
-  "SUBMIT_ONE_TO_PAUSED_MAILSHAKE";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -916,19 +914,45 @@ export async function POST(
       action ===
       "prepare_authorized";
 
+    const submitAuthorizedOperation =
+      action ===
+      "submit_authorized";
+
+    const authorizedOperation =
+      prepareAuthorizedOperation ||
+      submitAuthorizedOperation;
+
+    /*
+     * H3C2 fail-closed boundary.
+     *
+     * The legacy direct-submit path is disabled.
+     * Every new provider operation must now use one exact
+     * run-authorization item.
+     */
+    if (!authorizedOperation) {
+      return NextResponse.json(
+        {
+          error:
+            "Direct Mailshake submission is disabled. Create and use an exact CRM run authorization first.",
+        },
+        {
+          status:
+            409,
+        }
+      );
+    }
+
     const providerWritePolicy =
       getMailshakeProviderWritePolicy();
 
     /*
-     * H3C1B has one prepare-only exception to the provider-write
-     * policy gate.
+     * A real authorized provider write is still governed by
+     * the existing Preview-only provider-write policy.
      *
-     * It may create the CRM-owned prepared operation, but it
-     * returns before recipients/add and therefore does not
-     * perform a Mailshake provider write.
+     * Production therefore remains explicitly locked.
      */
     if (
-      !prepareAuthorizedOperation &&
+      submitAuthorizedOperation &&
       !providerWritePolicy.enabled
     ) {
       return NextResponse.json(
@@ -943,49 +967,62 @@ export async function POST(
       );
     }
 
+    const authorizedRole =
+      cleanText(
+        access.context.crmRole
+      ).toLowerCase();
+
     if (
-      prepareAuthorizedOperation
+      authorizedRole !==
+      "admin"
     ) {
-      const prepareRole =
-        cleanText(
-          access.context.crmRole
-        ).toLowerCase();
-
-      if (
-        prepareRole !==
-        "admin"
-      ) {
-        return NextResponse.json(
-          {
-            error:
-              "Only a signed-in CRM Admin can prepare an authorized Mailshake provider operation.",
-          },
-          {
-            status:
-              403,
-          }
-        );
-      }
-
-      if (
-        providerWritePolicy.environment !==
-          "preview" &&
-        providerWritePolicy.environment !==
-          "production"
-      ) {
-        return NextResponse.json(
-          {
-            error:
-              `Authorized provider-operation preparation is available only in Vercel Preview or Production. Current environment: ${providerWritePolicy.environment}.`,
-          },
-          {
-            status:
-              409,
-          }
-        );
-      }
+      return NextResponse.json(
+        {
+          error:
+            "Only a signed-in CRM Admin can prepare or submit an authorized Mailshake provider operation.",
+        },
+        {
+          status:
+            403,
+        }
+      );
     }
 
+    if (
+      prepareAuthorizedOperation &&
+      providerWritePolicy.environment !==
+        "preview" &&
+      providerWritePolicy.environment !==
+        "production"
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            `Authorized operation preparation is available only in Vercel Preview or Production. Current environment: ${providerWritePolicy.environment}.`,
+        },
+        {
+          status:
+            409,
+        }
+      );
+    }
+
+    if (
+      submitAuthorizedOperation &&
+      providerWritePolicy.environment !==
+        "preview"
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "H3C2 authorized Mailshake submission is Preview-only. Production provider writes remain explicitly locked.",
+        },
+        {
+          status:
+            409,
+        }
+      );
+    }
     const previewTestRecipientEmails =
       providerWritePolicy.allowedRecipientEmails;
 
@@ -995,7 +1032,6 @@ export async function POST(
       );
 
     if (
-      prepareAuthorizedOperation &&
       !UUID_PATTERN.test(
         authorizationItemId
       )
@@ -1003,7 +1039,7 @@ export async function POST(
       return NextResponse.json(
         {
           error:
-            "A valid run-authorization item ID is required for prepare-only operation creation.",
+            "A valid run-authorization item ID is required for authorized provider execution.",
         },
         {
           status:
@@ -1035,7 +1071,12 @@ export async function POST(
               8
             )
             .toUpperCase()}`
-        : CONFIRMATION_PHRASE;
+        : `SUBMIT AUTHORIZED ${authorizationItemId
+            .slice(
+              0,
+              8
+            )
+            .toUpperCase()}`;
 
     if (
       confirmationPhrase !==
@@ -1044,9 +1085,7 @@ export async function POST(
       return NextResponse.json(
         {
           error:
-            prepareAuthorizedOperation
-              ? `Preparation confirmation did not match. Type exactly: ${expectedConfirmationPhrase}`
-              : "The provider execution confirmation was missing or invalid.",
+            `Confirmation did not match. Type exactly: ${expectedConfirmationPhrase}`,
         },
         {
           status:
@@ -1054,7 +1093,6 @@ export async function POST(
         }
       );
     }
-
     if (
       !providerCampaignId
     ) {
@@ -1336,7 +1374,7 @@ export async function POST(
      * test inbox.
      */
     if (
-      !prepareAuthorizedOperation &&
+      submitAuthorizedOperation &&
       !previewTestRecipientEmails.includes(
         currentEmail
       )
@@ -1512,122 +1550,130 @@ export async function POST(
     }
 
     /*
-     * H3C1B PREPARE ONLY
+     * H3C2 AUTHORIZED ATOMIC CLAIM
      *
-     * Every CRM and Mailshake read check above has passed.
-     * The database function now atomically consumes one exact
-     * authorization item into one prepared provider operation.
+     * The database consumes the exact authorization item and
+     * creates the one prepared provider operation plus mapping
+     * in the same transaction.
      *
-     * This branch RETURNS before recipients/add.
+     * prepare_authorized stops here.
+     * submit_authorized continues using THIS SAME operation.
      */
+    const claimedAt =
+      new Date().toISOString();
+
+    const {
+      data:
+        claimedOperationIdRaw,
+      error:
+        claimOperationError,
+    } =
+      await supabase.rpc(
+        "claim_outreach_provider_run_authorization_item",
+        {
+          p_authorization_item_id:
+            authorizationItemId,
+
+          p_expected_enrollment_id:
+            enrollmentId,
+
+          p_environment:
+            providerWritePolicy.environment,
+
+          p_requested_by_crm_user_id:
+            access.context.crmUserId,
+
+          p_requested_by_display_name:
+            access.context.crmDisplayName,
+
+          p_request_snapshot: {
+            revision:
+              "3.27H3C2",
+
+            safetyPolicy:
+              submitAuthorizedOperation
+                ? "authorized_atomic_preview_submit"
+                : "authorized_atomic_prepare_only",
+
+            preparationOnly:
+              prepareAuthorizedOperation,
+
+            providerWritePerformedAtClaim:
+              false,
+
+            environment:
+              providerWritePolicy.environment,
+
+            providerWritePolicyMode:
+              providerWritePolicy.mode,
+
+            providerWritePolicyEnabled:
+              providerWritePolicy.enabled,
+
+            previewAllowlistedRecipient:
+              submitAuthorizedOperation
+                ? currentEmail
+                : null,
+
+            providerCampaignTitle:
+              providerCampaign.title,
+
+            providerCampaignState:
+              "paused",
+
+            crmEligibilityReviewedAt:
+              claimedAt,
+
+            contactId,
+
+            enrollmentId,
+
+            normalizedEmail:
+              currentEmail,
+          },
+        }
+      );
+
+    if (
+      claimOperationError
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            claimOperationError.message ||
+            "The exact authorization item could not be claimed atomically.",
+
+          providerOperationPrepared:
+            false,
+
+          providerWritePerformed:
+            false,
+        },
+        {
+          status:
+            409,
+        }
+      );
+    }
+
+    const operationId =
+      cleanText(
+        claimedOperationIdRaw
+      );
+
+    if (
+      !UUID_PATTERN.test(
+        operationId
+      )
+    ) {
+      throw new Error(
+        "The atomic authorization claim did not return a valid provider-operation ID."
+      );
+    }
+
     if (
       prepareAuthorizedOperation
     ) {
-      const preparedAt =
-        new Date().toISOString();
-
-      const {
-        data:
-          preparedOperationIdRaw,
-        error:
-          prepareOperationError,
-      } =
-        await supabase.rpc(
-          "claim_outreach_provider_run_authorization_item",
-          {
-            p_authorization_item_id:
-              authorizationItemId,
-
-            p_expected_enrollment_id:
-              enrollmentId,
-
-            p_environment:
-              providerWritePolicy.environment,
-
-            p_requested_by_crm_user_id:
-              access.context.crmUserId,
-
-            p_requested_by_display_name:
-              access.context.crmDisplayName,
-
-            p_request_snapshot: {
-              revision:
-                "3.27H3C1B",
-
-              safetyPolicy:
-                "authorized_atomic_prepare_only",
-
-              preparationOnly:
-                true,
-
-              providerWritePerformed:
-                false,
-
-              environment:
-                providerWritePolicy.environment,
-
-              providerWritePolicyMode:
-                providerWritePolicy.mode,
-
-              providerWritePolicyEnabled:
-                providerWritePolicy.enabled,
-
-              providerCampaignTitle:
-                providerCampaign.title,
-
-              providerCampaignState:
-                "paused",
-
-              crmEligibilityReviewedAt:
-                preparedAt,
-
-              contactId,
-
-              enrollmentId,
-
-              normalizedEmail:
-                currentEmail,
-            },
-          }
-        );
-
-      if (
-        prepareOperationError
-      ) {
-        return NextResponse.json(
-          {
-            error:
-              prepareOperationError.message ||
-              "The authorized provider operation could not be prepared atomically.",
-
-            providerOperationPrepared:
-              false,
-
-            providerWritePerformed:
-              false,
-          },
-          {
-            status:
-              409,
-          }
-        );
-      }
-
-      const operationId =
-        cleanText(
-          preparedOperationIdRaw
-        );
-
-      if (
-        !UUID_PATTERN.test(
-          operationId
-        )
-      ) {
-        throw new Error(
-          "The atomic authorization claim did not return a valid provider-operation ID."
-        );
-      }
-
       return NextResponse.json(
         {
           status:
@@ -1666,7 +1712,7 @@ export async function POST(
             false,
 
           message:
-            "The exact authorized enrollment was atomically reserved as one prepared CRM provider operation. No Mailshake recipients/add request was made.",
+            "The exact authorization item was atomically converted into one prepared CRM provider operation. No Mailshake recipients/add request was made.",
         },
         {
           status:
@@ -1674,187 +1720,6 @@ export async function POST(
         }
       );
     }
-
-    const requestedAt =
-      new Date().toISOString();
-
-    /*
-     * Create the CRM-owned provider-operation record BEFORE
-     * calling Mailshake.
-     */
-    const {
-      data:
-        operationData,
-      error:
-        operationInsertError,
-    } =
-      await supabase
-        .from(
-          "outreach_provider_operations"
-        )
-        .insert({
-          provider:
-            "mailshake",
-
-          operation_type:
-            "recipient_add",
-
-          outreach_campaign_id:
-            outreachCampaignId,
-
-          provider_campaign_id:
-            providerCampaignId,
-
-          status:
-            "prepared",
-
-          requested_by_crm_user_id:
-            access.context.crmUserId,
-
-          requested_by_display_name:
-            access.context.crmDisplayName,
-
-          requested_count:
-            1,
-
-          request_snapshot: {
-            safetyPolicy:
-              "preview_only_paused_single_recipient_allowlist",
-
-            previewAllowlistedRecipient:
-              currentEmail,
-
-            previewAllowlistSize:
-              previewTestRecipientEmails.length,
-
-            providerCampaignTitle:
-              providerCampaign.title,
-
-            providerCampaignState:
-              "paused",
-
-            crmEligibilityReviewedAt:
-              requestedAt,
-
-            contactId,
-
-            enrollmentId,
-          },
-
-          requested_at:
-            requestedAt,
-
-          created_at:
-            requestedAt,
-
-          updated_at:
-            requestedAt,
-        })
-        .select(
-          "id"
-        )
-        .single();
-
-    if (operationInsertError) {
-      throw operationInsertError;
-    }
-
-    const operationId =
-      cleanText(
-        operationData?.id
-      );
-
-    if (!operationId) {
-      throw new Error(
-        "The CRM could not establish the provider operation identity."
-      );
-    }
-
-    /*
-     * Reserve the enrollment.
-     *
-     * The unique partial database index prevents two active
-     * operations from reserving the same enrollment.
-     */
-    const {
-      error:
-        mappingInsertError,
-    } =
-      await supabase
-        .from(
-          "outreach_provider_operation_enrollments"
-        )
-        .insert({
-          operation_id:
-            operationId,
-
-          enrollment_id:
-            enrollmentId,
-
-          submitted_email:
-            currentEmail,
-
-          status:
-            "prepared",
-
-          created_at:
-            requestedAt,
-
-          updated_at:
-            requestedAt,
-        });
-
-    if (mappingInsertError) {
-      const isConcurrencyConflict =
-        cleanText(
-          (
-            mappingInsertError as {
-              code?: string;
-            }
-          ).code
-        ) ===
-        "23505";
-
-      await supabase
-        .from(
-          "outreach_provider_operations"
-        )
-        .update({
-          status:
-            "cancelled",
-
-          error_message:
-            isConcurrencyConflict
-              ? "Another active provider operation already reserved this CRM enrollment."
-              : mappingInsertError.message,
-
-          completed_at:
-            new Date().toISOString(),
-
-          updated_at:
-            new Date().toISOString(),
-        })
-        .eq(
-          "id",
-          operationId
-        );
-
-      return NextResponse.json(
-        {
-          error:
-            isConcurrencyConflict
-              ? "Another provider request reserved this enrollment first. Nothing was submitted to Mailshake."
-              : "CRM could not safely reserve this enrollment for provider submission. Nothing was submitted to Mailshake.",
-        },
-        {
-          status:
-            isConcurrencyConflict
-              ? 409
-              : 500,
-        }
-      );
-    }
-
     /*
      * Second fresh Mailshake campaign check immediately before
      * the provider write.

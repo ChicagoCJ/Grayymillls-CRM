@@ -207,10 +207,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.27H3C1B - Authorized Operation Preparation";
+  "Version 3.27H3C2 - Preview End-to-End Authorized Send";
 
 const REVISION_NOTE =
-  "Current revision 3.27H3C1B: adds an Admin-only prepare-only provider execution path that atomically consumes one exact valid authorization item into one prepared CRM provider operation and enrollment mapping, then returns before Mailshake recipients/add. Production Mailshake provider writes remain explicitly locked.";
+  "Current revision 3.27H3C2: requires one exact short-lived run-authorization item for every new Preview Mailshake recipient add. The item is atomically consumed into the same CRM provider operation used for the provider write. This proof remains Admin-only, one-recipient, allowlisted, and paused-campaign-only. Production Mailshake provider writes remain explicitly locked.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean

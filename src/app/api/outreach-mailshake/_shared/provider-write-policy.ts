@@ -87,9 +87,15 @@ export function getMailshakeProviderWritePolicy(): MailshakeProviderWritePolicy 
   const allowedRecipientEmails =
     Array.from(
       new Set(
-        cleanText(
-          process.env.MAILSHAKE_PREVIEW_TEST_EMAILS
-        )
+        [
+          cleanText(
+            process.env.MAILSHAKE_PREVIEW_TEST_EMAILS
+          ),
+          cleanText(
+            process.env.MAILSHAKE_PREVIEW_AUTHORIZED_TEST_EMAILS
+          ),
+        ]
+          .join(",")
           .split(
             /[,;\n\r]+/
           )

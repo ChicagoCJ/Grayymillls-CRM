@@ -211,6 +211,16 @@ type ProductionAuthorizationLifecycleResponse = {
     stop_reason?: string | null;
   } | null;
 
+  authorizationItems?: {
+    id?: string;
+    authorization_id?: string;
+    enrollment_id?: string;
+    contact_id?: string;
+    normalized_email?: string;
+    sequence_number?: number;
+    status?: string;
+  }[];
+
   cancelConfirmationPhrase?: string | null;
   message?: string;
   error?: string;
@@ -244,7 +254,7 @@ type ProviderBatchSubmissionItem = {
   error?: string;
 };
 
-const MAX_CONTROLLED_PROVIDER_RUN_SIZE = 10;
+const MAX_CONTROLLED_PROVIDER_RUN_SIZE = 1;
 
 type ProviderStatusResponse = {
   status?: string;
@@ -2798,11 +2808,76 @@ export default function OutreachMailshakeSection({
       return;
     }
 
-    const runContactIds =
-      readyContactIds.slice(
-        0,
-        MAX_CONTROLLED_PROVIDER_RUN_SIZE
+    const authorizationItems =
+      Array.isArray(
+        authorizationLifecycle?.authorizationItems
+      )
+        ? authorizationLifecycle.authorizationItems
+        : [];
+
+    if (
+      authorizationLifecycle?.authorizationCreated !==
+        true ||
+      authorizationItems.length !==
+        1
+    ) {
+      setProviderSubmissionError(
+        "Create one fresh controlled run authorization before Step 4."
       );
+
+      return;
+    }
+
+    const authorizationItem =
+      authorizationItems[0];
+
+    const authorizationItemId =
+      String(
+        authorizationItem.id ||
+          ""
+      ).trim();
+
+    const authorizationContactId =
+      String(
+        authorizationItem.contact_id ||
+          ""
+      ).trim();
+
+    if (
+      !authorizationItemId ||
+      !authorizationContactId ||
+      String(
+        authorizationItem.status ||
+          ""
+      ).toLowerCase() !==
+        "authorized"
+    ) {
+      setProviderSubmissionError(
+        "The controlled run authorization does not contain one usable authorization item."
+      );
+
+      return;
+    }
+
+    if (
+      readyContactIds.length !==
+        1 ||
+      readyToSubmitCount !==
+        1 ||
+      readyContactIds[0] !==
+        authorizationContactId
+    ) {
+      setProviderSubmissionError(
+        "The exact authorized contact no longer matches the single server-ready contact. Run Step 3 and the authorization review again."
+      );
+
+      return;
+    }
+
+    const runContactIds =
+      [
+        authorizationContactId,
+      ];
 
     const campaignName =
       providerReview.providerCampaignTitle ||
@@ -2900,13 +2975,23 @@ export default function OutreachMailshakeSection({
 
                 body:
                   JSON.stringify({
+                    action:
+                      "submit_authorized",
+
                     providerCampaignId:
                       selectedCampaign.providerCampaignId,
 
                     contactId,
 
+                    authorizationItemId,
+
                     confirmationPhrase:
-                      "SUBMIT_ONE_TO_PAUSED_MAILSHAKE",
+                      `SUBMIT AUTHORIZED ${authorizationItemId
+                        .slice(
+                          0,
+                          8
+                        )
+                        .toUpperCase()}`,
                   }),
 
                 cache:
@@ -3358,7 +3443,7 @@ export default function OutreachMailshakeSection({
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-wide text-blue-700">
-              Version 3.27H3C1B - Authorized Operation Preparation
+              Version 3.27H3C2 - Preview End-to-End Authorized Send
             </p>
 
             <h2 className="mt-1 text-2xl font-bold text-slate-950">
@@ -5723,11 +5808,11 @@ export default function OutreachMailshakeSection({
                               </p>
 
                               <h6 className="mt-1 font-bold text-red-950">
-                                Submit the next controlled group to the paused campaign
+                                Submit exactly one authorized Preview recipient to the paused campaign
                               </h6>
 
                               <p className="mt-2 text-xs leading-5 text-red-900">
-                                Version 3.27H3C1A preserves CRM/List batches containing 100+ recipients. A controlled run processes up to {MAX_CONTROLLED_PROVIDER_RUN_SIZE} server-verified ready recipients sequentially. Each recipient still receives a separate CRM provider operation and a separate one-recipient Mailshake request. The run stops immediately on the first abnormal or uncertain result.
+                                Version 3.27H3C2 deliberately limits this end-to-end proof to exactly {MAX_CONTROLLED_PROVIDER_RUN_SIZE} server-verified recipient. The exact authorization item is atomically consumed into the same CRM provider operation used for the Mailshake request.
                               </p>
 
                               <p className="mt-2 text-xs font-black text-red-950">
@@ -5771,6 +5856,17 @@ export default function OutreachMailshakeSection({
                                 }
                                 disabled={
                                   isSubmittingProvider ||
+                                  authorizationLifecycle
+                                    ?.authorizationCreated !==
+                                    true ||
+                                  (authorizationLifecycle
+                                    ?.authorizationItems?.length ??
+                                    0) !==
+                                    1 ||
+                                  authorizationLifecycle
+                                    ?.authorizationItems?.[0]
+                                    ?.status !==
+                                    "authorized" ||
                                   providerExecutionReviewFingerprint !==
                                     enrollmentSelectionFingerprint ||
                                   providerExecutionReview.providerReview
@@ -5778,26 +5874,20 @@ export default function OutreachMailshakeSection({
                                     true ||
                                   (providerExecutionReview.providerReview
                                     .readyContactIds?.length ??
-                                    0) ===
-                                    0 ||
+                                    0) !==
+                                    1 ||
                                   Number(
                                     providerExecutionReview.providerReview
                                       .readyToSubmitCount ??
                                       0
                                   ) !==
-                                    (providerExecutionReview.providerReview
-                                      .readyContactIds?.length ??
-                                      0)
+                                    1
                                 }
                                 className="mt-4 rounded-xl bg-red-700 px-5 py-3 text-sm font-black text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                               >
                                 {isSubmittingProvider
-                                  ? `Submitting controlled run — ${providerBatchSubmissionResults.length} of ${providerBatchPlannedCount} attempted...`
-                                  : `Step 4 — Submit Next ${Math.min(
-                                      providerExecutionReview.providerReview
-                                        .readyContactIds?.length ?? 0,
-                                      MAX_CONTROLLED_PROVIDER_RUN_SIZE
-                                    )} to PAUSED Mailshake`}
+                                  ? "Submitting 1 authorized Preview recipient..."
+                                  : "Step 4 — Submit 1 AUTHORIZED Preview Recipient"}
                               </button>
 
                               {(isSubmittingProvider ||
