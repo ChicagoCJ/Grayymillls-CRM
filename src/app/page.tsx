@@ -207,10 +207,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.27H3C2 - Preview End-to-End Authorized Send";
+  "Version 3.27H3C3 - First Authorization-Gated Production Send";
 
 const REVISION_NOTE =
-  "Current revision 3.27H3C2: requires one exact short-lived run-authorization item for every new Preview Mailshake recipient add. The item is atomically consumed into the same CRM provider operation used for the provider write. This proof remains Admin-only, one-recipient, allowlisted, and paused-campaign-only. Production Mailshake provider writes remain explicitly locked.";
+  "Current revision 3.27H3C3: keeps the global Production Mailshake policy locked while allowing one narrow Admin-only Production submission path backed by one exact short-lived Production authorization item. The item must be atomically consumed into the exact provider operation before the paused-campaign Mailshake recipient add can occur. Preview continues to require its recipient allowlist.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean

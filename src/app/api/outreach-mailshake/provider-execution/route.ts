@@ -945,15 +945,32 @@ export async function POST(
     const providerWritePolicy =
       getMailshakeProviderWritePolicy();
 
+    const productionAuthorizedSubmit =
+      submitAuthorizedOperation &&
+      providerWritePolicy.environment ===
+        "production";
+
+    const previewAuthorizedSubmit =
+      submitAuthorizedOperation &&
+      providerWritePolicy.environment ===
+        "preview";
+
     /*
-     * A real authorized provider write is still governed by
-     * the existing Preview-only provider-write policy.
+     * H3C3 narrow Production boundary.
      *
-     * Production therefore remains explicitly locked.
+     * The centralized Production provider policy remains
+     * globally locked. Only this Admin-only submit_authorized
+     * path may proceed in Production, and the database must
+     * atomically validate and consume the exact Production
+     * authorization item before recipients/add can be reached.
+     *
+     * Preview continues to require the existing provider-write
+     * policy and recipient allowlist.
      */
     if (
       submitAuthorizedOperation &&
-      !providerWritePolicy.enabled
+      !providerWritePolicy.enabled &&
+      !productionAuthorizedSubmit
     ) {
       return NextResponse.json(
         {
@@ -1009,13 +1026,13 @@ export async function POST(
 
     if (
       submitAuthorizedOperation &&
-      providerWritePolicy.environment !==
-        "preview"
+      !previewAuthorizedSubmit &&
+      !productionAuthorizedSubmit
     ) {
       return NextResponse.json(
         {
           error:
-            "H3C2 authorized Mailshake submission is Preview-only. Production provider writes remain explicitly locked.",
+            `Authorized Mailshake submission is available only in Vercel Preview or Production. Current environment: ${providerWritePolicy.environment}.`,
         },
         {
           status:
@@ -1071,12 +1088,19 @@ export async function POST(
               8
             )
             .toUpperCase()}`
-        : `SUBMIT AUTHORIZED ${authorizationItemId
-            .slice(
-              0,
-              8
-            )
-            .toUpperCase()}`;
+        : productionAuthorizedSubmit
+          ? `SUBMIT PRODUCTION ${authorizationItemId
+              .slice(
+                0,
+                8
+              )
+              .toUpperCase()} FOR ${providerCampaignId}`
+          : `SUBMIT AUTHORIZED ${authorizationItemId
+              .slice(
+                0,
+                8
+              )
+              .toUpperCase()}`;
 
     if (
       confirmationPhrase !==
@@ -1374,7 +1398,7 @@ export async function POST(
      * test inbox.
      */
     if (
-      submitAuthorizedOperation &&
+      previewAuthorizedSubmit &&
       !previewTestRecipientEmails.includes(
         currentEmail
       )
@@ -1588,12 +1612,14 @@ export async function POST(
 
           p_request_snapshot: {
             revision:
-              "3.27H3C2",
+              "3.27H3C3",
 
             safetyPolicy:
-              submitAuthorizedOperation
-                ? "authorized_atomic_preview_submit"
-                : "authorized_atomic_prepare_only",
+              productionAuthorizedSubmit
+                ? "authorized_atomic_production_single_recipient"
+                : submitAuthorizedOperation
+                  ? "authorized_atomic_preview_submit"
+                  : "authorized_atomic_prepare_only",
 
             preparationOnly:
               prepareAuthorizedOperation,
@@ -1610,8 +1636,11 @@ export async function POST(
             providerWritePolicyEnabled:
               providerWritePolicy.enabled,
 
+            productionAuthorizedPolicyOverride:
+              productionAuthorizedSubmit,
+
             previewAllowlistedRecipient:
-              submitAuthorizedOperation
+              previewAuthorizedSubmit
                 ? currentEmail
                 : null,
 

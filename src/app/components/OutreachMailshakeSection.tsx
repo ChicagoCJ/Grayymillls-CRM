@@ -2759,9 +2759,35 @@ export default function OutreachMailshakeSection({
       return;
     }
 
+    const authorizationEnvironment =
+      String(
+        authorizationReview?.environment ||
+          ""
+      ).toLowerCase();
+
+    const productionAuthorizedSubmit =
+      authorizationEnvironment ===
+      "production";
+
+    const previewAuthorizedSubmit =
+      authorizationEnvironment ===
+      "preview";
+
+    if (
+      !productionAuthorizedSubmit &&
+      !previewAuthorizedSubmit
+    ) {
+      setProviderSubmissionError(
+        "The controlled run authorization environment is missing or unsupported. Run the authorization review again."
+      );
+
+      return;
+    }
+
     if (
       providerReview.providerWritePolicyAllowed !==
-      true
+        true &&
+      !productionAuthorizedSubmit
     ) {
       setProviderSubmissionError(
         providerReview.providerWritePolicyReason ||
@@ -2884,9 +2910,14 @@ export default function OutreachMailshakeSection({
       selectedCampaign.title ||
       "the selected campaign";
 
+    const submitEnvironmentLabel =
+      productionAuthorizedSubmit
+        ? "PRODUCTION"
+        : "PREVIEW";
+
     const confirmed =
       window.confirm(
-        `SUBMIT A CONTROLLED MAILSHAKE BATCH?\n\nCampaign: ${campaignName}\n\nServer-verified ready recipients: ${readyContactIds.length}\nRecipients in this controlled run: ${runContactIds.length}\n\nThis is a REAL Mailshake provider action. Recipients are processed ONE AT A TIME. Each recipient gets a separate CRM provider-operation record and the server re-checks eligibility, existing Mailshake membership, and PAUSED campaign status for every recipient.\n\nThe controller STOPS on the first blocked, failed, unreadable, or uncertain result. It never automatically retries an uncertain recipient.\n\nA campaign may contain 100+ recipients. The ${MAX_CONTROLLED_PROVIDER_RUN_SIZE}-recipient run size is only a controlled processing increment, not a campaign limit.\n\nKEEP THE CAMPAIGN PAUSED until asynchronous results are reconciled.\n\nContinue?`
+        `SUBMIT ONE AUTHORIZED ${submitEnvironmentLabel} MAILSHAKE RECIPIENT?\n\nCampaign: ${campaignName}\n\nServer-verified ready recipients: ${readyContactIds.length}\nRecipients in this controlled run: ${runContactIds.length}\n\nThis is a REAL Mailshake provider action. Recipients are processed ONE AT A TIME. Each recipient gets a separate CRM provider-operation record and the server re-checks eligibility, existing Mailshake membership, and PAUSED campaign status for every recipient.\n\nThe controller STOPS on the first blocked, failed, unreadable, or uncertain result. It never automatically retries an uncertain recipient.\n\nA campaign may contain 100+ recipients. The ${MAX_CONTROLLED_PROVIDER_RUN_SIZE}-recipient run size is only a controlled processing increment, not a campaign limit.\n\nKEEP THE CAMPAIGN PAUSED until asynchronous results are reconciled.\n\nContinue?`
       );
 
     if (!confirmed) {
@@ -2986,12 +3017,19 @@ export default function OutreachMailshakeSection({
                     authorizationItemId,
 
                     confirmationPhrase:
-                      `SUBMIT AUTHORIZED ${authorizationItemId
-                        .slice(
-                          0,
-                          8
-                        )
-                        .toUpperCase()}`,
+                      productionAuthorizedSubmit
+                        ? `SUBMIT PRODUCTION ${authorizationItemId
+                            .slice(
+                              0,
+                              8
+                            )
+                            .toUpperCase()} FOR ${selectedCampaign.providerCampaignId}`
+                        : `SUBMIT AUTHORIZED ${authorizationItemId
+                            .slice(
+                              0,
+                              8
+                            )
+                            .toUpperCase()}`,
                   }),
 
                 cache:
@@ -3443,7 +3481,7 @@ export default function OutreachMailshakeSection({
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-wide text-blue-700">
-              Version 3.27H3C2 - Preview End-to-End Authorized Send
+              Version 3.27H3C3 - First Authorization-Gated Production Send
             </p>
 
             <h2 className="mt-1 text-2xl font-bold text-slate-950">
@@ -3461,7 +3499,7 @@ export default function OutreachMailshakeSection({
             </p>
 
             <p className="mt-1 text-xs leading-5">
-              Provider submission remains limited to exactly one recorded enrollment, a paused Mailshake campaign, and an explicit server-side recipient allowlist, and is enabled only on Vercel Preview deployments. Provider-status reconciliation remains available in Preview and Production for existing CRM-tracked provider operations and now requires an explicit CRM provider operation ID.
+              Provider submission remains limited to exactly one recorded enrollment and a paused Mailshake campaign. Preview continues to require the server-side test-recipient allowlist. Production remains globally locked except for the Admin-only exact Production run-authorization path, where the server must atomically consume the exact authorization item before any Mailshake recipient add. Provider-status reconciliation remains available for exact CRM-tracked operations.
             </p>
 
             <details className="mt-4 rounded-xl border border-blue-200 bg-white/80 p-4">
@@ -3480,7 +3518,7 @@ export default function OutreachMailshakeSection({
                     <li><span className="font-black text-blue-800">1. Review Selection on Server — CHECK ONLY.</span>{" "}Re-validates the current selection against CRM data. Nothing is submitted to Mailshake.</li>
                     <li><span className="font-black text-violet-800">2. Record Enrollment in CRM — CRM WRITE.</span>{" "}Creates CRM enrollment and batch tracking records. It does not add a recipient to Mailshake and does not send email.</li>
                     <li><span className="font-black text-rose-800">3. Check Recorded Enrollment and Mailshake Readiness — CHECK ONLY.</span>{" "}Re-checks CRM eligibility and reads the current Mailshake campaign state immediately before any provider action.</li>
-                    <li><span className="font-black text-red-800">4. Submit to Mailshake — MAILSHAKE WRITE.</span>{" "}This is the first step that can actually add a recipient to Mailshake. Current rollout permits one server-approved recipient on Vercel Preview only, and the campaign must remain paused.</li>
+                    <li><span className="font-black text-red-800">4. Submit to Mailshake — MAILSHAKE WRITE.</span>{" "}This is the first step that can actually add a recipient to Mailshake. Current rollout permits one authorized recipient at a time. Preview requires the server allowlist; Production requires an exact Admin-created Production run authorization. The campaign must remain paused.</li>
                     <li><span className="font-black text-sky-800">5. Reconcile the Mailshake Result — STATUS / CRM SYNC.</span>{" "}Checks the exact existing CRM-tracked provider operation and records the provider result. Reconcile never means submit again.</li>
                     <li><span className="font-black text-emerald-800">6. Understand the Final CRM Outcome.</span>{" "}Review the final enrollment, provider-operation, and batch statuses before considering the outreach action complete.</li>
                   </ol>
@@ -5664,7 +5702,7 @@ export default function OutreachMailshakeSection({
                           authorizationLifecycle.authorization?.id && (
                             <div className="mt-4 rounded-xl border border-emerald-300 bg-emerald-50 p-4">
                               <p className="text-xs font-black uppercase tracking-wide text-emerald-800">
-                                Authorization Created — Provider Execution Still Locked
+                                Authorization Created — Exact Item Required for Step 4
                               </p>
 
                               <p className="mt-2 text-sm font-semibold text-emerald-950">
@@ -5808,11 +5846,11 @@ export default function OutreachMailshakeSection({
                               </p>
 
                               <h6 className="mt-1 font-bold text-red-950">
-                                Submit exactly one authorized Preview recipient to the paused campaign
+                                Submit exactly one authorized recipient to the paused campaign
                               </h6>
 
                               <p className="mt-2 text-xs leading-5 text-red-900">
-                                Version 3.27H3C2 deliberately limits this end-to-end proof to exactly {MAX_CONTROLLED_PROVIDER_RUN_SIZE} server-verified recipient. The exact authorization item is atomically consumed into the same CRM provider operation used for the Mailshake request.
+                                Version 3.27H3C3 keeps this first Production boundary limited to exactly {MAX_CONTROLLED_PROVIDER_RUN_SIZE} server-verified recipient. Preview still requires its allowlist. Production requires an exact Admin-created Production authorization whose exact item must be atomically consumed before the Mailshake request.
                               </p>
 
                               <p className="mt-2 text-xs font-black text-red-950">
@@ -5832,10 +5870,17 @@ export default function OutreachMailshakeSection({
                                 contact(s). This is not a campaign-size limit.
                               </p>
 
-                              {providerExecutionReview.providerReview
-                                .providerWritePolicyAllowed ? (
+                              {authorizationReview?.environment ===
+                                "production" &&
+                              authorizationLifecycle?.authorizationCreated ===
+                                true ? (
+                                <div className="mt-3 rounded-lg border border-red-300 bg-red-100 p-3 text-xs font-black text-red-950">
+                                  PRODUCTION AUTHORIZED PATH: the global Production provider-write policy remains locked. This exact Admin-created Production authorization may proceed only if the server atomically consumes its exact authorization item and every current CRM, duplicate, recipient, and paused-campaign safety check still passes.
+                                </div>
+                              ) : providerExecutionReview.providerReview
+                                  .providerWritePolicyAllowed ? (
                                 <div className="mt-3 rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-xs font-bold text-emerald-900">
-                                  Controlled Preview provider-write policy confirmed. The server still applies the recipient allowlist and all per-recipient safety checks.
+                                  Controlled Preview provider-write policy confirmed. The server still applies the Preview recipient allowlist and all per-recipient safety checks.
                                 </div>
                               ) : (
                                 <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs font-bold text-amber-950">
@@ -5869,9 +5914,11 @@ export default function OutreachMailshakeSection({
                                     "authorized" ||
                                   providerExecutionReviewFingerprint !==
                                     enrollmentSelectionFingerprint ||
-                                  providerExecutionReview.providerReview
+                                  (providerExecutionReview.providerReview
                                     .providerWritePolicyAllowed !==
-                                    true ||
+                                    true &&
+                                    authorizationReview?.environment !==
+                                      "production") ||
                                   (providerExecutionReview.providerReview
                                     .readyContactIds?.length ??
                                     0) !==
@@ -5886,8 +5933,8 @@ export default function OutreachMailshakeSection({
                                 className="mt-4 rounded-xl bg-red-700 px-5 py-3 text-sm font-black text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                               >
                                 {isSubmittingProvider
-                                  ? "Submitting 1 authorized Preview recipient..."
-                                  : "Step 4 — Submit 1 AUTHORIZED Preview Recipient"}
+                                  ? `Submitting 1 authorized ${authorizationReview?.environment === "production" ? "PRODUCTION" : "Preview"} recipient...`
+                                  : `Step 4 — Submit 1 AUTHORIZED ${authorizationReview?.environment === "production" ? "PRODUCTION" : "Preview"} Recipient`}
                               </button>
 
                               {(isSubmittingProvider ||
