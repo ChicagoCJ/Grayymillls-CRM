@@ -225,6 +225,18 @@ type ProductionAuthorizationLifecycleResponse = {
   message?: string;
   error?: string;
 };
+type ProductionAuthorizationStopResponse = {
+  status?: string;
+  authorizationStopped?: boolean;
+  providerExecutionUnlocked?: boolean;
+  stopResult?: {
+    status?: string;
+    skipped_count?: number;
+    provider_operation_count?: number;
+  } | null;
+  message?: string;
+  error?: string;
+};
 type ProviderSubmissionResponse = {
   status?: string;
   mode?: string;
@@ -254,7 +266,7 @@ type ProviderBatchSubmissionItem = {
   error?: string;
 };
 
-const MAX_CONTROLLED_PROVIDER_RUN_SIZE = 1;
+const MAX_CONTROLLED_PROVIDER_RUN_SIZE = 10;
 
 type ProviderStatusResponse = {
   status?: string;
@@ -2721,6 +2733,79 @@ export default function OutreachMailshakeSection({
       setIsCancellingAuthorization(false);
     }
   }
+  async function stopRemainingControlledAuthorization(
+    authorizationId: string,
+    providerCampaignId: string,
+    reason: string
+  ) {
+    const response =
+      await fetch(
+        "/api/outreach-mailshake/run-authorization",
+        {
+          method: "POST",
+
+          headers: {
+            ...(await getBearerHeaders()),
+
+            "Content-Type":
+              "application/json",
+          },
+
+          body:
+            JSON.stringify({
+              action:
+                "stop",
+
+              authorizationId,
+
+              providerCampaignId,
+
+              stopReason:
+                reason,
+            }),
+
+          cache:
+            "no-store",
+        }
+      );
+
+    const rawText =
+      await response.text();
+
+    let data:
+      ProductionAuthorizationStopResponse;
+
+    try {
+      data =
+        rawText
+          ? JSON.parse(
+              rawText
+            )
+          : {};
+    } catch {
+      throw new Error(
+        `Controlled-run authorization cleanup returned an unreadable response with HTTP status ${response.status}.`
+      );
+    }
+
+    if (!response.ok) {
+      throw new Error(
+        data.error ||
+          "The remaining controlled-run authorization items could not be retired safely."
+      );
+    }
+
+    if (
+      data.authorizationStopped !==
+        true
+    ) {
+      throw new Error(
+        "The CRM server did not confirm controlled-run authorization cleanup."
+      );
+    }
+
+    return data;
+  }
   async function submitRecordedEnrollmentToMailshake() {
     const providerReview =
       providerExecutionReview?.providerReview;
@@ -2835,6 +2920,12 @@ export default function OutreachMailshakeSection({
       return;
     }
 
+    const expectedRunCount =
+      Math.min(
+        readyContactIds.length,
+        MAX_CONTROLLED_PROVIDER_RUN_SIZE
+      );
+
     const authorizationItems =
       Array.isArray(
         authorizationLifecycle?.authorizationItems
@@ -2842,69 +2933,142 @@ export default function OutreachMailshakeSection({
         ? authorizationLifecycle.authorizationItems
         : [];
 
+    const parentAuthorizationId =
+      String(
+        authorizationLifecycle?.authorization?.id ||
+          ""
+      ).trim();
+
     if (
       authorizationLifecycle?.authorizationCreated !==
         true ||
+      !parentAuthorizationId ||
+      expectedRunCount < 1 ||
       authorizationItems.length !==
-        1
+        expectedRunCount ||
+      Number(
+        authorizationLifecycle?.authorization
+          ?.authorized_count ??
+          0
+      ) !==
+        expectedRunCount ||
+      Number(
+        authorizationReview?.proposedCount ??
+          0
+      ) !==
+        expectedRunCount
     ) {
       setProviderSubmissionError(
-        "Create one fresh controlled run authorization before Step 4."
+        `Create one fresh controlled run authorization for exactly ${expectedRunCount} recipient${expectedRunCount === 1 ? "" : "s"} before Step 4.`
       );
 
       return;
     }
 
-    const authorizationItem =
-      authorizationItems[0];
+    const runAuthorizationItems =
+      authorizationItems
+        .map(
+          (authorizationItem) => ({
+            authorizationItemId:
+              String(
+                authorizationItem.id ||
+                  ""
+              ).trim(),
 
-    const authorizationItemId =
-      String(
-        authorizationItem.id ||
-          ""
-      ).trim();
+            authorizationId:
+              String(
+                authorizationItem.authorization_id ||
+                  ""
+              ).trim(),
 
-    const authorizationContactId =
-      String(
-        authorizationItem.contact_id ||
-          ""
-      ).trim();
+            contactId:
+              String(
+                authorizationItem.contact_id ||
+                  ""
+              ).trim(),
+
+            sequenceNumber:
+              Number(
+                authorizationItem.sequence_number ??
+                  0
+              ),
+
+            status:
+              String(
+                authorizationItem.status ||
+                  ""
+              ).toLowerCase(),
+          })
+        )
+        .sort(
+          (left, right) =>
+            left.sequenceNumber -
+            right.sequenceNumber
+        );
+
+    const uniqueAuthorizationItemIds =
+      new Set(
+        runAuthorizationItems.map(
+          (item) =>
+            item.authorizationItemId
+        )
+      );
+
+    const uniqueAuthorizationContactIds =
+      new Set(
+        runAuthorizationItems.map(
+          (item) =>
+            item.contactId
+        )
+      );
 
     if (
-      !authorizationItemId ||
-      !authorizationContactId ||
-      String(
-        authorizationItem.status ||
-          ""
-      ).toLowerCase() !==
-        "authorized"
+      uniqueAuthorizationItemIds.size !==
+        expectedRunCount ||
+      uniqueAuthorizationContactIds.size !==
+        expectedRunCount
     ) {
       setProviderSubmissionError(
-        "The controlled run authorization does not contain one usable authorization item."
+        "The controlled run authorization contains duplicate item or contact identities. Do not submit. Run Step 3 and the authorization review again."
       );
 
       return;
     }
 
-    if (
-      readyContactIds.length !==
-        1 ||
-      readyToSubmitCount !==
-        1 ||
-      readyContactIds[0] !==
-        authorizationContactId
+    for (
+      let index = 0;
+      index < runAuthorizationItems.length;
+      index += 1
     ) {
-      setProviderSubmissionError(
-        "The exact authorized contact no longer matches the single server-ready contact. Run Step 3 and the authorization review again."
-      );
+      const item =
+        runAuthorizationItems[index];
 
-      return;
+      if (
+        !item.authorizationItemId ||
+        !item.authorizationId ||
+        !item.contactId ||
+        item.authorizationId !==
+          parentAuthorizationId ||
+        item.sequenceNumber !==
+          index + 1 ||
+        item.status !==
+          "authorized" ||
+        item.contactId !==
+          readyContactIds[index]
+      ) {
+        setProviderSubmissionError(
+          `Authorization item ${index + 1} no longer exactly matches the server-reviewed recipient sequence. Do not submit. Run Step 3 and the authorization review again.`
+        );
+
+        return;
+      }
     }
 
     const runContactIds =
-      [
-        authorizationContactId,
-      ];
+      runAuthorizationItems.map(
+        (item) =>
+          item.contactId
+      );
 
     const campaignName =
       providerReview.providerCampaignTitle ||
@@ -2918,7 +3082,7 @@ export default function OutreachMailshakeSection({
 
     const confirmed =
       window.confirm(
-        `SUBMIT ONE AUTHORIZED ${submitEnvironmentLabel} MAILSHAKE RECIPIENT?\n\nCampaign: ${campaignName}\n\nServer-verified ready recipients: ${readyContactIds.length}\nRecipients in this controlled run: ${runContactIds.length}\n\nThis is a REAL Mailshake provider action. Recipients are processed ONE AT A TIME. Each recipient gets a separate CRM provider-operation record and the server re-checks eligibility, existing Mailshake membership, and PAUSED campaign status for every recipient.\n\nThe controller STOPS on the first blocked, failed, unreadable, or uncertain result. It never automatically retries an uncertain recipient.\n\nA campaign may contain 100+ recipients. The ${MAX_CONTROLLED_PROVIDER_RUN_SIZE}-recipient run size is only a controlled processing increment, not a campaign limit.\n\nKEEP THE CAMPAIGN PAUSED until asynchronous results are reconciled.\n\nContinue?`
+        `SUBMIT ${runContactIds.length} AUTHORIZED ${submitEnvironmentLabel} MAILSHAKE RECIPIENT${runContactIds.length === 1 ? "" : "S"}?\n\nCampaign: ${campaignName}\n\nServer-verified ready recipients: ${readyContactIds.length}\nRecipients in this controlled run: ${runContactIds.length}\n\nThis is a REAL Mailshake provider action. Recipients are processed ONE AT A TIME. Each recipient has its own exact authorization item and gets a separate CRM provider-operation record plus a separate one-recipient Mailshake request.\n\nThe controller STOPS on the first blocked, failed, unreadable, or uncertain result. It never automatically retries an uncertain recipient and never automatically continues past a stop condition.\n\nA campaign may contain 100+ recipients. The ${MAX_CONTROLLED_PROVIDER_RUN_SIZE}-recipient run size is only a controlled processing increment, not a campaign limit.\n\nKEEP THE CAMPAIGN PAUSED until every submitted provider operation is reconciled.\n\nContinue?`
       );
 
     if (!confirmed) {
@@ -2942,7 +3106,7 @@ export default function OutreachMailshakeSection({
     );
 
     setProviderBatchPlannedCount(
-      runContactIds.length
+      runAuthorizationItems.length
     );
 
     setProviderBatchMessage(
@@ -2971,9 +3135,9 @@ export default function OutreachMailshakeSection({
         await getBearerHeaders();
 
       /*
-       * The Step 3 review becomes stale as soon as this controlled
-       * run begins. The run itself uses the immutable server-reviewed
-       * contact ID snapshot captured above.
+       * Step 3 becomes stale as soon as the controlled run starts.
+       * The run itself uses the immutable exact authorization-item
+       * sequence validated above.
        */
       setProviderExecutionReviewFingerprint(
         ""
@@ -2981,11 +3145,17 @@ export default function OutreachMailshakeSection({
 
       for (
         let index = 0;
-        index < runContactIds.length;
+        index < runAuthorizationItems.length;
         index += 1
       ) {
+        const runItem =
+          runAuthorizationItems[index];
+
         const contactId =
-          runContactIds[index];
+          runItem.contactId;
+
+        const authorizationItemId =
+          runItem.authorizationItemId;
 
         let response:
           Response;
@@ -3061,7 +3231,7 @@ export default function OutreachMailshakeSection({
           );
 
           setProviderSubmissionError(
-            `Controlled batch stopped on recipient ${index + 1}. The browser did not receive a definitive CRM response. Do not retry this recipient automatically. Run a fresh Step 3 review and inspect Existing Operations before deciding what to do next. ${message}`
+            `Controlled run stopped on recipient ${index + 1}. The browser did not receive a definitive CRM response. Do not retry this recipient automatically and do not continue to later recipients. Inspect Existing Operations and reconcile before deciding what to do next. ${message}`
           );
 
           stopped =
@@ -3105,7 +3275,7 @@ export default function OutreachMailshakeSection({
           );
 
           setProviderSubmissionError(
-            `Controlled batch stopped on recipient ${index + 1} because the CRM response could not be read. Do not retry this recipient automatically. Run Step 3 again and inspect Existing Operations first.`
+            `Controlled run stopped on recipient ${index + 1} because the CRM response could not be read. Do not retry this recipient automatically and do not continue to later recipients. Inspect Existing Operations first.`
           );
 
           stopped =
@@ -3124,9 +3294,11 @@ export default function OutreachMailshakeSection({
             status:
               String(
                 data.status ||
-                  (response.ok
-                    ? "unknown"
-                    : "blocked")
+                  (
+                    response.ok
+                      ? "unknown"
+                      : "blocked"
+                  )
               ),
 
             httpStatus:
@@ -3165,7 +3337,7 @@ export default function OutreachMailshakeSection({
           !response.ok
         ) {
           setProviderSubmissionError(
-            `Controlled batch stopped on recipient ${index + 1}. ${data.error || "The CRM provider endpoint blocked this recipient."} Run a fresh Step 3 review before taking another provider action.`
+            `Controlled run stopped on recipient ${index + 1}. ${data.error || "The CRM provider endpoint blocked this recipient."} Later authorized recipients were not attempted. Run a fresh Step 3 review before another provider action.`
           );
 
           stopped =
@@ -3179,7 +3351,7 @@ export default function OutreachMailshakeSection({
           "submitted"
         ) {
           setProviderSubmissionError(
-            `Controlled batch stopped on recipient ${index + 1} because its provider status is "${data.status || "unknown"}". Do not automatically retry this recipient. Reconcile the exact provider operation first.`
+            `Controlled run stopped on recipient ${index + 1} because its provider status is "${data.status || "unknown"}". Do not automatically retry this recipient or continue to later recipients. Reconcile the exact provider operation first.`
           );
 
           stopped =
@@ -3192,10 +3364,71 @@ export default function OutreachMailshakeSection({
           1;
       }
 
+      let stopCleanupNote =
+        "";
+
+      if (stopped) {
+        try {
+          const stopData =
+            await stopRemainingControlledAuthorization(
+              parentAuthorizationId,
+              selectedCampaign.providerCampaignId,
+              "Controlled provider run stopped after a blocked, failed, unreadable, or uncertain recipient result."
+            );
+
+          const skippedCount =
+            Number(
+              stopData.stopResult
+                ?.skipped_count ??
+                0
+            );
+
+          const parentStatus =
+            String(
+              stopData.stopResult
+                ?.status ||
+                "unknown"
+            );
+
+          stopCleanupNote =
+            ` Authorization cleanup retired ${skippedCount} unattempted authorization item${skippedCount === 1 ? "" : "s"}. Parent authorization status: ${parentStatus}.`;
+
+          /*
+           * Force a fresh review before another provider action.
+           * Existing provider-operation progress remains visible
+           * and can still be reconciled individually.
+           */
+          setAuthorizationLifecycle(
+            null
+          );
+
+          setAuthorizationReview(
+            null
+          );
+
+          setAuthorizationReviewFingerprint(
+            ""
+          );
+        } catch (cleanupError) {
+          const cleanupMessage =
+            cleanupError instanceof Error
+              ? cleanupError.message
+              : "Unknown authorization cleanup error.";
+
+          stopCleanupNote =
+            ` Automatic authorization cleanup FAILED: ${cleanupMessage}`;
+
+          setProviderSubmissionError(
+            (current) =>
+              `${current} AUTOMATIC AUTHORIZATION CLEANUP ALSO FAILED. Do not continue this campaign run until the authorization state is reviewed. ${cleanupMessage}`
+          );
+        }
+      }
+
       if (
         !stopped &&
         submittedCount ===
-          runContactIds.length
+          runAuthorizationItems.length
       ) {
         const remainingAfterRun =
           Math.max(
@@ -3206,8 +3439,8 @@ export default function OutreachMailshakeSection({
 
         setProviderBatchMessage(
           remainingAfterRun > 0
-            ? `${submittedCount} recipient${submittedCount === 1 ? "" : "s"} in this controlled run were accepted asynchronously by Mailshake. ${remainingAfterRun} recipient${remainingAfterRun === 1 ? "" : "s"} were in the prior server-ready set but were not attempted in this run. Run Step 3 again before continuing.`
-            : `${submittedCount} recipient${submittedCount === 1 ? "" : "s"} in this controlled run were accepted asynchronously by Mailshake. Run Step 3 again to verify the CRM batch state before any further provider action.`
+            ? `${submittedCount} recipient${submittedCount === 1 ? "" : "s"} in this controlled run were accepted asynchronously by Mailshake. ${remainingAfterRun} recipient${remainingAfterRun === 1 ? "" : "s"} from the prior server-ready set were not part of this run. Reconcile every provider operation from this run, then run Step 3 again for the next controlled group.`
+            : `${submittedCount} recipient${submittedCount === 1 ? "" : "s"} in this controlled run were accepted asynchronously by Mailshake. Reconcile every provider operation from this run before considering the authorization complete.`
         );
       } else if (
         stopped &&
@@ -3215,7 +3448,11 @@ export default function OutreachMailshakeSection({
           0
       ) {
         setProviderBatchMessage(
-          `${submittedCount} recipient${submittedCount === 1 ? "" : "s"} were accepted before the controlled run stopped. The remaining recipients were not automatically attempted after the stop condition.`
+          `${submittedCount} recipient${submittedCount === 1 ? "" : "s"} were accepted before the controlled run stopped. Remaining authorized recipients were not automatically attempted after the stop condition.${stopCleanupNote} Reconcile the exact operations already created before taking another provider action.`
+        );
+      } else if (stopped) {
+        setProviderBatchMessage(
+          `The controlled run stopped before any recipient was confirmed as accepted by the CRM response.${stopCleanupNote} Inspect Existing Operations before deciding whether any reconciliation is required.`
         );
       }
     } catch (error) {
@@ -3223,18 +3460,74 @@ export default function OutreachMailshakeSection({
         ""
       );
 
-      setProviderSubmissionError(
+      const primaryMessage =
         error instanceof Error
-          ? `Controlled batch stopped. ${error.message}`
-          : "Controlled batch stopped before completion. Run Step 3 again before another provider action."
+          ? `Controlled run stopped. ${error.message}`
+          : "Controlled run stopped before completion.";
+
+      setProviderSubmissionError(
+        primaryMessage
       );
-    } finally {
+
+      /*
+       * An unexpected client-side failure can happen after an
+       * authorization was created but before the normal stop branch.
+       * Best-effort cleanup removes permission from items that never
+       * acquired provider operations. Failure here is surfaced and
+       * never silently ignored.
+       */
+      try {
+        const stopData =
+          await stopRemainingControlledAuthorization(
+            parentAuthorizationId,
+            selectedCampaign.providerCampaignId,
+            "Controlled provider run stopped because the client controller exited unexpectedly."
+          );
+
+        const skippedCount =
+          Number(
+            stopData.stopResult
+              ?.skipped_count ??
+              0
+          );
+
+        const parentStatus =
+          String(
+            stopData.stopResult
+              ?.status ||
+              "unknown"
+          );
+
+        setProviderBatchMessage(
+          `Controlled run stopped unexpectedly. Authorization cleanup retired ${skippedCount} unattempted authorization item${skippedCount === 1 ? "" : "s"}. Parent authorization status: ${parentStatus}. Inspect and reconcile any exact provider operations already created.`
+        );
+
+        setAuthorizationLifecycle(
+          null
+        );
+
+        setAuthorizationReview(
+          null
+        );
+
+        setAuthorizationReviewFingerprint(
+          ""
+        );
+      } catch (cleanupError) {
+        const cleanupMessage =
+          cleanupError instanceof Error
+            ? cleanupError.message
+            : "Unknown authorization cleanup error.";
+
+        setProviderSubmissionError(
+          `${primaryMessage} AUTOMATIC AUTHORIZATION CLEANUP ALSO FAILED. Do not continue this campaign run until the authorization state is reviewed. ${cleanupMessage}`
+        );
+      }    } finally {
       setIsSubmittingProvider(
         false
       );
     }
   }
-
   async function checkMailshakeImportStatus(
     providerOperationId: string
   ) {
@@ -3482,7 +3775,7 @@ export default function OutreachMailshakeSection({
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-wide text-blue-700">
-              Version 3.27H3C3A - Complete Authorization After Reconciliation
+              Version 3.27H3C4 - Controlled Multi-Recipient Runs
             </p>
 
             <h2 className="mt-1 text-2xl font-bold text-slate-950">
@@ -3500,7 +3793,7 @@ export default function OutreachMailshakeSection({
             </p>
 
             <p className="mt-1 text-xs leading-5">
-              Provider submission remains limited to exactly one recorded enrollment and a paused Mailshake campaign. Preview continues to require the server-side test-recipient allowlist. Production remains globally locked except for the Admin-only exact Production run-authorization path, where the server must atomically consume the exact authorization item before any Mailshake recipient add. Provider-status reconciliation remains available for exact CRM-tracked operations.
+              A controlled run may submit up to 10 exactly authorized recipients sequentially to a paused Mailshake campaign. Each recipient still uses one exact authorization item, one CRM provider operation, and one one-recipient Mailshake request. Preview continues to require the server-side test-recipient allowlist. Production remains globally locked except for the Admin-only exact Production run-authorization path. Provider-status reconciliation remains available for every exact CRM-tracked operation.
             </p>
 
             <details className="mt-4 rounded-xl border border-blue-200 bg-white/80 p-4">
@@ -3519,7 +3812,7 @@ export default function OutreachMailshakeSection({
                     <li><span className="font-black text-blue-800">1. Review Selection on Server — CHECK ONLY.</span>{" "}Re-validates the current selection against CRM data. Nothing is submitted to Mailshake.</li>
                     <li><span className="font-black text-violet-800">2. Record Enrollment in CRM — CRM WRITE.</span>{" "}Creates CRM enrollment and batch tracking records. It does not add a recipient to Mailshake and does not send email.</li>
                     <li><span className="font-black text-rose-800">3. Check Recorded Enrollment and Mailshake Readiness — CHECK ONLY.</span>{" "}Re-checks CRM eligibility and reads the current Mailshake campaign state immediately before any provider action.</li>
-                    <li><span className="font-black text-red-800">4. Submit to Mailshake — MAILSHAKE WRITE.</span>{" "}This is the first step that can actually add a recipient to Mailshake. Current rollout permits one authorized recipient at a time. Preview requires the server allowlist; Production requires an exact Admin-created Production run authorization. The campaign must remain paused.</li>
+                    <li><span className="font-black text-red-800">4. Submit to Mailshake — MAILSHAKE WRITE.</span>{" "}This is the first step that can actually add a recipient to Mailshake. Current rollout permits up to 10 exactly authorized recipients per controlled run, processed one at a time. Preview requires the server allowlist; Production requires an exact Admin-created Production run authorization. The campaign must remain paused.</li>
                     <li><span className="font-black text-sky-800">5. Reconcile the Mailshake Result — STATUS / CRM SYNC.</span>{" "}Checks the exact existing CRM-tracked provider operation and records the provider result. Reconcile never means submit again.</li>
                     <li><span className="font-black text-emerald-800">6. Understand the Final CRM Outcome.</span>{" "}Review the final enrollment, provider-operation, and batch statuses before considering the outreach action complete.</li>
                   </ol>
@@ -5712,7 +6005,7 @@ export default function OutreachMailshakeSection({
                           authorizationLifecycle.authorization?.id && (
                             <div className="mt-4 rounded-xl border border-emerald-300 bg-emerald-50 p-4">
                               <p className="text-xs font-black uppercase tracking-wide text-emerald-800">
-                                Authorization Created — Exact Item Required for Step 4
+                                Authorization Created — Exact Items Required for Step 4
                               </p>
 
                               <p className="mt-2 text-sm font-semibold text-emerald-950">
@@ -5856,11 +6149,11 @@ export default function OutreachMailshakeSection({
                               </p>
 
                               <h6 className="mt-1 font-bold text-red-950">
-                                Submit exactly one authorized recipient to the paused campaign
+                                Submit the next authorized controlled run to the paused campaign
                               </h6>
 
                               <p className="mt-2 text-xs leading-5 text-red-900">
-                                Version 3.27H3C3A keeps this Production boundary limited to exactly {MAX_CONTROLLED_PROVIDER_RUN_SIZE} server-verified recipient. Preview still requires its allowlist. Production requires an exact Admin-created Production authorization whose exact item must be atomically consumed before the Mailshake request. Terminal reconciliation now also closes the parent authorization when every exact authorization item has reached a terminal provider outcome.
+                                Version 3.27H3C4 allows up to {MAX_CONTROLLED_PROVIDER_RUN_SIZE} exactly authorized recipients in one controlled run. Recipients are processed sequentially, and every recipient still gets a separate authorization item, CRM provider operation, and one-recipient Mailshake request. The controller stops immediately on the first abnormal or uncertain result. Campaigns may contain more than {MAX_CONTROLLED_PROVIDER_RUN_SIZE} recipients.
                               </p>
 
                               <p className="mt-2 text-xs font-black text-red-950">
@@ -5885,7 +6178,7 @@ export default function OutreachMailshakeSection({
                               authorizationLifecycle?.authorizationCreated ===
                                 true ? (
                                 <div className="mt-3 rounded-lg border border-red-300 bg-red-100 p-3 text-xs font-black text-red-950">
-                                  PRODUCTION AUTHORIZED PATH: the global Production provider-write policy remains locked. This exact Admin-created Production authorization may proceed only if the server atomically consumes its exact authorization item and every current CRM, duplicate, recipient, and paused-campaign safety check still passes.
+                                  PRODUCTION AUTHORIZED PATH: the global Production provider-write policy remains locked. This Admin-created Production authorization may proceed only as the server atomically consumes each exact authorization item and every current CRM, duplicate, recipient, and paused-campaign safety check still passes.
                                 </div>
                               ) : providerExecutionReview.providerReview
                                   .providerWritePolicyAllowed ? (
@@ -5916,12 +6209,24 @@ export default function OutreachMailshakeSection({
                                     true ||
                                   (authorizationLifecycle
                                     ?.authorizationItems?.length ??
-                                    0) !==
-                                    1 ||
-                                  authorizationLifecycle
-                                    ?.authorizationItems?.[0]
-                                    ?.status !==
-                                    "authorized" ||
+                                    0) ===
+                                    0 ||
+                                  (authorizationLifecycle
+                                    ?.authorizationItems?.length ??
+                                    0) >
+                                    MAX_CONTROLLED_PROVIDER_RUN_SIZE ||
+                                  (
+                                    authorizationLifecycle
+                                      ?.authorizationItems ??
+                                    []
+                                  ).some(
+                                    (item) =>
+                                      String(
+                                        item.status ||
+                                          ""
+                                      ).toLowerCase() !==
+                                      "authorized"
+                                  ) ||
                                   providerExecutionReviewFingerprint !==
                                     enrollmentSelectionFingerprint ||
                                   (providerExecutionReview.providerReview
@@ -5931,22 +6236,39 @@ export default function OutreachMailshakeSection({
                                       "production") ||
                                   (providerExecutionReview.providerReview
                                     .readyContactIds?.length ??
-                                    0) !==
-                                    1 ||
+                                    0) ===
+                                    0 ||
                                   Number(
                                     providerExecutionReview.providerReview
                                       .readyToSubmitCount ??
                                       0
                                   ) !==
-                                    1
+                                    (providerExecutionReview.providerReview
+                                      .readyContactIds?.length ??
+                                      0) ||
+                                  (authorizationLifecycle
+                                    ?.authorizationItems?.length ??
+                                    0) !==
+                                    Math.min(
+                                      providerExecutionReview.providerReview
+                                        .readyContactIds?.length ??
+                                        0,
+                                      MAX_CONTROLLED_PROVIDER_RUN_SIZE
+                                    ) ||
+                                  Number(
+                                    authorizationReview?.proposedCount ??
+                                      0
+                                  ) !==
+                                    (authorizationLifecycle
+                                      ?.authorizationItems?.length ??
+                                      0)
                                 }
                                 className="mt-4 rounded-xl bg-red-700 px-5 py-3 text-sm font-black text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                               >
                                 {isSubmittingProvider
-                                  ? `Submitting 1 authorized ${authorizationReview?.environment === "production" ? "PRODUCTION" : "Preview"} recipient...`
-                                  : `Step 4 — Submit 1 AUTHORIZED ${authorizationReview?.environment === "production" ? "PRODUCTION" : "Preview"} Recipient`}
+                                  ? `Submitting controlled run — ${providerBatchSubmissionResults.length} of ${providerBatchPlannedCount} attempted...`
+                                  : `Step 4 — Submit ${authorizationLifecycle?.authorizationItems?.length ?? 0} AUTHORIZED ${authorizationReview?.environment === "production" ? "PRODUCTION" : "Preview"} Recipient${(authorizationLifecycle?.authorizationItems?.length ?? 0) === 1 ? "" : "s"}`}
                               </button>
-
                               {(isSubmittingProvider ||
                                 providerBatchSubmissionResults.length >
                                   0) && (
@@ -5990,10 +6312,29 @@ export default function OutreachMailshakeSection({
                                             </p>
 
                                             {item.operationId && (
-                                              <p className="mt-1 break-all text-slate-600">
-                                                Provider operation:{" "}
-                                                {item.operationId}
-                                              </p>
+                                              <div className="mt-2">
+                                                <p className="break-all text-slate-600">
+                                                  Provider operation:{" "}
+                                                  {item.operationId}
+                                                </p>
+
+                                                <button
+                                                  type="button"
+                                                  onClick={() =>
+                                                    void checkMailshakeImportStatus(
+                                                      item.operationId ||
+                                                        ""
+                                                    )
+                                                  }
+                                                  disabled={
+                                                    isSubmittingProvider ||
+                                                    isCheckingProviderStatus
+                                                  }
+                                                  className="mt-2 rounded-lg bg-sky-700 px-3 py-2 font-black text-white hover:bg-sky-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                                                >
+                                                  Reconcile This Operation
+                                                </button>
+                                              </div>
                                             )}
 
                                             {item.providerCheckStatusId && (

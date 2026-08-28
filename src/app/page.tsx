@@ -207,10 +207,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.27H3C3A - Complete Authorization After Reconciliation";
+  "Version 3.27H3C4 - Controlled Multi-Recipient Runs";
 
 const REVISION_NOTE =
-  "Current revision 3.27H3C3A: terminal Mailshake reconciliation now re-evaluates the exact linked run authorization and marks the parent authorization completed only after every authorized item has reached a terminal outcome. The existing one-recipient Production authorization boundary and Preview allowlist remain unchanged.";
+  "Current revision 3.27H3C4: controlled Mailshake runs may authorize up to 10 exact recipients at a time and process them sequentially through separate one-recipient provider operations. The controller stops on the first blocked, failed, unreadable, or uncertain result. Campaign size is not limited to 10. Preview still requires its allowlist, and Production still requires an exact Admin-created Production authorization.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean

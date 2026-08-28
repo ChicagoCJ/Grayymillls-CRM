@@ -19,7 +19,7 @@ const MAILSHAKE_API_BASE =
   "https://api.mailshake.com/2017-04-01";
 
 const MAX_PROPOSED_AUTHORIZATION_COUNT =
-  2;
+  10;
 
 const AUTHORIZATION_DURATION_MINUTES =
   15;
@@ -39,6 +39,7 @@ type AuthorizationReviewPayload = {
   confirmationPhrase?: string;
   authorizationId?: string;
   cancellationReason?: string;
+  stopReason?: string;
 };
 type ProviderReviewResult = {
   error?: string;
@@ -299,6 +300,7 @@ export async function POST(
         "review",
         "create",
         "cancel",
+        "stop",
       ].includes(
         action
       )
@@ -306,7 +308,7 @@ export async function POST(
       return NextResponse.json(
         {
           error:
-            'The run-authorization endpoint supports only action "review", "create", or "cancel".',
+            'The run-authorization endpoint supports only action "review", "create", "cancel", or "stop".',
         },
         {
           status: 400,
@@ -314,6 +316,220 @@ export async function POST(
       );
     }
 
+    /*
+     * H3C4 controlled-run stop.
+     *
+     * This action removes permission from authorization items
+     * that never acquired a provider operation.
+     *
+     * It never calls Mailshake.
+     */
+    if (
+      action ===
+      "stop"
+    ) {
+      const environment =
+        deploymentEnvironment();
+
+      if (
+        environment !==
+          "preview" &&
+        environment !==
+          "production"
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              `Controlled run cleanup is available only from Vercel Preview or Production. Current environment: ${environment}.`,
+          },
+          {
+            status: 409,
+          }
+        );
+      }
+
+      const authorizationId =
+        cleanText(
+          payload.authorizationId
+        );
+
+      const stopProviderCampaignId =
+        cleanText(
+          payload.providerCampaignId
+        );
+
+      const stopReason =
+        cleanText(
+          payload.stopReason
+        );
+
+      if (
+        !UUID_PATTERN.test(
+          authorizationId
+        )
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "A valid run authorization ID is required for controlled-run cleanup.",
+          },
+          {
+            status: 400,
+          }
+        );
+      }
+
+      if (!stopProviderCampaignId) {
+        return NextResponse.json(
+          {
+            error:
+              "A Mailshake campaign ID is required for controlled-run cleanup.",
+          },
+          {
+            status: 400,
+          }
+        );
+      }
+
+      if (
+        stopReason.length <
+          8 ||
+        stopReason.length >
+          500
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "The controlled-run stop reason must be between 8 and 500 characters.",
+          },
+          {
+            status: 400,
+          }
+        );
+      }
+
+      const supabase =
+        getSupabaseAdmin();
+
+      const {
+        data:
+          existingAuthorization,
+        error:
+          existingAuthorizationError,
+      } =
+        await supabase
+          .from(
+            "outreach_provider_run_authorizations"
+          )
+          .select(
+            `
+            id,
+            provider,
+            provider_campaign_id,
+            environment,
+            status
+            `
+          )
+          .eq(
+            "id",
+            authorizationId
+          )
+          .maybeSingle();
+
+      if (
+        existingAuthorizationError
+      ) {
+        throw existingAuthorizationError;
+      }
+
+      if (
+        !existingAuthorization
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "The controlled run authorization could not be found.",
+          },
+          {
+            status: 404,
+          }
+        );
+      }
+
+      if (
+        cleanText(
+          existingAuthorization.provider
+        ).toLowerCase() !==
+          "mailshake" ||
+        cleanText(
+          existingAuthorization.environment
+        ).toLowerCase() !==
+          environment ||
+        cleanText(
+          existingAuthorization.provider_campaign_id
+        ) !==
+          stopProviderCampaignId
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "The controlled run authorization does not match this deployment environment and Mailshake campaign.",
+          },
+          {
+            status: 409,
+          }
+        );
+      }
+
+      const {
+        data:
+          stopResult,
+        error:
+          stopError,
+      } =
+        await supabase.rpc(
+          "stop_outreach_provider_run_authorization_remaining_items",
+          {
+            p_authorization_id:
+              authorizationId,
+
+            p_environment:
+              environment,
+
+            p_reason:
+              stopReason,
+          }
+        );
+
+      if (stopError) {
+        return NextResponse.json(
+          {
+            error:
+              stopError.message ||
+              "The remaining authorization items could not be retired safely.",
+          },
+          {
+            status: 409,
+          }
+        );
+      }
+
+      return NextResponse.json({
+        status:
+          "run_authorization_stopped",
+
+        authorizationStopped:
+          true,
+
+        providerExecutionUnlocked:
+          false,
+
+        stopResult,
+
+        message:
+          "The controlled run was stopped. Authorization items that never acquired a provider operation were retired. Any provider operations already created must still be reconciled. No Mailshake request was made by this cleanup action.",
+      });
+    }
     /*
      * Cancellation only removes permission.
      * It does not require another provider-readiness pass.
@@ -1496,7 +1712,7 @@ export async function POST(
 
       const authorizationSnapshot = {
         revision:
-          "3.27H3B2B2A",
+          "3.27H3C4",
 
         createdAt:
           new Date().toISOString(),
