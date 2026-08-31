@@ -1,7 +1,8 @@
 # Graymills CRM User Guide
 
 **Application:** Graymills CRM / Prospecting Tool  
-**Release:** Version 3.02 - Admin Authentication Management  
+**Application behavior:** Version 3.27H3C5 - Automatic Reconciliation
+**Guide revision:** Version 3.27H3C5A - Outreach and Operations Documentation
 **Audience:** Graymills sales, sales management, and CRM administrators
 
 ---
@@ -15,11 +16,16 @@ The Graymills CRM is used to manage:
 - Salesperson and Sales Manager coverage
 - Sales opportunities and funnel stages
 - Activities, follow-ups, notes, and documents
-- ZoomInfo or other CSV imports
+- ZoomInfo and other CSV imports
 - AI-assisted prospect analysis
-- CRM users, roles, tags, buyer personas, and workflow settings
+- Projects / Lists and segmentation tags
+- Mailshake outreach preparation and controlled recipient enrollment
+- ERP reconciliation
+- CRM users, roles, buyer personas, and workflow settings
 
-Access is controlled through the userâ€™s Graymills CRM role.
+CRM data remains the system of record for sales work.
+
+Access is controlled through the signed-in user's Graymills CRM role.
 
 ---
 
@@ -34,13 +40,13 @@ Enter:
 
 Select **Sign in to CRM**.
 
-The CRM matches the signed-in Supabase Authentication account to a CRM Users record with the same email address.
+The CRM matches the signed-in Supabase Authentication account to an active CRM Users record with the same email address.
 
 If the email addresses do not match, access will be restricted.
 
 ### Signing out
 
-Use the sign-out control in the Admin authentication section when available, or close the browser after signing out of the authenticated session.
+Use the CRM sign-out control.
 
 Do not share passwords or leave the CRM open on a shared computer.
 
@@ -50,16 +56,21 @@ Do not share passwords or leave the CRM open on a shared computer.
 
 ### Admin
 
-Admins have full CRM access, including:
+Admins have the broadest CRM access, including:
 
 - All companies and contacts
 - All opportunities and activities
 - Imports
 - Sales coverage assignment
+- Outreach administration and controlled Mailshake submission
+- ERP Reconciliation
 - CRM user administration
 - Funnel stage administration
 - Buyer persona administration
 - Tag administration
+- Projects / Lists administration
+- Knowledge Library administration
+- Workflow Automation administration
 - Backup export
 
 ### Sales Manager
@@ -72,8 +83,10 @@ Sales Managers can:
 - Import ZoomInfo data
 - Assign and rebalance sales coverage
 - Manage opportunities
+- Access Outreach for review and reconciliation
+- Access ERP Reconciliation
 
-Sales Managers cannot manage CRM users or protected Admin settings.
+Production Mailshake authorization and controlled provider submission require an Admin.
 
 ### Sales Rep
 
@@ -86,93 +99,125 @@ Sales Reps can:
 - Move opportunities through permitted funnel stages
 - Mark permitted opportunities won or lost
 
-Sales Reps do not have access to Admin settings or ZoomInfo imports.
+Sales Reps do not have access to protected Admin settings, ZoomInfo imports, Outreach, or ERP Reconciliation.
 
 ---
 
 ## 4. Main Navigation
 
-The CRM includes these primary areas:
+The CRM includes these primary areas.
 
 ### Dashboard
 
-The Dashboard provides an overview of CRM activity, pipeline, company records, and follow-up information.
-
-Use it to identify:
+Use the Dashboard to review:
 
 - Open sales opportunities
 - Upcoming activities
+- Overdue work
 - Companies requiring attention
 - Sales coverage conditions
 - Pipeline and funnel status
 
 ### Companies
 
-The Companies area contains prospect and customer company records.
+Use Companies to:
 
-Use it to:
-
-- Search for a company
-- Filter company records
+- Search and filter company records
 - Open Company Detail
 - Review sales coverage
+- Review contacts
+- Review opportunities and activities
 - Review AI prospect analysis
-- View contacts, opportunities, activities, notes, and documents
-- Select multiple companies for bulk sales coverage assignment when permitted
+- Review documents
+- Review classifications and tags
+- Review Graymills Customer Number when available
 
 ### Contacts
 
-The Contacts area contains people associated with CRM companies.
-
-Use it to:
+Use Contacts to:
 
 - Search by name, company, title, email, department, or tags
-- Filter by market, sector, or category
+- Filter contact records
 - Open the related company
-- Review available phone and email information
+- Review phone and email information
 
 ### Funnel
 
-The Funnel area contains sales opportunities arranged by stage.
-
-Use it to:
+Use Funnel to:
 
 - Review active opportunities
 - Move opportunities through the sales process
-- Review opportunity value and status
+- Review estimated value
+- Review expected close information
 - Mark opportunities won or lost
 - Open the associated company
 
 ### Import ZoomInfo
 
-The Import area is available to Admins and Sales Managers.
+Available to Admins and Sales Managers.
 
 Use it to:
 
-- Upload a ZoomInfo CSV file
-- Map imported columns
-- Assign imported companies to a salesperson or Sales Manager
-- Apply CRM tags
-- Review import validation
-- Import companies and contacts
+- Upload CSV files
+- Review and correct field mappings
+- Assign sales coverage
+- Apply segmentation tags
+- Review import results
+
+### Outreach
+
+Available to Admins and Sales Managers.
+
+Use Outreach to:
+
+- Load Mailshake campaigns
+- Select eligible CRM contacts
+- Record CRM outreach enrollment
+- Review Mailshake readiness
+- Create controlled Production authorizations as an Admin
+- Submit controlled recipient runs as an Admin
+- Review automatic reconciliation
+- Manually reconcile an existing provider operation when necessary
+- Review provider-operation history
+
+See **Mailshake Outreach** later in this guide before using Production submission.
+
+### ERP Reconciliation
+
+Available to Admins and Sales Managers.
+
+Use ERP Reconciliation to review CRM and ERP identity information and perform approved reconciliation work.
+
+Graymills Customer Number is an important ERP identity field and should be verified carefully before changing it.
 
 ### Admin
 
-The Admin area is available only to Admin users.
+Available only to Admin users.
 
-Use it to manage:
+Use Admin to manage:
 
-- CRM users
-- User roles and status
+- Roles and permissions
+- Knowledge Library
+- CRM Users
+- Projects / Lists
+- Workflow Automation
 - Funnel stages
 - Buyer personas
-- Tags and tag types
-- Authentication status
-- CRM backup exports
+- Markets / Sectors / Categories
+- Authentication administration
+- Backup exports
+
+### Help
+
+Help displays this User Guide inside the CRM.
 
 ### Release Notes
 
-The Release Notes area summarizes recent CRM revisions and features.
+Release Notes summarize recent CRM revisions and features.
+
+### Refresh CRM
+
+Use **Refresh CRM** when CRM information appears out of date.
 
 ---
 
@@ -180,26 +225,29 @@ The Release Notes area summarizes recent CRM revisions and features.
 
 ### Searching for a company
 
-Open **Companies** and use the search box.
+Open **Companies** and use the search and filter controls.
 
-The search can match information such as:
+Searchable information may include:
 
 - Company name
+- Graymills Customer Number
 - Industry
 - Location
 - Website
 - NAICS or SIC information
 - CRM tags
-- Prospect-analysis fields
+- Prospect-analysis information
 
 ### Opening Company Detail
 
-Select a company to open its Company Detail page.
+Select a company to open Company Detail.
 
 The page may include:
 
 - Company information
 - Sales Coverage
+- Graymills classifications
+- Graymills Customer Number
 - Contacts
 - Activities
 - Sales opportunities
@@ -208,12 +256,13 @@ The page may include:
 - Notes
 - Documents
 - Tags
+- Projects / Lists
 
 Use the Back control to return to the previous CRM view.
 
 ### Sales Coverage
 
-The Sales Coverage section identifies:
+Sales Coverage identifies:
 
 - Assigned Salesperson / Rep
 - Assigned Sales Manager
@@ -251,8 +300,13 @@ A contact may include:
 - Mobile phone
 - Related company
 - Market, sector, and category tags
+- Projects / Lists
 
-When a Sales Repâ€™s visibility is restricted to assigned companies, related contact visibility follows the company assignment.
+When a Sales Rep's visibility is restricted to assigned companies, related contact visibility follows the company assignment.
+
+Accurate email information is especially important for Mailshake Outreach.
+
+Do not create duplicate CRM contacts merely to work around an outreach eligibility problem.
 
 ---
 
@@ -311,15 +365,15 @@ Typical outcomes include:
 - Won
 - Lost
 
-Do not mark an opportunity Won until the sale has reached the companyâ€™s accepted definition of a win.
+Do not delete lost opportunities solely to improve funnel appearance.
 
-Do not delete lost opportunities solely to improve funnel appearance. Retaining the history supports analysis and future follow-up.
+Retaining history supports reporting, analysis, and future follow-up.
 
 ---
 
 ## 9. AI Prospect Analysis
 
-The CRM can generate an AI-assisted prospect analysis for a company.
+The CRM can generate AI-assisted prospect analysis for a company.
 
 The analysis may include:
 
@@ -344,8 +398,6 @@ The analysis may include:
 ### Analysis history
 
 The CRM stores prior analysis results so changes can be reviewed over time.
-
-Historical snapshots may include the score, tier, confidence, product recommendation, use case, soils, cleaning action, and next best action.
 
 ### Important limitation
 
@@ -376,28 +428,336 @@ Review the source file and confirm it contains the expected:
 - Industry information
 - Location information
 - ZoomInfo identifiers
+- Graymills Customer Number when appropriate
 
 ### Import process
 
 1. Open **Import ZoomInfo**.
 2. Upload the CSV file.
-3. Review detected columns.
+3. Review the first-row preview and detected columns.
 4. Confirm or correct field mapping.
 5. Select optional salesperson and Sales Manager assignments.
-6. Select any tags to apply.
+6. Select permitted tags or Projects / Lists when appropriate.
 7. Run the import.
 8. Review the import results.
 9. Check several imported companies and contacts.
 
 ### Duplicate handling
 
-Imports may match or update existing records based on available identifiers and matching rules.
+Imports may create, reuse, or enrich records depending on matching information.
 
 Always review the import summary rather than assuming every row created a new record.
 
 ---
 
-## 11. Tags
+## 11. Projects / Lists and Segmentation
+
+Projects / Lists help group companies and contacts for sales work and outreach selection.
+
+Segmentation may also use:
+
+- Markets
+- Sectors
+- Categories
+- Company
+- State
+- Management level
+- Function
+
+For Outreach, a CRM List can be used to select all currently eligible members of that List.
+
+The server independently verifies current membership and eligibility before CRM outreach records are created.
+
+---
+
+## 12. Mailshake Outreach
+
+### What Outreach does
+
+The CRM is the source of truth for selecting and tracking recipients.
+
+Mailshake executes email campaigns.
+
+The Outreach workflow intentionally separates:
+
+- CRM selection
+- CRM enrollment
+- Mailshake readiness checks
+- Admin authorization
+- Mailshake recipient submission
+- Provider reconciliation
+
+Selecting a contact does not by itself add anyone to Mailshake.
+
+### Important terminology
+
+**Selected** means the contact is selected in the CRM interface.
+
+**Recorded enrollment** means the CRM created outreach tracking records. It does not mean the recipient was added to Mailshake.
+
+**Ready** means the latest server-side checks indicate the CRM enrollment is currently eligible for provider submission.
+
+**Authorized** means an Admin created exact permission for specific recipients in a controlled run.
+
+**Submitted** means Mailshake accepted the asynchronous recipient-add request. It does not yet mean the recipient is confirmed in the campaign.
+
+**Confirmed** means reconciliation verified that the recipient exists in the intended Mailshake campaign.
+
+**Provider operation** is the CRM audit record for one exact Mailshake recipient action.
+
+**Run authorization completed** means every exact item in that controlled authorization reached a terminal CRM outcome.
+
+### Campaign size versus controlled run size
+
+A Mailshake campaign is not limited to 10 people.
+
+The CRM currently permits up to 10 exactly authorized recipients in one controlled run.
+
+For example, if 37 recipients are ready:
+
+1. Authorize and process the first 10.
+2. Reconcile that run to terminal outcomes.
+3. Review the remaining eligible population.
+4. Authorize and process the next 10.
+5. Repeat until the final 7 are complete.
+
+The 10-recipient limit is a safety boundary for one controlled action, not a campaign-size limit.
+
+### Before using Step 4
+
+Keep the Mailshake campaign **paused**.
+
+Do not unpause the campaign while recipients are still being added or reconciled.
+
+The server checks campaign state again before each recipient submission.
+
+### Outreach workflow
+
+#### Step 0 - Choose campaign and recipients
+
+Choose the Mailshake campaign and select CRM contacts.
+
+Selection alone does not create enrollment records and does not change Mailshake.
+
+#### Step 1 - Review Selection on Server
+
+This is a check-only step.
+
+The server re-validates the selected CRM contacts.
+
+No Mailshake recipient is added.
+
+#### Step 2 - Record Enrollment in CRM
+
+This creates CRM enrollment and batch tracking records.
+
+It does not submit recipients to Mailshake and does not send email.
+
+#### Step 3 - Check Recorded Enrollment and Mailshake Readiness
+
+The CRM re-checks:
+
+- Current contact eligibility
+- Recorded enrollment state
+- Email consistency
+- Duplicate and prior-processing conditions
+- Existing provider operations
+- Existing Mailshake recipient state
+- Current Mailshake campaign state
+
+The campaign must be paused before provider submission can proceed.
+
+#### Production authorization
+
+Production Mailshake submission requires an Admin-created exact run authorization.
+
+The authorization identifies the exact recipient items permitted for the controlled run.
+
+A Production authorization is time-limited.
+
+If it expires or becomes invalid, run the review again and create a fresh authorization.
+
+#### Step 4 - Submit the Controlled Run
+
+Step 4 is the first step that can actually add recipients to Mailshake.
+
+Each authorized recipient is processed sequentially.
+
+Even in a 10-recipient controlled run:
+
+- Each recipient has its own exact authorization item.
+- Each recipient gets its own CRM provider operation.
+- Each Mailshake provider request contains one recipient.
+
+The CRM does not send one bulk Mailshake request for all 10 recipients.
+
+### Stop-on-error behavior
+
+The controlled run stops on the first blocked, failed, unreadable, or uncertain result.
+
+The CRM does not automatically continue to later recipients after a stop condition.
+
+Unattempted authorization items are retired so they cannot be submitted accidentally from the stopped run.
+
+If an outcome is uncertain, do not automatically retry the recipient.
+
+Review Existing Operations / Reconciliation first.
+
+### Automatic reconciliation
+
+After a completely successful controlled submission run, Version 3.27H3C5 automatically reconciles the exact provider operations created by that run.
+
+Automatic reconciliation:
+
+- Checks status only
+- Uses the exact existing CRM provider-operation IDs
+- Does not call the recipient-submission endpoint
+- Does not add a recipient again
+- Does not unpause the campaign
+- Does not send email
+- Polls for up to approximately 60 seconds
+
+When Mailshake finishes processing, CRM can update:
+
+- Enrollment status
+- Provider-operation status
+- Mailshake recipient ID
+- Batch status
+- Run authorization status
+
+### Manual reconciliation fallback
+
+If Mailshake is still processing after the automatic polling window, or an operation requires attention, use **Reconcile This Operation**.
+
+Manual reconciliation checks the exact existing provider operation.
+
+It does not submit the recipient again.
+
+If the operation still shows processing:
+
+- Wait
+- Reconcile the same operation later
+- Do not click Step 4 again for that recipient
+
+### When reconciliation is complete
+
+A normal successful final result shows:
+
+- CRM enrollment: confirmed
+- Provider operation: completed
+- Mailshake recipient ID populated
+
+For the final operation in a controlled run, the linked run authorization should also reach completed when every authorized item has a terminal outcome.
+
+### Existing Operations / Reconciliation
+
+Provider history is the CRM audit trail for Mailshake operations already created.
+
+Loading history is read-only.
+
+Use it to:
+
+- Review prior operations
+- Review recipient outcomes
+- Find exact provider-operation IDs
+- Reconcile an existing operation safely
+
+Reconciliation never means submit again.
+
+### When to unpause the Mailshake campaign
+
+Do not unpause solely because Mailshake accepted the asynchronous recipient-add request.
+
+Unpause only after:
+
+- All recipient additions you intended for the current campaign load have been reconciled
+- You have reviewed the final recipient population
+- No unresolved provider operation needs investigation
+- You are actually ready for the Mailshake email sequence to begin
+
+The CRM does not automatically unpause the campaign.
+
+Unpausing is a deliberate Mailshake campaign decision.
+
+### Production Outreach operating checklist
+
+Before clicking Step 4:
+
+- Confirm the correct Mailshake campaign.
+- Confirm the campaign is paused.
+- Confirm the intended CRM contacts.
+- Confirm server-ready counts.
+- Review blocked and already-processed counts.
+- Confirm the controlled authorization contains only the intended recipients.
+- Confirm the Step 4 button shows the expected recipient count.
+- Read the final browser confirmation before continuing.
+
+After Step 4:
+
+- Do not click Step 4 again.
+- Allow automatic reconciliation to run.
+- Review every exact provider operation.
+- Use manual reconciliation only when needed.
+- Confirm terminal outcomes.
+- Keep the campaign paused until the intended recipient load is complete.
+
+---
+
+## 13. Outreach Eligibility and Safety
+
+A contact may be blocked from Mailshake Outreach for reasons such as:
+
+- Do Not Contact status
+- Missing email
+- Duplicate active CRM email
+- Email changed after enrollment
+- Enrollment no longer in the expected state
+- Recipient already processed
+- Existing active provider operation
+- Recipient already present in the Mailshake campaign
+- Mailshake campaign not paused
+- Authorization expired or invalid
+
+Do not bypass a blocked condition by creating a duplicate CRM contact or resubmitting the same recipient.
+
+Correct the underlying CRM or campaign condition, then run a fresh review.
+
+### Preview test allowlist
+
+Vercel Preview uses a server-side recipient allowlist for Mailshake testing.
+
+If Preview reports that a contact is not on the configured test-recipient allowlist:
+
+- No Mailshake recipient should be submitted through that blocked attempt.
+- Confirm the exact test email in the Preview environment variable.
+- Redeploy the Preview after changing the environment variable.
+- Run a fresh review and authorization.
+
+This allowlist is a testing control and is not the normal Production recipient-selection mechanism.
+
+---
+
+## 14. ERP Reconciliation
+
+ERP Reconciliation is available to Admins and Sales Managers.
+
+Use it to review CRM company identity against ERP information.
+
+Graymills Customer Number is the strongest explicit ERP identity field when it is available and correct.
+
+Before changing an ERP identity value:
+
+- Verify the company record.
+- Verify the customer number.
+- Preserve leading zeros.
+- Confirm the number does not belong to another CRM company.
+- Avoid guessing based only on similar company names.
+
+ERP reconciliation should be human-reviewed when identity is uncertain.
+
+---
+
+## 15. Tags
 
 Tags help categorize companies and contacts.
 
@@ -418,13 +778,13 @@ Use existing standardized tags whenever possible instead of creating multiple ta
 
 ---
 
-## 12. Buyer Personas
+## 16. Buyer Personas
 
 Buyer personas help describe common customer or prospect profiles.
 
 Admins can manage buyer-persona definitions.
 
-Personas may be used to support:
+Personas may support:
 
 - Prospect analysis
 - Sales messaging
@@ -432,169 +792,130 @@ Personas may be used to support:
 - Campaign targeting
 - Application recommendations
 
-Persona assignments should support sales judgment rather than replace it.
+Persona assignments support sales judgment rather than replace it.
 
 ---
 
-## 13. Admin User Management
+## 17. Admin User Management
 
 Only a signed-in Admin can create or modify CRM Users and manage matching authentication logins.
 
-Each person who signs in requires two linked records:
+Each person who signs in requires:
 
 1. A Graymills CRM Users record.
 2. A Supabase Authentication login.
 
-The email address must match exactly in both records. The CRM performs this matching automatically.
+The email address must match exactly in both records.
 
 ### Creating a new user
 
-#### Step 1: Create the CRM Users record
+#### Step 1 - Create the CRM Users record
 
-1. Sign in to the CRM as an Admin.
+1. Sign in as an Admin.
 2. Open **Admin**.
 3. Find **Create CRM User**.
-4. Enter the user’s display name.
-5. Enter the user’s email address.
-6. Select the correct **User Role**.
-7. Select the appropriate **Coverage Type**.
-8. Set **Status** to **Active**.
-9. Enter optional phone, function, notes, and sort-order information.
+4. Enter the display name.
+5. Enter the email address.
+6. Select the correct User Role.
+7. Select the appropriate Coverage Type.
+8. Set Status to Active.
+9. Enter optional information.
 10. Select **Create CRM User**.
 
 The new user initially displays **No login**.
 
-#### Step 2: Create the matching Auth login
+#### Step 2 - Create the matching Auth login
 
-1. Find the new user in the **CRM Users** list.
-2. Confirm the email address is correct.
+1. Find the user in CRM Users.
+2. Confirm the email address.
 3. Confirm the user is Active.
-4. Enter a temporary password in the **Temporary Password** field.
+4. Enter a temporary password.
 5. Use at least eight characters.
 6. Select **Create Auth Login**.
-7. Confirm the user now displays **Login exists**.
-8. Confirm **Email confirmed** displays **Yes**.
+7. Confirm **Login exists**.
+8. Confirm email confirmation status as appropriate.
 
-The temporary password is sent directly to Supabase Authentication. It is not stored in the CRM or browser storage.
+The temporary password is sent to Supabase Authentication.
 
-Give the temporary password to the user through an approved secure method. Do not include passwords in ordinary support tickets, screenshots, CRM notes, or shared documents.
+Do not place passwords in CRM notes, screenshots, support tickets, or shared documents.
 
 ### Selecting the correct role
 
-Use these application roles:
-
-- **Admin:** Full CRM access, including protected Admin settings and user management.
-- **Sales Manager:** Broad sales visibility, funnel management, imports, and sales coverage assignment.
-- **Sales Rep:** Assigned-account visibility and permitted work on related contacts, activities, and opportunities.
-
-Assign the least-privileged role that still allows the person to perform their work.
+Assign the least-privileged role that still permits the person's work.
 
 ### Selecting status
 
-- **Active:** The user can be matched to a login and appears in applicable assignment controls.
-- **Archived:** The CRM User record is retained for history but should not receive new work or normal CRM access.
+**Active** users may receive normal CRM access when authentication also matches.
 
-An archived CRM User cannot receive a new Auth login or have a password reset from the CRM Admin page.
-
-### Selecting coverage type
-
-- **Internal:** A Graymills employee or other internal CRM user.
-- **Outside Rep:** An external sales representative who may receive assigned account coverage.
-
-Coverage type does not replace the application role. Set both fields correctly.
-
-### Verifying a new user
-
-After creating both records, have the user sign in with the exact email address and temporary password.
-
-Confirm:
-
-- The login succeeds.
-- The correct display name appears.
-- The correct application role is applied.
-- The expected navigation tabs appear.
-- Company and contact visibility match the user’s role and assignments.
-- Sales coverage dropdowns include the user when appropriate.
-- Admin functions are hidden from non-Admin users.
-- Import access is available only to Admins and Sales Managers.
-
-Resolve role or visibility problems before assigning normal production work.
+**Archived** users are retained for history but should not receive new work or normal CRM access.
 
 ---
 
-## 14. Password Administration
+## 18. Password Administration
 
-Admins can reset another active user’s password from the CRM.
+Admins can reset another active user's password from the CRM.
 
-### Resetting another user’s password
+### Resetting another user's password
 
 1. Sign in as an Admin.
 2. Open **Admin**.
-3. Find the active user in **CRM Users**.
-4. Confirm the user displays **Login exists**.
-5. Enter a new temporary password under **New Temporary Password**.
+3. Find the active user.
+4. Confirm **Login exists**.
+5. Enter a new temporary password.
 6. Use at least eight characters.
 7. Select **Reset Password**.
-8. Confirm the success message appears.
-9. Give the temporary password to the user securely.
-10. Have the user verify that the new password works.
-
-The password is sent directly to Supabase and is not stored in CRM records or browser storage.
+8. Confirm the success message.
+9. Give the password to the user securely.
+10. Have the user verify it works.
 
 ### Resetting your own password
 
 The CRM intentionally prevents an Admin from resetting their own password from the Admin user-management page.
 
-The current signed-in account displays **Current login** and the message:
-
-**Your own password cannot be reset from this Admin page.**
-
-Use the approved Supabase or account-recovery process for your own password.
+Use the approved authentication or account-recovery process.
 
 ### Password safety
 
-- Never place a password in CRM notes.
-- Never send a password in an ordinary support message.
-- Never include a visible password in a screenshot.
+- Never place passwords in CRM notes.
+- Never include visible passwords in screenshots.
 - Use a unique temporary password.
-- Send credentials through an approved secure method.
-- Confirm the intended recipient before sharing credentials.
+- Share credentials through an approved secure method.
 
 ---
 
-## 15. Archiving and Reactivating Users
+## 19. Archiving and Reactivating Users
 
 ### Archiving a CRM User
 
-Archive a user who should no longer appear as an active CRM participant.
+Before archiving:
 
-1. Open **Admin**.
-2. Find the user in **CRM Users**.
-3. Review open companies, opportunities, and activities assigned to the user.
-4. Reassign active work when necessary.
-5. Select **Archive**.
-6. Confirm the user displays **archived**.
+- Review open companies
+- Review opportunities
+- Review activities
+- Reassign active work when necessary
 
-Archiving retains the CRM User record for historical references.
+Archiving retains the CRM User record for history.
 
-Archiving the CRM User does not delete the Supabase Authentication account. Because the CRM only matches active CRM Users for access, the archived user should no longer receive normal CRM access. For terminated users or other security-sensitive situations, an administrator should also disable or remove the Supabase Authentication account through the approved authentication-administration process.
+Archiving the CRM User does not by itself delete the Supabase Authentication account.
+
+For security-sensitive departures, also follow the approved authentication-administration process.
 
 ### Reactivating a CRM User
 
 1. Open **Admin**.
 2. Find the archived user.
 3. Select **Reactivate**.
-4. Confirm the status returns to **active**.
-5. Review the assigned role and coverage type.
-6. Confirm whether the existing Auth login is still appropriate.
+4. Confirm Active status.
+5. Review role and coverage type.
+6. Confirm the existing authentication login is appropriate.
 7. Reset the password when required.
-8. Verify the user’s access and record visibility.
+8. Verify access.
 
 Do not create a second Auth login when **Login exists** is already displayed.
 
 ---
 
-## 16. Backup Export
+## 20. Backup Export
 
 Admins can download a dated JSON backup of core CRM operational tables.
 
@@ -604,7 +925,7 @@ Before major data changes:
 2. Locate **Backup Export**.
 3. Select **Download CRM backup JSON**.
 4. Confirm the file downloads.
-5. Store the file in an approved secure location.
+5. Store it in an approved secure location.
 
 The current backup tool exports data only.
 
@@ -612,24 +933,28 @@ A full automated restore workflow is not currently enabled.
 
 ---
 
-## 17. Data Quality Practices
+## 21. Data Quality Practices
 
 Follow these practices when adding or updating records:
 
 - Search before creating a new company.
-- Use the companyâ€™s standard legal or operating name.
+- Search before creating a new contact.
+- Use the company's standard legal or operating name.
 - Verify website addresses.
+- Verify email addresses.
+- Preserve Graymills Customer Number accurately.
 - Use direct phone and email information when available.
 - Assign the correct salesperson and Sales Manager.
 - Use standardized tags.
 - Keep opportunity stages current.
 - Complete old activities.
+- Preserve useful historical records instead of deleting them.
 - Avoid entering sensitive personal information that does not belong in the CRM.
 - Do not use AI-generated claims without review.
 
 ---
 
-## 18. Troubleshooting
+## 22. Troubleshooting
 
 ### The login screen keeps appearing
 
@@ -645,7 +970,7 @@ Check:
 Check:
 
 - A CRM Users record exists.
-- The CRM Users email matches the Supabase Authentication email.
+- The CRM Users email matches the Authentication email.
 - The CRM Users record is Active.
 - The role is Admin, Sales Manager, or Sales Rep.
 
@@ -653,13 +978,15 @@ Check:
 
 Only Admin users can access the Admin area.
 
-Verify the userâ€™s CRM role.
-
 ### The Import tab is missing
 
 Import access is available to Admins and Sales Managers.
 
-Sales Reps do not have Import access.
+### Outreach is unavailable
+
+Outreach is available to Admins and Sales Managers.
+
+Production authorization and controlled Mailshake submission require an Admin.
 
 ### A Sales Rep cannot see a company
 
@@ -669,8 +996,6 @@ Check whether the company is assigned to that user as Salesperson / Rep.
 
 Contacts inherit visibility from their related company.
 
-Confirm the company is visible to the signed-in user.
-
 ### An assignment dropdown is empty
 
 Check:
@@ -678,7 +1003,7 @@ Check:
 - CRM users exist.
 - The users are Active.
 - The CRM Users API loaded successfully.
-- The browser session is still signed in.
+- The browser session is signed in.
 
 ### AI analysis fails
 
@@ -686,69 +1011,142 @@ Check:
 
 - The company record loaded correctly.
 - The server has the required OpenAI configuration.
-- The user has permission for the requested operation.
-- The application error message for additional details.
+- The user has permission.
+- The displayed application error.
+
+### Mailshake Step 4 says a recipient is blocked
+
+Do not repeatedly click Step 4.
+
+Review the displayed reason.
+
+Common causes include:
+
+- Do Not Contact
+- Missing email
+- Duplicate email
+- Email changed
+- Already processed
+- Existing provider operation
+- Recipient already in campaign
+- Campaign not paused
+- Authorization invalid or expired
+
+Correct the underlying issue and run a fresh review.
+
+### Preview says the recipient is not allowlisted
+
+Confirm the exact test email is in the Preview-only Mailshake test-recipient allowlist and redeploy the Preview.
+
+Then create a fresh review and authorization.
+
+### Mailshake says submitted but not confirmed
+
+This is normal for an asynchronous Mailshake add request.
+
+Allow automatic reconciliation to run.
+
+Do not resubmit.
+
+### Automatic reconciliation times out
+
+Use **Reconcile This Operation** later for the same exact provider operation.
+
+Do not submit the recipient again.
+
+### Reconciliation says processing
+
+Wait and reconcile the same operation later.
+
+Do not use Step 4 again for that recipient.
+
+### Reconciliation requires investigation
+
+Stop provider actions for that recipient.
+
+Review the exact existing provider operation and its CRM audit history before deciding what to do.
+
+Do not automatically retry an uncertain submission.
+
+### Campaign has more than 10 recipients
+
+This is normal.
+
+Process the campaign in controlled groups of up to 10.
+
+The campaign itself is not limited to 10.
 
 ### Data appears outdated
 
-Select **Refresh CRM** and recheck the record.
+Select **Refresh CRM**.
+
+For Outreach history, also use **Refresh Provider History** when appropriate.
 
 ---
 
-## 19. Production Administrator Checklist
+## 23. Production Administrator Checklist
 
-Before adding the first production records:
+Periodically verify:
 
-- Confirm the production Supabase project is connected.
-- Confirm required environment variables are present.
-- Confirm at least one Admin authentication account.
-- Confirm the matching Admin CRM Users record.
-- Verify Admin, Sales Manager, and Sales Rep permissions.
-- Download a CRM backup.
-- Remove test companies, contacts, activities, opportunities, and analyses.
-- Preserve CRM users and configuration records.
-- Confirm zero unintended test records remain.
-- Import or create initial production companies.
-- Verify backup export after production data is added.
+- Production Supabase is connected.
+- Required environment variables are present.
+- At least one active Admin authentication account exists.
+- Matching CRM Users records are correct.
+- Admin, Sales Manager, and Sales Rep permissions behave as expected.
+- Backup export works.
+- Production Mailshake campaigns used by CRM are intentionally selected.
+- Controlled Mailshake runs remain capped at the intended limit.
+- Mailshake recipient submission requires exact Production authorization.
+- Provider-operation history is retained.
+- Automatic reconciliation is working.
+- Manual reconciliation remains available as fallback.
+- No Production secrets are exposed in browser-visible code or documentation.
+
+Before major production data changes, download a backup.
 
 ---
 
-## 20. Support and Change Requests
+## 24. Support and Change Requests
 
 Report CRM issues with:
 
 - The page or section being used
 - The user role
 - The company or contact involved
+- The Mailshake campaign when relevant
+- The CRM provider-operation ID when relevant
 - What action was attempted
-- The displayed error message
+- The first meaningful displayed error message
 - A screenshot when appropriate
-- Whether Refresh CRM changed the result
+- Whether Refresh CRM or Refresh Provider History changed the result
 
-Do not include passwords in support messages or screenshots.
+Do not include passwords or secret environment-variable values in support messages or screenshots.
+
+For an uncertain Mailshake submission, include the provider-operation information and do not retry the recipient before review.
 
 ---
 
-## 21. Version 3.02 Release Notes
+## 25. Guide Revision Notes
 
-Version 3.02 expands the production CRM with protected Admin authentication-management controls.
+### Version 3.27H3C5A
 
-Production-release priorities include:
+This guide revision updates operating documentation through the Version 3.27H3C5 Automatic Reconciliation behavior.
 
-- Supabase email/password login gate
-- Signed-in CRM-user matching
-- Role-based navigation and permissions
-- Sales Rep company visibility
-- Sales coverage management
-- Protected Admin and Import access
-- CRM backup export
-- AI analysis history and metric snapshots
-- Removal of temporary role-testing controls
-- Production documentation
-- Removal of test CRM data before normal use
-- Verified Admin authentication-management API
-- Auth-login status and email-confirmation visibility
-- In-app creation of matching Auth logins
-- Protected password resets for other active users
-- Protection against resetting the current Admin’s own password
-- Updated operational instructions for creating, verifying, archiving, and reactivating users
+Major documentation updates include:
+
+- Current main navigation
+- Outreach / Mailshake workflow
+- Campaign size versus controlled-run size
+- Up-to-10-recipient controlled runs
+- Production authorization
+- One provider operation per recipient
+- Stop-on-error behavior
+- Automatic reconciliation
+- Manual reconciliation fallback
+- Campaign pause and unpause guidance
+- Outreach troubleshooting
+- ERP Reconciliation overview
+- Updated Admin-area navigation
+- Corrected text-encoding artifacts from the older guide
+
+No CRM database, Mailshake provider behavior, or application code is changed by this guide revision.
