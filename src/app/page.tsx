@@ -282,7 +282,7 @@ const CRM_FIELDS = [
   {
     field: "Company Name",
     required: true,
-    aliases: ["company name", "company", "account name", "account"],
+    aliases: ["company name", "company", "company/school", "company school", "organization", "employer", "account name", "account"],
   },
   {
     field: "Graymills Customer Number",
@@ -398,7 +398,7 @@ const CRM_FIELDS = [
   {
     field: "Department",
     required: false,
-    aliases: ["department", "contact department"],
+    aliases: ["department", "contact department", "division", "division/department", "division/dept/district", "division dept district"],
   },
   {
     field: "Function",
@@ -413,7 +413,7 @@ const CRM_FIELDS = [
   {
     field: "Direct Phone",
     required: false,
-    aliases: ["direct phone", "direct dial", "contact phone"],
+    aliases: ["direct phone", "direct dial", "contact phone", "telephone", "phone number"],
   },
   {
     field: "Mobile Phone",
@@ -434,6 +434,16 @@ const CRM_FIELDS = [
     field: "Person Country",
     required: false,
     aliases: ["person country", "contact country"],
+  },
+  {
+    field: "Sales Rep",
+    required: false,
+    aliases: ["sales rep", "rep", "rep name", "salesperson", "sales person", "sales representative"],
+  },
+  {
+    field: "Sales Manager",
+    required: false,
+    aliases: ["sales manager", "sales mgr", "rep manager", "manager"],
   },
   {
     field: "LinkedIn URL",
@@ -1083,6 +1093,7 @@ export default function Home() {
   }, [activeTab]);
   const [importAssignedSalespersonId, setImportAssignedSalespersonId] = useState("");
   const [importAssignedSalesManagerId, setImportAssignedSalesManagerId] = useState("");
+  const [importSourceName, setImportSourceName] = useState("ZoomInfo");
   const [importProjectListOptions, setImportProjectListOptions] = useState<any[]>([]);
   const [importSelectedProjectListIds, setImportSelectedProjectListIds] = useState<string[]>([]);
   const [isLoadingImportProjectLists, setIsLoadingImportProjectLists] = useState(false);
@@ -2133,6 +2144,7 @@ async function loadCompanyOwnerFilterData() {
         },
         body: JSON.stringify({
           fileName: csvData.fileName,
+          sourceName: importSourceName,
           headers: csvData.headers,
           rows: csvData.rows,
           mapping: activeMapping,
@@ -2161,7 +2173,9 @@ async function loadCompanyOwnerFilterData() {
 
       const assignmentSummary =
         data.companiesAssigned && data.companiesAssigned > 0
-          ? ` Sales coverage assigned to ${data.companiesAssigned} companies. Salesperson / Rep: ${assignedSalespersonName}. Sales Manager: ${assignedSalesManagerName}.`
+          ? data.rowLevelSalesCoverageMapped
+            ? ` Sales coverage assigned to ${data.companiesAssigned} companies using mapped CSV sales coverage values and any configured import-wide fallbacks.`
+            : ` Sales coverage assigned to ${data.companiesAssigned} companies. Salesperson / Rep: ${assignedSalespersonName}. Sales Manager: ${assignedSalesManagerName}.`
           : "";
 
       const projectListAssignmentSummary =
@@ -2532,7 +2546,7 @@ async function handleAnalyzeProspect() {
     { key: "companies", label: "Companies" },
     { key: "contacts", label: "Contacts" },
     { key: "funnel", label: "Funnel" },
-    { key: "import", label: "Import ZoomInfo" },
+    { key: "import", label: "Import CSV" },
     { key: "outreach", label: "Outreach" },
     { key: "erpReconciliation", label: "ERP Reconciliation" },
     { key: "admin", label: "Admin" },
@@ -3683,17 +3697,32 @@ async function handleAnalyzeProspect() {
             <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
               <div className="flex flex-col gap-4">
                 <div>
-                  <h2 className="text-xl font-bold">Import ZoomInfo CSV</h2>
-                  <p className="mt-1 max-w-3xl text-sm leading-5 text-slate-600">
-                    Upload a ZoomInfo CSV, review and adjust field mapping, then save the
-                    data into the Graymills CRM.
+                  <h2 className="text-xl font-bold">Import CSV</h2>
+                  <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-blue-700">
+                    Version 3.27I1 - Flexible Import Mapping
                   </p>
+                  <p className="mt-2 max-w-3xl text-sm leading-5 text-slate-600">
+                    Upload a CSV from ZoomInfo, a trade show, or another prospect source, review the field mapping, then save the data into the Graymills CRM.
+                  </p>
+                  <div className="mt-4 max-w-xl">
+                    <label className="text-sm font-semibold text-slate-700">Import Source</label>
+                    <input
+                      type="text"
+                      value={importSourceName}
+                      onChange={(event) => setImportSourceName(event.target.value)}
+                      placeholder="Example: Trade Show - IMTS 2026"
+                      className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    />
+                    <p className="mt-2 text-xs text-slate-500">
+                      Keep ZoomInfo for ZoomInfo files, or enter the show/list source so imported records are labeled correctly.
+                    </p>
+                  </div>
                 </div>
 
                 <div className="max-w-full overflow-hidden rounded-2xl border border-blue-200 bg-blue-50 p-5">
                   <h3 className="text-lg font-bold text-blue-950">Import Sales Coverage Assignment</h3>
                   <p className="mt-2 text-sm leading-6 text-blue-900">
-                    Optional: assign every company created or reused from this import to a Salesperson / Rep and Sales Manager.
+                    Optional defaults: assign companies from this import to a Salesperson / Rep and Sales Manager. If the CSV maps a row-level Sales Rep or Sales Manager, an exact active CRM display name or email overrides the default for that row. Unknown, ambiguous, or conflicting values stop the import before CRM records are written.
                   </p>
 
                   <div className="mt-5 grid max-w-full gap-4 md:grid-cols-2">
@@ -3960,7 +3989,7 @@ async function handleAnalyzeProspect() {
 <div className="max-w-full overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
                   <h3 className="text-lg font-bold">Manual CRM Field Mapping</h3>
                   <p className="mt-2 text-sm text-slate-600">
-                    Review each CRM field and choose the correct ZoomInfo CSV column. Use
+                    Review each CRM field and choose the correct uploaded CSV column. Use
 
                   </p>
 

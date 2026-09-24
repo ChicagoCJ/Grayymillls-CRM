@@ -1,9 +1,10 @@
-﻿import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { verifySignedInCrmUser } from "../_shared/verified-auth";
 
 type ImportPayload = {
   fileName: string;
+  sourceName?: string | null;
   headers: string[];
   rows: Record<string, string>[];
   mapping: Record<string, string>;
@@ -68,6 +69,57 @@ function normalizeImportTagIds(value: unknown) {
         .filter(Boolean)
     )
   );
+}
+
+type ImportAssignmentUser = {
+  id: string;
+  display_name: string | null;
+  email: string | null;
+  user_role: string | null;
+  status: string | null;
+};
+
+type RowImportSalesAssignment = {
+  salespersonId?: string;
+  salesManagerId?: string;
+};
+
+function normalizeImportAssignmentLookup(value: unknown) {
+  return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
+
+function isMappedImportField(mapping: Record<string, string>, fieldName: string) {
+  const mappedColumn = mapping[fieldName];
+  return Boolean(
+    mappedColumn &&
+      mappedColumn !== "Not detected" &&
+      mappedColumn !== "__skip__"
+  );
+}
+
+function findImportAssignmentMatches(
+  users: ImportAssignmentUser[],
+  rawValue: string,
+  managerOnly: boolean
+) {
+  const lookup = normalizeImportAssignmentLookup(rawValue);
+
+  if (!lookup) return [];
+
+  return users.filter((user) => {
+    if (managerOnly && user.user_role !== "sales_manager" && user.user_role !== "admin") {
+      return false;
+    }
+
+    return (
+      normalizeImportAssignmentLookup(user.email) === lookup ||
+      normalizeImportAssignmentLookup(user.display_name) === lookup
+    );
+  });
+}
+
+function normalizeImportCompanyAssignmentKey(value: string | null) {
+  return String(value || "").trim().toLowerCase();
 }
 
 async function applyImportSalesAssignmentsToCompany(
@@ -887,11 +939,210 @@ export async function POST(request: Request) {
 
     const supabase = getSupabaseAdmin();
 
+    const importSource =
+      typeof payload.sourceName === "string" && payload.sourceName.trim().length > 0
+        ? payload.sourceName.trim().slice(0, 100)
+        : "ZoomInfo";
+
+    const defaultSalespersonId =
+      typeof payload.assignedSalespersonId === "string"
+        ? payload.assignedSalespersonId.trim()
+        : "";
+    const defaultSalesManagerId =
+      typeof payload.assignedSalesManagerId === "string"
+        ? payload.assignedSalesManagerId.trim()
+        : "";
+
+    const salesRepMapped = isMappedImportField(payload.mapping, "Sales Rep");
+    const salesManagerMapped = isMappedImportField(payload.mapping, "Sales Manager");
+    const salesCoverageRequested = Boolean(
+      defaultSalespersonId ||
+        defaultSalesManagerId ||
+        salesRepMapped ||
+        salesManagerMapped
+    );
+
+    let activeCrmUsers: ImportAssignmentUser[] = [];
+
+    if (salesCoverageRequested) {
+      const { data: crmUsers, error: crmUsersError } = await supabase
+        .from("crm_users")
+        .select("id, display_name, email, user_role, status")
+        .eq("status", "active");
+
+      if (crmUsersError) throw crmUsersError;
+      activeCrmUsers = (crmUsers ?? []) as ImportAssignmentUser[];
+    }
+
+    const salesCoveragePreflightErrors: string[] = [];
+
+    if (defaultSalespersonId) {
+      const defaultSalesperson = activeCrmUsers.find(
+        (user) => user.id === defaultSalespersonId
+      );
+
+      if (!defaultSalesperson) {
+        salesCoveragePreflightErrors.push(
+          "The selected default Sales Rep is not an active CRM user."
+        );
+      }
+    }
+
+    if (defaultSalesManagerId) {
+      const defaultSalesManager = activeCrmUsers.find(
+        (user) => user.id === defaultSalesManagerId
+      );
+
+      if (
+        !defaultSalesManager ||
+        (defaultSalesManager.user_role !== "sales_manager" &&
+          defaultSalesManager.user_role !== "admin")
+      ) {
+        salesCoveragePreflightErrors.push(
+          "The selected default Sales Manager is not an active Sales Manager or Admin."
+        );
+      }
+    }
+
+    const rowSalesAssignments: RowImportSalesAssignment[] = [];
+    const companyAssignmentExpectations = new Map<
+      string,
+      {
+        companyName: string;
+        firstRowNumber: number;
+        salespersonId?: string;
+        salesManagerId?: string;
+      }
+    >();
+
+    for (let index = 0; index < payload.rows.length; index += 1) {
+      const row = payload.rows[index];
+      const csvRowNumber = index + 2;
+      let salespersonId = defaultSalespersonId || undefined;
+      let salesManagerId = defaultSalesManagerId || undefined;
+
+      if (salesRepMapped) {
+        const rawSalesRep = getMappedValue(row, payload.mapping, "Sales Rep");
+
+        if (rawSalesRep) {
+          const matches = findImportAssignmentMatches(
+            activeCrmUsers,
+            rawSalesRep,
+            false
+          );
+
+          if (matches.length === 1) {
+            salespersonId = matches[0].id;
+          } else if (matches.length === 0) {
+            salesCoveragePreflightErrors.push(
+              `Row ${csvRowNumber}: Sales Rep "${rawSalesRep}" does not exactly match an active CRM user display name or email.`
+            );
+          } else {
+            salesCoveragePreflightErrors.push(
+              `Row ${csvRowNumber}: Sales Rep "${rawSalesRep}" matches more than one active CRM user.`
+            );
+          }
+        }
+      }
+
+      if (salesManagerMapped) {
+        const rawSalesManager = getMappedValue(
+          row,
+          payload.mapping,
+          "Sales Manager"
+        );
+
+        if (rawSalesManager) {
+          const matches = findImportAssignmentMatches(
+            activeCrmUsers,
+            rawSalesManager,
+            true
+          );
+
+          if (matches.length === 1) {
+            salesManagerId = matches[0].id;
+          } else if (matches.length === 0) {
+            salesCoveragePreflightErrors.push(
+              `Row ${csvRowNumber}: Sales Manager "${rawSalesManager}" does not exactly match an active CRM Sales Manager/Admin display name or email.`
+            );
+          } else {
+            salesCoveragePreflightErrors.push(
+              `Row ${csvRowNumber}: Sales Manager "${rawSalesManager}" matches more than one active CRM user.`
+            );
+          }
+        }
+      }
+
+      rowSalesAssignments.push({
+        salespersonId,
+        salesManagerId,
+      });
+
+      const companyNameForAssignment = getMappedValue(
+        row,
+        payload.mapping,
+        "Company Name"
+      );
+      const companyKey = normalizeImportCompanyAssignmentKey(
+        companyNameForAssignment
+      );
+
+      if (!companyKey) continue;
+
+      const existingExpectation = companyAssignmentExpectations.get(companyKey);
+
+      if (!existingExpectation) {
+        companyAssignmentExpectations.set(companyKey, {
+          companyName: companyNameForAssignment || companyKey,
+          firstRowNumber: csvRowNumber,
+          salespersonId,
+          salesManagerId,
+        });
+        continue;
+      }
+
+      if (
+        salespersonId &&
+        existingExpectation.salespersonId &&
+        salespersonId !== existingExpectation.salespersonId
+      ) {
+        salesCoveragePreflightErrors.push(
+          `Rows ${existingExpectation.firstRowNumber} and ${csvRowNumber}: company "${existingExpectation.companyName}" has conflicting Sales Rep assignments.`
+        );
+      } else if (salespersonId && !existingExpectation.salespersonId) {
+        existingExpectation.salespersonId = salespersonId;
+      }
+
+      if (
+        salesManagerId &&
+        existingExpectation.salesManagerId &&
+        salesManagerId !== existingExpectation.salesManagerId
+      ) {
+        salesCoveragePreflightErrors.push(
+          `Rows ${existingExpectation.firstRowNumber} and ${csvRowNumber}: company "${existingExpectation.companyName}" has conflicting Sales Manager assignments.`
+        );
+      } else if (salesManagerId && !existingExpectation.salesManagerId) {
+        existingExpectation.salesManagerId = salesManagerId;
+      }
+    }
+
+    if (salesCoveragePreflightErrors.length > 0) {
+      return NextResponse.json(
+        {
+          error: `Import not started. Sales coverage validation failed: ${salesCoveragePreflightErrors
+            .slice(0, 12)
+            .join(" ")}`,
+          salesCoverageErrors: salesCoveragePreflightErrors,
+        },
+        { status: 400 }
+      );
+    }
+
     const { data: importRecord, error: importError } = await supabase
       .from("imports")
       .insert({
         file_name: payload.fileName,
-        source: "ZoomInfo",
+        source: importSource,
         import_type: "prospecting_csv",
         row_count: payload.rows.length,
         status: "processing",
@@ -999,7 +1250,7 @@ export async function POST(request: Request) {
           postal_code: getMappedValue(row, payload.mapping, "Company Postal Code"),
           country: getMappedValue(row, payload.mapping, "Company Country") ?? "United States",
           company_type: "Prospect",
-          source: "ZoomInfo",
+          source: importSource,
           naics_codes: zoomInfoNaicsCodes,
           sic_codes: zoomInfoSicCodes,
           primary_industry: zoomInfoPrimaryIndustry,
@@ -1009,12 +1260,17 @@ export async function POST(request: Request) {
 
         const company = await findOrCreateCompany(supabase, companyBeforeInsert);
 
-        if (payload.assignedSalespersonId || undefined || payload.assignedSalesManagerId || undefined) {
+        const rowSalesAssignment = rowSalesAssignments[index];
+
+        if (
+          rowSalesAssignment?.salespersonId ||
+          rowSalesAssignment?.salesManagerId
+        ) {
           await applyImportSalesAssignmentsToCompany(
             supabase,
             company.id,
-            payload.assignedSalespersonId || undefined,
-            payload.assignedSalesManagerId || undefined
+            rowSalesAssignment.salespersonId,
+            rowSalesAssignment.salesManagerId
           );
 
           assignedCompanyIds.add(company.id);
@@ -1051,7 +1307,7 @@ const companyWasDuplicate = company.created_at !== company.updated_at;
           linkedin_url: getMappedValue(row, payload.mapping, "LinkedIn URL"),
           is_primary: true,
           buying_role_hypothesis: getBuyerPersona(title, fullName),
-          source: "ZoomInfo",
+          source: importSource,
         };
 
         const contact = await findOrCreateContact(supabase, contactBeforeInsert);
@@ -1343,6 +1599,8 @@ const industryFitScore = scoreIndustryFit(industry, naics);
       companiesAssigned: assignedCompanyIds.size,
       assignedSalespersonId: payload.assignedSalespersonId || undefined || null,
       assignedSalesManagerId: payload.assignedSalesManagerId || undefined || null,
+      importSource,
+      rowLevelSalesCoverageMapped: salesRepMapped || salesManagerMapped,
       selectedProjectListIds,
       projectListCompanyAssignments,
       projectListContactAssignments,
