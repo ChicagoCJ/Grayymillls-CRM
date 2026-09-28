@@ -264,7 +264,7 @@ export default function LeadMethodImportPage() {
 
     try {
       const accessToken = await getAccessToken();
-      const response = await fetch("/api/leadmethod-import/analyze-preview", {
+      const response = await fetch("/api/leadmethod-import/analyze", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken}`,
