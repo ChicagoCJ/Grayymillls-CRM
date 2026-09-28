@@ -66,6 +66,8 @@ type AnalyzeRow = {
 type AnalyzeResponse = {
   summary?: Record<string, number>;
   analysis?: AnalyzeRow[];
+  duplicateCheckAvailable?: boolean;
+  duplicateCheckMessage?: string;
   error?: string;
 };
 
@@ -81,11 +83,17 @@ function parseCsvPreservingMultiline(text: string, fileName: string): ParsedCsv 
     const next = cleaned[i + 1];
 
     if (char === '"') {
-      if (inQuotes && next === '"') {
-        field += '"';
-        i += 1;
+      if (inQuotes) {
+        if (next === '"') {
+          field += '"';
+          i += 1;
+        } else {
+          inQuotes = false;
+        }
+      } else if (field.length === 0) {
+        inQuotes = true;
       } else {
-        inQuotes = !inQuotes;
+        field += '"';
       }
       continue;
     }
@@ -117,7 +125,9 @@ function parseCsvPreservingMultiline(text: string, fileName: string): ParsedCsv 
   }
 
   if (inQuotes) {
-    throw new Error("The CSV ends inside a quoted field. Re-export the LeadMethod file and try again.");
+    throw new Error(
+      "The CSV ends inside a quoted field. Re-export the LeadMethod file and try again."
+    );
   }
 
   if (records.length < 2) {
@@ -139,7 +149,11 @@ function parseCsvPreservingMultiline(text: string, fileName: string): ParsedCsv 
 function badgeClass(status: string) {
   if (status === "matched" || status === "new") return "bg-emerald-100 text-emerald-800";
   if (status === "no_match") return "bg-slate-100 text-slate-700";
-  if (status === "already_imported" || status === "duplicate_in_upload" || status === "blocked") {
+  if (
+    status === "already_imported" ||
+    status === "duplicate_in_upload" ||
+    status === "blocked"
+  ) {
     return "bg-red-100 text-red-800";
   }
   return "bg-amber-100 text-amber-800";
@@ -177,9 +191,11 @@ export default function LeadMethodImportPage() {
       const supabase = getBrowserSupabaseClient();
       const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData.session?.access_token;
-      if (!accessToken) throw new Error("Sign in to the CRM before analyzing LeadMethod data.");
+      if (!accessToken) {
+        throw new Error("Sign in to the CRM before analyzing LeadMethod data.");
+      }
 
-      const response = await fetch("/api/leadmethod-import/analyze", {
+      const response = await fetch("/api/leadmethod-import/analyze-preview", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -189,7 +205,9 @@ export default function LeadMethodImportPage() {
       });
 
       const payload = (await response.json()) as AnalyzeResponse;
-      if (!response.ok) throw new Error(payload.error || "LeadMethod analysis failed.");
+      if (!response.ok) {
+        throw new Error(payload.error || "LeadMethod analysis failed.");
+      }
       setAnalysis(payload);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "LeadMethod analysis failed.");
@@ -209,19 +227,29 @@ export default function LeadMethodImportPage() {
             <div>
               <h1 className="text-2xl font-bold">LeadMethod Historical Import</h1>
               <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-blue-700">
-                Version 3.28A3 — Analyze & Review
+                Version 3.28A3A — Analyze & Review
               </p>
               <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-                Upload a LeadMethod CSV, review conservative company/contact matches, duplicates, and rows requiring attention. This screen is analysis-only and does not write CRM data.
+                Upload a LeadMethod CSV, review conservative company/contact matches,
+                duplicates, and rows requiring attention. This screen is analysis-only and
+                does not write CRM data.
               </p>
             </div>
-            <a href="/" className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-50">
+            <a
+              href="/"
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-50"
+            >
               Back to CRM
             </a>
           </div>
 
           <div className="mt-6 flex flex-wrap items-center gap-3">
-            <input type="file" accept=".csv,text/csv" onChange={handleFile} className="block text-sm" />
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              onChange={handleFile}
+              className="block text-sm"
+            />
             <button
               type="button"
               onClick={analyzeFile}
@@ -234,11 +262,23 @@ export default function LeadMethodImportPage() {
 
           {csv ? (
             <div className="mt-4 rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
-              <span className="font-semibold">{csv.fileName}</span> — {csv.rows.length.toLocaleString()} rows, {csv.headers.length} columns. Multiline quoted fields are preserved.
+              <span className="font-semibold">{csv.fileName}</span> —{" "}
+              {csv.rows.length.toLocaleString()} rows, {csv.headers.length} columns.
+              Multiline quoted fields are preserved.
             </div>
           ) : null}
 
-          {error ? <div className="mt-4 rounded-lg bg-red-50 p-3 text-sm font-medium text-red-800">{error}</div> : null}
+          {error ? (
+            <div className="mt-4 rounded-lg bg-red-50 p-3 text-sm font-medium text-red-800">
+              {error}
+            </div>
+          ) : null}
+
+          {analysis?.duplicateCheckAvailable === false ? (
+            <div className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+              {analysis.duplicateCheckMessage}
+            </div>
+          ) : null}
         </div>
 
         {analysis ? (
@@ -253,7 +293,9 @@ export default function LeadMethodImportPage() {
                 ["Contact Matches", summary.contactMatches ?? 0],
               ].map(([label, value]) => (
                 <div key={String(label)} className="rounded-xl bg-white p-4 shadow-sm">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    {label}
+                  </div>
                   <div className="mt-1 text-2xl font-bold">{String(value)}</div>
                 </div>
               ))}
@@ -261,19 +303,36 @@ export default function LeadMethodImportPage() {
 
             <div className="space-y-4">
               {rows.map((row) => (
-                <div key={`${row.rowNumber}-${row.leadNumber ?? "none"}`} className="rounded-2xl bg-white p-5 shadow-sm">
+                <div
+                  key={`${row.rowNumber}-${row.leadNumber ?? "none"}`}
+                  className="rounded-2xl bg-white p-5 shadow-sm"
+                >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <div className="text-lg font-bold">
-                        Lead #{row.leadNumber || "Missing"} — {row.lead.companyName || "Company missing"}
+                        Lead #{row.leadNumber || "Missing"} —{" "}
+                        {row.lead.companyName || "Company missing"}
                       </div>
                       <div className="mt-1 text-sm text-slate-600">
-                        {row.lead.fullName || "Contact name missing"}{row.lead.email ? ` · ${row.lead.email}` : ""}
+                        {row.lead.fullName || "Contact name missing"}
+                        {row.lead.email ? ` · ${row.lead.email}` : ""}
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2 text-xs font-semibold">
-                      <span className={`rounded-full px-2.5 py-1 ${badgeClass(row.duplicateStatus)}`}>{row.duplicateStatus.replaceAll("_", " ")}</span>
-                      <span className={`rounded-full px-2.5 py-1 ${badgeClass(row.recommendedAction)}`}>{row.recommendedAction.replaceAll("_", " ")}</span>
+                      <span
+                        className={`rounded-full px-2.5 py-1 ${badgeClass(
+                          row.duplicateStatus
+                        )}`}
+                      >
+                        {row.duplicateStatus.replaceAll("_", " ")}
+                      </span>
+                      <span
+                        className={`rounded-full px-2.5 py-1 ${badgeClass(
+                          row.recommendedAction
+                        )}`}
+                      >
+                        {row.recommendedAction.replaceAll("_", " ")}
+                      </span>
                     </div>
                   </div>
 
@@ -281,55 +340,108 @@ export default function LeadMethodImportPage() {
                     <div className="rounded-xl border border-slate-200 p-4">
                       <div className="text-sm font-bold">Company match</div>
                       <div className="mt-2 flex items-center gap-2 text-sm">
-                        <span className={`rounded-full px-2 py-1 text-xs font-semibold ${badgeClass(row.companyMatch.status)}`}>{row.companyMatch.status.replaceAll("_", " ")}</span>
-                        <span className="text-slate-500">{row.companyMatch.method || "No match method"}</span>
+                        <span
+                          className={`rounded-full px-2 py-1 text-xs font-semibold ${badgeClass(
+                            row.companyMatch.status
+                          )}`}
+                        >
+                          {row.companyMatch.status.replaceAll("_", " ")}
+                        </span>
+                        <span className="text-slate-500">
+                          {row.companyMatch.method || "No match method"}
+                        </span>
                       </div>
                       <div className="mt-3 space-y-2 text-sm">
-                        {row.companyMatch.candidates.length === 0 ? <div className="text-slate-500">No existing company candidate.</div> : row.companyMatch.candidates.map((candidate) => (
-                          <div key={candidate.id} className="rounded-lg bg-slate-50 p-2">
-                            <div className="font-semibold">{candidate.companyName}</div>
-                            <div className="text-slate-500">{[candidate.city, candidate.state, candidate.domain].filter(Boolean).join(" · ")}</div>
-                          </div>
-                        ))}
+                        {row.companyMatch.candidates.length === 0 ? (
+                          <div className="text-slate-500">No existing company candidate.</div>
+                        ) : (
+                          row.companyMatch.candidates.map((candidate) => (
+                            <div key={candidate.id} className="rounded-lg bg-slate-50 p-2">
+                              <div className="font-semibold">{candidate.companyName}</div>
+                              <div className="text-slate-500">
+                                {[candidate.city, candidate.state, candidate.domain]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </div>
+                            </div>
+                          ))
+                        )}
                       </div>
                     </div>
 
                     <div className="rounded-xl border border-slate-200 p-4">
                       <div className="text-sm font-bold">Contact match</div>
                       <div className="mt-2 flex items-center gap-2 text-sm">
-                        <span className={`rounded-full px-2 py-1 text-xs font-semibold ${badgeClass(row.contactMatch.status)}`}>{row.contactMatch.status.replaceAll("_", " ")}</span>
-                        <span className="text-slate-500">{row.contactMatch.method || "No match method"}</span>
+                        <span
+                          className={`rounded-full px-2 py-1 text-xs font-semibold ${badgeClass(
+                            row.contactMatch.status
+                          )}`}
+                        >
+                          {row.contactMatch.status.replaceAll("_", " ")}
+                        </span>
+                        <span className="text-slate-500">
+                          {row.contactMatch.method || "No match method"}
+                        </span>
                       </div>
                       <div className="mt-3 space-y-2 text-sm">
-                        {row.contactMatch.candidates.length === 0 ? <div className="text-slate-500">No existing contact candidate.</div> : row.contactMatch.candidates.map((candidate) => (
-                          <div key={candidate.id} className="rounded-lg bg-slate-50 p-2">
-                            <div className="font-semibold">{candidate.fullName}</div>
-                            <div className="text-slate-500">{candidate.email || "No email"}</div>
-                          </div>
-                        ))}
+                        {row.contactMatch.candidates.length === 0 ? (
+                          <div className="text-slate-500">No existing contact candidate.</div>
+                        ) : (
+                          row.contactMatch.candidates.map((candidate) => (
+                            <div key={candidate.id} className="rounded-lg bg-slate-50 p-2">
+                              <div className="font-semibold">{candidate.fullName}</div>
+                              <div className="text-slate-500">
+                                {candidate.email || "No email"}
+                              </div>
+                            </div>
+                          ))
+                        )}
                       </div>
                     </div>
                   </div>
 
-                  {(row.errors.length > 0 || row.warnings.length > 0) ? (
+                  {row.errors.length > 0 || row.warnings.length > 0 ? (
                     <div className="mt-4 space-y-2 text-sm">
-                      {row.errors.map((item) => <div key={item} className="rounded-lg bg-red-50 p-2 font-medium text-red-800">{item}</div>)}
-                      {row.warnings.map((item) => <div key={item} className="rounded-lg bg-amber-50 p-2 text-amber-900">{item}</div>)}
+                      {row.errors.map((item) => (
+                        <div
+                          key={item}
+                          className="rounded-lg bg-red-50 p-2 font-medium text-red-800"
+                        >
+                          {item}
+                        </div>
+                      ))}
+                      {row.warnings.map((item) => (
+                        <div
+                          key={item}
+                          className="rounded-lg bg-amber-50 p-2 text-amber-900"
+                        >
+                          {item}
+                        </div>
+                      ))}
                     </div>
                   ) : null}
 
                   <details className="mt-4 rounded-xl border border-slate-200 p-4">
-                    <summary className="cursor-pointer text-sm font-bold">LeadMethod history preview</summary>
+                    <summary className="cursor-pointer text-sm font-bold">
+                      LeadMethod history preview
+                    </summary>
                     <div className="mt-4 space-y-4 text-sm">
                       <div>
                         <div className="font-semibold">Comments</div>
-                        <pre className="mt-1 whitespace-pre-wrap font-sans text-slate-700">{row.lead.comments || "—"}</pre>
+                        <pre className="mt-1 whitespace-pre-wrap font-sans text-slate-700">
+                          {row.lead.comments || "—"}
+                        </pre>
                       </div>
                       <div>
                         <div className="font-semibold">Notes</div>
-                        <pre className="mt-1 whitespace-pre-wrap font-sans text-slate-700">{row.lead.notes || "—"}</pre>
+                        <pre className="mt-1 whitespace-pre-wrap font-sans text-slate-700">
+                          {row.lead.notes || "—"}
+                        </pre>
                       </div>
-                      <div><span className="font-semibold">Contacted Customer:</span> {row.lead.contactedCustomer || "—"}</div>
+                      <div>
+                        <span className="font-semibold">Contacted Customer:</span>{" "}
+                        {row.lead.contactedCustomer || "—"}
+                      </div>
                     </div>
                   </details>
                 </div>
