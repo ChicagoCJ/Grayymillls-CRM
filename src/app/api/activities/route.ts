@@ -17,6 +17,9 @@ type ActivityPayload = {
   notes?: string;
   dueDate?: string | null;
   completed?: boolean;
+  source?: string | null;
+  sourceRecordId?: string | null;
+  sourceMetadata?: Record<string, unknown> | null;
 };
 
 function getSupabaseAdmin() {
@@ -177,6 +180,8 @@ export async function POST(request: Request) {
     const relatedContactIds = cleanIdArray(payload.relatedContactIds);
     const subject = cleanText(payload.subject);
     const notes = cleanText(payload.notes);
+    const source = cleanText(payload.source);
+    const sourceRecordId = cleanText(payload.sourceRecordId);
 
     if (!companyId) {
       return NextResponse.json(
@@ -195,6 +200,16 @@ export async function POST(request: Request) {
     if (!subject && !notes) {
       return NextResponse.json(
         { error: "Enter a subject or note before saving activity." },
+        { status: 400 }
+      );
+    }
+
+    if ((source && !sourceRecordId) || (!source && sourceRecordId)) {
+      return NextResponse.json(
+        {
+          error:
+            "Imported activity source and source record id must be supplied together.",
+        },
         { status: 400 }
       );
     }
@@ -219,6 +234,29 @@ export async function POST(request: Request) {
 
     if (contactValidationResponse) return contactValidationResponse;
 
+    if (source && sourceRecordId) {
+      const { data: existingSourceActivity, error: duplicateLookupError } =
+        await supabase
+          .from("activities")
+          .select("id, company_id, contact_id, activity_type, subject, source, source_record_id")
+          .eq("source", source)
+          .eq("source_record_id", sourceRecordId)
+          .maybeSingle();
+
+      if (duplicateLookupError) throw duplicateLookupError;
+
+      if (existingSourceActivity) {
+        return NextResponse.json(
+          {
+            status: "duplicate",
+            error: `An activity from ${source} record ${sourceRecordId} already exists.`,
+            activity: existingSourceActivity,
+          },
+          { status: 409 }
+        );
+      }
+    }
+
     const { data: activity, error: activityError } = await supabase
       .from("activities")
       .insert({
@@ -229,11 +267,29 @@ export async function POST(request: Request) {
         subject,
         notes,
         due_date: cleanText(payload.dueDate),
+        source,
+        source_record_id: sourceRecordId,
+        source_metadata:
+          payload.sourceMetadata && typeof payload.sourceMetadata === "object"
+            ? payload.sourceMetadata
+            : null,
       })
       .select("*")
       .single();
 
-    if (activityError) throw activityError;
+    if (activityError) {
+      if (activityError.code === "23505" && source && sourceRecordId) {
+        return NextResponse.json(
+          {
+            status: "duplicate",
+            error: `An activity from ${source} record ${sourceRecordId} already exists.`,
+          },
+          { status: 409 }
+        );
+      }
+
+      throw activityError;
+    }
 
     try {
       await replaceRelatedContacts(
@@ -285,7 +341,7 @@ export async function PATCH(request: Request) {
 
     const { data: existingActivity, error: existingError } = await supabase
       .from("activities")
-      .select("id, company_id, contact_id")
+      .select("id, company_id, contact_id, source, source_record_id, source_metadata")
       .eq("id", activityId)
       .maybeSingle();
 
@@ -406,6 +462,37 @@ export async function PATCH(request: Request) {
       update.contact_id = primaryContactId;
     }
 
+    const hasSource = Object.prototype.hasOwnProperty.call(payload, "source");
+    const hasSourceRecordId = Object.prototype.hasOwnProperty.call(
+      payload,
+      "sourceRecordId"
+    );
+    const nextSource = hasSource
+      ? cleanText(payload.source)
+      : cleanText(existingActivity.source);
+    const nextSourceRecordId = hasSourceRecordId
+      ? cleanText(payload.sourceRecordId)
+      : cleanText(existingActivity.source_record_id);
+
+    if ((nextSource && !nextSourceRecordId) || (!nextSource && nextSourceRecordId)) {
+      return NextResponse.json(
+        {
+          error:
+            "Imported activity source and source record id must be supplied together.",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (hasSource) update.source = nextSource;
+    if (hasSourceRecordId) update.source_record_id = nextSourceRecordId;
+    if (Object.prototype.hasOwnProperty.call(payload, "sourceMetadata")) {
+      update.source_metadata =
+        payload.sourceMetadata && typeof payload.sourceMetadata === "object"
+          ? payload.sourceMetadata
+          : null;
+    }
+
     let activity = existingActivity;
 
     if (Object.keys(update).length > 0) {
@@ -416,7 +503,19 @@ export async function PATCH(request: Request) {
         .select("*")
         .single();
 
-      if (error) throw error;
+      if (error) {
+        if (error.code === "23505" && nextSource && nextSourceRecordId) {
+          return NextResponse.json(
+            {
+              status: "duplicate",
+              error: `An activity from ${nextSource} record ${nextSourceRecordId} already exists.`,
+            },
+            { status: 409 }
+          );
+        }
+
+        throw error;
+      }
       activity = data;
     }
 
