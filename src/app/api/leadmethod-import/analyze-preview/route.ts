@@ -109,6 +109,20 @@ function dedupeById<T extends { id: string }>(rows: T[]) {
   return Array.from(map.values());
 }
 
+function migrationMissing(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const record = error as { message?: unknown; details?: unknown; hint?: unknown };
+  const combined = `${String(record.message ?? "")} ${String(record.details ?? "")} ${String(
+    record.hint ?? ""
+  )}`.toLowerCase();
+
+  return (
+    combined.includes("source_record_id") ||
+    combined.includes("source_metadata") ||
+    combined.includes("activities.source")
+  );
+}
+
 export async function POST(request: Request) {
   try {
     const verification = await verifySignedInCrmUser(request);
@@ -173,6 +187,41 @@ export async function POST(request: Request) {
       ]);
     }
 
+    const leadNumbers = Array.from(
+      new Set(
+        rows
+          .map((row) => getHeaderValue(row, ["Lead #", "Lead Number", "Lead No"]))
+          .filter((value): value is string => Boolean(value))
+      )
+    );
+
+    const importedLeadNumbers = new Set<string>();
+    let duplicateCheckAvailable = true;
+    let duplicateCheckMessage: string | null = null;
+
+    if (leadNumbers.length > 0) {
+      const { data: existingActivities, error: duplicateError } = await supabase
+        .from("activities")
+        .select("source_record_id")
+        .eq("source", "LeadMethod")
+        .in("source_record_id", leadNumbers);
+
+      if (duplicateError) {
+        if (migrationMissing(duplicateError)) {
+          duplicateCheckAvailable = false;
+          duplicateCheckMessage =
+            "Existing CRM LeadMethod duplicate checking will activate after the 3.28A1 source-identity migration is applied. Import actions remain disabled until the migration is applied.";
+        } else {
+          throw duplicateError;
+        }
+      } else {
+        for (const activity of existingActivities ?? []) {
+          const sourceRecordId = cleanText(activity.source_record_id);
+          if (sourceRecordId) importedLeadNumbers.add(sourceRecordId);
+        }
+      }
+    }
+
     const seenLeadNumbers = new Map<string, number>();
 
     const analysis = rows.map((row, index) => {
@@ -196,7 +245,7 @@ export async function POST(request: Request) {
       if (!companyName) warnings.push("Company is missing.");
       if (!email && !fullName) warnings.push("Contact email and name are both missing.");
 
-      let duplicateStatus = "not_checked";
+      let duplicateStatus = duplicateCheckAvailable ? "new" : "not_checked";
       if (leadNumber) {
         const earlierRow = seenLeadNumbers.get(leadNumber);
         if (earlierRow !== undefined) {
@@ -204,6 +253,11 @@ export async function POST(request: Request) {
           errors.push(`Lead # ${leadNumber} also appears on CSV row ${earlierRow}.`);
         } else {
           seenLeadNumbers.set(leadNumber, rowNumber);
+        }
+
+        if (duplicateCheckAvailable && importedLeadNumbers.has(leadNumber)) {
+          duplicateStatus = "already_imported";
+          errors.push(`Lead # ${leadNumber} has already been imported from LeadMethod.`);
         }
       }
 
@@ -377,7 +431,12 @@ export async function POST(request: Request) {
     const summary = analysis.reduce(
       (acc, row) => {
         acc.totalRows += 1;
-        if (row.duplicateStatus === "duplicate_in_upload") acc.duplicates += 1;
+        if (
+          row.duplicateStatus === "duplicate_in_upload" ||
+          row.duplicateStatus === "already_imported"
+        ) {
+          acc.duplicates += 1;
+        }
         if (row.errors.length > 0) acc.blocked += 1;
         else if (row.needsReview) acc.needsReview += 1;
         else acc.ready += 1;
@@ -398,9 +457,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       status: "analyzed",
-      duplicateCheckAvailable: false,
-      duplicateCheckMessage:
-        "Existing CRM LeadMethod duplicate checking will activate after the 3.28A1 source-identity migration is applied.",
+      duplicateCheckAvailable,
+      duplicateCheckMessage,
       summary,
       analysis,
     });
