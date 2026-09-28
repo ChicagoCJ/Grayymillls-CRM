@@ -207,10 +207,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.27H3C5 - Automatic Reconciliation";
+  "Version 3.28B - Company Coverage Visibility";
 
 const REVISION_NOTE =
-  "Current revision 3.27H3C5: after a successful controlled Mailshake run, CRM automatically polls only the exact provider operations created by that run for up to 60 seconds and synchronizes terminal outcomes back into CRM. Automatic reconciliation never re-submits recipients. Manual reconciliation remains available for operations that are still processing or require attention. The controlled-run cap remains 10, Preview still requires its allowlist, and Production still requires an exact Admin-created Production authorization.";
+  "Current revision 3.28B: company and contact summary capacity is increased so larger imported lists such as IMTS 2026 remain available in the CRM Companies view. Refresh CRM now also reloads active CRM users and coverage options so newly added internal and outside reps appear in Salesperson / Rep filters and assignment controls without restarting the application.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean
@@ -1894,7 +1894,11 @@ async function loadCompanyOwnerFilterData() {
       }
     }
 
-    await loadCrmSummary();
+    await Promise.all([
+      loadCrmSummary(),
+      loadRoleTestUsers(),
+      loadCompanyOwnerFilterData(),
+    ]);
   }
 
   function getCompanyDetailReturnTab(currentReturnTab: TabKey) {

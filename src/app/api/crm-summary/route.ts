@@ -56,7 +56,7 @@ export async function GET() {
       )
       .is("archived_at", null)
       .order("created_at", { ascending: false })
-      .limit(100);
+      .limit(1000);
 
     if (companiesError) throw companiesError;
 
@@ -86,7 +86,7 @@ export async function GET() {
       .is("archived_at", null)
       .is("companies.archived_at", null)
       .order("created_at", { ascending: false })
-      .limit(100);
+      .limit(1000);
 
     if (contactsError) throw contactsError;
 
