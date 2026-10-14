@@ -207,10 +207,10 @@ type ManualCompanyForm = {
 };
 
 const APP_VERSION =
-  "Version 3.28B - Company Coverage Visibility";
+  "Version 3.28C - Primary Use Case Label Correction";
 
 const REVISION_NOTE =
-  "Current revision 3.28B: company and contact summary capacity is increased so larger imported lists such as IMTS 2026 remain available in the CRM Companies view. Refresh CRM now also reloads active CRM users and coverage options so newly added internal and outside reps appear in Salesperson / Rep filters and assignment controls without restarting the application.";
+  "Current revision 3.28C: the Opportunity create and edit forms now consistently label the primaryUseCase field Primary Use Case. This is a UI wording correction only; existing opportunity data and the separate internal prospect relationship are unchanged.";
 
 function setConfirmedCompanyEditBrowserExitAllowed(
   allowed: boolean
@@ -24205,7 +24205,7 @@ function CompanyOpportunityPanel({
             </div>
 
             <div>
-              <label className="text-sm font-semibold text-slate-700">Prospect</label>
+              <label className="text-sm font-semibold text-slate-700">Primary Use Case</label>
               <input
                 type="text"
                 value={form.primaryUseCase}
@@ -24568,7 +24568,7 @@ function CompanyOpportunityPanel({
                           </div>
 
                           <div className="lg:col-span-2">
-                            <label className="text-sm font-semibold text-slate-700">Prospect / Use Case</label>
+                            <label className="text-sm font-semibold text-slate-700">Primary Use Case</label>
                             <input
                               type="text"
                               value={editForm.primaryUseCase}
