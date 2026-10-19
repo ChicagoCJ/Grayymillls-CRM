@@ -26,7 +26,7 @@ def main():
             raise SystemExit("Authorization invalid; repeat OAuth authorization.")
     drive = build("drive", "v3", credentials=creds, cache_discovery=False)
     escaped = FOLDER_NAME.replace("\\", "\\\\").replace("'", "\\'")
-    result = drive.files().list(q=f"name = '{escaped}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false", fields="files(id,name),nextPageToken", page_size=100).execute()
+    result = drive.files().list(q=f"name = '{escaped}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false", fields="files(id,name),nextPageToken", pageSize=100).execute()
     folders = result.get("files", [])
     if len(folders) > 1:
         raise SystemExit("Multiple matching backup folders found. Resolve ambiguity before upload.")
